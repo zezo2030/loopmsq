@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not, IsNull } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../database/entities/user.entity';
@@ -35,10 +35,11 @@ export class AuthService {
   ) {}
 
   async sendOtp(sendOtpDto: SendOtpDto): Promise<{ success: boolean; message: string }> {
-    const { phone, language = 'ar' } = sendOtpDto;
+    const language = sendOtpDto.language ?? 'ar';
+    const normalizedPhone = this.normalizePhone(sendOtpDto.phone);
 
     // Rate limiting check
-    const rateLimitKey = `otp_rate:${phone}`;
+    const rateLimitKey = `otp_rate:${normalizedPhone}`;
     const attempts = await this.redisService.incrementRateLimit(rateLimitKey, 300); // 5 minutes
     
     if (attempts > 3) {
@@ -49,10 +50,10 @@ export class AuthService {
     const otp = this.generateOtp();
     
     // Store OTP in Redis with 5 minutes expiry
-    await this.redisService.setOTP(phone, otp, 300);
+    await this.redisService.setOTP(normalizedPhone, otp, 300);
 
     // TODO: Send SMS via Twilio or other SMS provider
-    this.logger.log(`OTP for ${phone}: ${otp}`); // For development only
+    this.logger.log(`OTP for ${normalizedPhone}: ${otp}`); // For development only
 
     const message = language === 'ar' 
       ? 'تم إرسال رمز التحقق إلى هاتفك'
@@ -70,19 +71,41 @@ export class AuthService {
     user: Partial<User>;
     isNewUser: boolean;
   }> {
-    const { phone, otp, name } = verifyOtpDto;
+    const name = verifyOtpDto.name;
+    const normalizedPhone = this.normalizePhone(verifyOtpDto.phone);
+    const normalizedOtp = this.normalizeOtp(verifyOtpDto.otp);
 
     // Verify OTP
-    const storedOtp = await this.redisService.getOTP(phone);
-    if (!storedOtp || storedOtp !== otp) {
+    let storedOtp: string | null = null;
+    let otpKeyUsed: string | null = null;
+    try {
+      // Try multiple key variants for backward compatibility
+      const phoneKeyCandidates = this.getPhoneKeyVariants(normalizedPhone);
+      for (const candidate of phoneKeyCandidates) {
+        const candidateOtp = await this.redisService.getOTP(candidate);
+        if (candidateOtp) {
+          storedOtp = candidateOtp;
+          otpKeyUsed = candidate;
+          break;
+        }
+      }
+    } catch (e) {
+      this.logger.error(`Redis error while fetching OTP for ${normalizedPhone}: ${String(e)}`);
+      throw new BadRequestException('OTP service temporarily unavailable, please try again');
+    }
+    if (!storedOtp || storedOtp !== normalizedOtp) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
     // Delete OTP after successful verification
-    await this.redisService.deleteOTP(phone);
+    try {
+      await this.redisService.deleteOTP(otpKeyUsed ?? normalizedPhone);
+    } catch (e) {
+      this.logger.warn(`Failed to delete OTP for ${normalizedPhone}: ${String(e)}`);
+    }
 
     // Find or create user
-    let user = await this.userRepository.findOne({ where: { phone } });
+    let user = await this.findUserByDecryptedPhone(normalizedPhone);
     let isNewUser = false;
 
     if (!user) {
@@ -92,7 +115,7 @@ export class AuthService {
 
       // Create new user
       user = this.userRepository.create({
-        phone: this.encryptionService.encrypt(phone),
+        phone: this.encryptionService.encrypt(normalizedPhone),
         name,
         roles: [UserRole.USER],
         isActive: true,
@@ -124,7 +147,7 @@ export class AuthService {
       ...tokens,
       user: {
         id: user.id,
-        phone: phone, // Return decrypted phone
+        phone: normalizedPhone, // Return decrypted phone
         name: user.name,
         roles: user.roles,
         language: user.language,
@@ -254,5 +277,56 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  private normalizePhone(input: string): string {
+    if (!input) return input;
+    const trimmed = input.trim();
+    const asciiDigits = this.toAsciiDigits(trimmed);
+    return asciiDigits.replace(/[\s\-()]/g, '');
+  }
+
+  private normalizeOtp(input: string): string {
+    if (!input) return input;
+    const asciiDigits = this.toAsciiDigits(input.trim());
+    return asciiDigits;
+  }
+
+  private toAsciiDigits(input: string): string {
+    // Convert Arabic-Indic and Eastern Arabic-Indic digits to ASCII 0-9
+    return input
+      .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+      .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
+  }
+
+  private async findUserByDecryptedPhone(plainPhone: string): Promise<User | null> {
+    const candidates = await this.userRepository.find({ where: { phone: Not(IsNull()) } });
+    for (const candidate of candidates) {
+      try {
+        const decrypted = this.encryptionService.decrypt(candidate.phone);
+        if (decrypted && this.normalizePhone(decrypted) === plainPhone) {
+          return candidate;
+        }
+      } catch (e) {
+        // skip invalid decryption
+      }
+    }
+    return null;
+  }
+
+  private getPhoneKeyVariants(normalized: string): string[] {
+    const variants = new Set<string>();
+    variants.add(normalized);
+    // Without leading plus
+    if (normalized.startsWith('+')) {
+      variants.add(normalized.substring(1));
+      // Convert + to 00
+      variants.add(`00${normalized.substring(1)}`);
+    }
+    // Convert leading 00 to +
+    if (normalized.startsWith('00')) {
+      variants.add(`+${normalized.substring(2)}`);
+    }
+    return Array.from(variants);
   }
 }
