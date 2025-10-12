@@ -45,7 +45,15 @@ export class BookingsService {
     totalPrice: number;
     available: boolean;
   }> {
-    const { branchId, hallId, startTime, durationHours, persons, addOns = [], couponCode } = quoteDto;
+    const {
+      branchId,
+      hallId,
+      startTime,
+      durationHours,
+      persons,
+      addOns = [],
+      couponCode,
+    } = quoteDto;
 
     // Find available hall if not specified
     let selectedHall: Hall;
@@ -53,9 +61,16 @@ export class BookingsService {
       selectedHall = await this.contentService.findHallById(hallId);
     } else {
       // Find available hall in the branch
-      const availableHalls = await this.findAvailableHalls(branchId, new Date(startTime), durationHours, persons);
+      const availableHalls = await this.findAvailableHalls(
+        branchId,
+        new Date(startTime),
+        durationHours,
+        persons,
+      );
       if (availableHalls.length === 0) {
-        throw new BadRequestException('No available halls for the specified time and capacity');
+        throw new BadRequestException(
+          'No available halls for the specified time and capacity',
+        );
       }
       selectedHall = availableHalls[0]; // Select the first available hall
     }
@@ -68,7 +83,9 @@ export class BookingsService {
     );
 
     if (!isAvailable) {
-      throw new ConflictException('Selected hall is not available for the specified time');
+      throw new ConflictException(
+        'Selected hall is not available for the specified time',
+      );
     }
 
     // Calculate pricing
@@ -83,13 +100,16 @@ export class BookingsService {
     const addOnsCost = addOns.reduce((total, addOn) => {
       // In a real implementation, you would fetch add-on prices from database
       const addOnPrice = 50; // Mock price
-      return total + (addOnPrice * addOn.quantity);
+      return total + addOnPrice * addOn.quantity;
     }, 0);
 
     // Apply coupon discount
     let discount = 0;
     if (couponCode) {
-      discount = await this.calculateCouponDiscount(couponCode, pricing.totalPrice + addOnsCost);
+      discount = await this.calculateCouponDiscount(
+        couponCode,
+        pricing.totalPrice + addOnsCost,
+      );
     }
 
     const totalPrice = pricing.totalPrice + addOnsCost - discount;
@@ -98,7 +118,7 @@ export class BookingsService {
       hallId: selectedHall.id,
       hallName: selectedHall.name_en,
       pricing,
-      addOns: addOns.map(addOn => ({
+      addOns: addOns.map((addOn) => ({
         ...addOn,
         price: 50, // Mock price
         total: 50 * addOn.quantity,
@@ -109,8 +129,21 @@ export class BookingsService {
     };
   }
 
-  async createBooking(userId: string, createBookingDto: CreateBookingDto): Promise<Booking> {
-    const { branchId, hallId, startTime, durationHours, persons, addOns = [], couponCode, specialRequests, contactPhone } = createBookingDto;
+  async createBooking(
+    userId: string,
+    createBookingDto: CreateBookingDto,
+  ): Promise<Booking> {
+    const {
+      branchId,
+      hallId,
+      startTime,
+      durationHours,
+      persons,
+      addOns = [],
+      couponCode,
+      specialRequests,
+      contactPhone,
+    } = createBookingDto;
 
     // Get quote first to validate and calculate pricing
     const quote = await this.getQuote({
@@ -119,7 +152,7 @@ export class BookingsService {
       startTime,
       durationHours,
       persons,
-      addOns: addOns?.map(a => ({ id: a.id, quantity: a.quantity })),
+      addOns: addOns?.map((a) => ({ id: a.id, quantity: a.quantity })),
       couponCode,
     });
 
@@ -153,7 +186,11 @@ export class BookingsService {
       const savedBooking = await queryRunner.manager.save(booking);
 
       // Generate tickets
-      const tickets = await this.generateTickets(queryRunner, savedBooking, persons);
+      const tickets = await this.generateTickets(
+        queryRunner,
+        savedBooking,
+        persons,
+      );
 
       await queryRunner.commitTransaction();
 
@@ -165,21 +202,28 @@ export class BookingsService {
       return savedBooking;
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      this.logger.error(`Failed to create booking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create booking: ${error.message}`,
+        error.stack,
+      );
       throw error;
     } finally {
       await queryRunner.release();
     }
   }
 
-  async findUserBookings(userId: string, page: number = 1, limit: number = 10): Promise<{
+  async findUserBookings(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
     bookings: Booking[];
     total: number;
     page: number;
     totalPages: number;
   }> {
     const cacheKey = `user:${userId}:bookings:${page}:${limit}`;
-    
+
     // Try cache first
     const cached = await this.redisService.get(cacheKey);
     if (cached) {
@@ -220,16 +264,22 @@ export class BookingsService {
     return booking;
   }
 
-  async getBookingTickets(bookingId: string, userId?: string): Promise<Ticket[]> {
+  async getBookingTickets(
+    bookingId: string,
+    userId?: string,
+  ): Promise<Ticket[]> {
     const booking = await this.findBookingById(bookingId, userId);
-    
+
     return this.ticketRepository.find({
       where: { bookingId: booking.id },
       order: { createdAt: 'ASC' },
     });
   }
 
-  async scanTicket(staffId: string, scanTicketDto: ScanTicketDto): Promise<{
+  async scanTicket(
+    staffId: string,
+    scanTicketDto: ScanTicketDto,
+  ): Promise<{
     success: boolean;
     ticket?: Ticket;
     booking?: Booking;
@@ -261,7 +311,10 @@ export class BookingsService {
       };
     }
 
-    if (ticket.status === TicketStatus.EXPIRED || ticket.status === TicketStatus.CANCELLED) {
+    if (
+      ticket.status === TicketStatus.EXPIRED ||
+      ticket.status === TicketStatus.CANCELLED
+    ) {
       return {
         success: false,
         ticket,
@@ -273,7 +326,9 @@ export class BookingsService {
     // Check if ticket is valid for current time
     const now = new Date();
     const bookingStart = new Date(ticket.booking.startTime);
-    const bookingEnd = new Date(bookingStart.getTime() + ticket.booking.durationHours * 60 * 60 * 1000);
+    const bookingEnd = new Date(
+      bookingStart.getTime() + ticket.booking.durationHours * 60 * 60 * 1000,
+    );
 
     if (now < bookingStart || now > bookingEnd) {
       return {
@@ -321,7 +376,11 @@ export class BookingsService {
     };
   }
 
-  async cancelBooking(bookingId: string, userId: string, reason?: string): Promise<Booking> {
+  async cancelBooking(
+    bookingId: string,
+    userId: string,
+    reason?: string,
+  ): Promise<Booking> {
     const booking = await this.findBookingById(bookingId, userId);
 
     if (booking.status === BookingStatus.CANCELLED) {
@@ -335,10 +394,13 @@ export class BookingsService {
     // Check if booking can be cancelled (e.g., not too close to start time)
     const now = new Date();
     const bookingStart = new Date(booking.startTime);
-    const hoursUntilBooking = (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hoursUntilBooking =
+      (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     if (hoursUntilBooking < 24) {
-      throw new BadRequestException('Cannot cancel booking less than 24 hours before start time');
+      throw new BadRequestException(
+        'Cannot cancel booking less than 24 hours before start time',
+      );
     }
 
     // Start transaction
@@ -347,12 +409,12 @@ export class BookingsService {
     await queryRunner.startTransaction();
 
     try {
-    // Update booking status
-    booking.status = BookingStatus.CANCELLED;
-    booking.cancelledAt = now;
-    if (reason) {
-      booking.cancellationReason = reason;
-    }
+      // Update booking status
+      booking.status = BookingStatus.CANCELLED;
+      booking.cancelledAt = now;
+      if (reason) {
+        booking.cancellationReason = reason;
+      }
 
       await queryRunner.manager.save(booking);
 
@@ -379,9 +441,14 @@ export class BookingsService {
     }
   }
 
-  private async findAvailableHalls(branchId: string, startTime: Date, durationHours: number, persons: number): Promise<Hall[]> {
+  private async findAvailableHalls(
+    branchId: string,
+    startTime: Date,
+    durationHours: number,
+    persons: number,
+  ): Promise<Hall[]> {
     const halls = await this.contentService.findAllHalls(branchId);
-    
+
     const availableHalls: Hall[] = [];
     for (const hall of halls) {
       if (hall.capacity >= persons) {
@@ -399,11 +466,18 @@ export class BookingsService {
     return availableHalls.sort((a, b) => a.capacity - b.capacity); // Sort by capacity ascending
   }
 
-  private async generateTickets(queryRunner: any, booking: Booking, personCount: number): Promise<Ticket[]> {
+  private async generateTickets(
+    queryRunner: any,
+    booking: Booking,
+    personCount: number,
+  ): Promise<Ticket[]> {
     const tickets: Ticket[] = [];
-    
+
     for (let i = 0; i < personCount; i++) {
-      const qrToken = this.qrCodeService.generateQRToken(booking.id, `${booking.id}-${i}`);
+      const qrToken = this.qrCodeService.generateQRToken(
+        booking.id,
+        `${booking.id}-${i}`,
+      );
       const qrTokenHash = this.qrCodeService.generateQRTokenHash(qrToken);
 
       const ticket = queryRunner.manager.create(Ticket, {
@@ -412,7 +486,9 @@ export class BookingsService {
         status: TicketStatus.VALID,
         personCount: 1,
         validFrom: booking.startTime,
-        validUntil: new Date(booking.startTime.getTime() + booking.durationHours * 60 * 60 * 1000),
+        validUntil: new Date(
+          booking.startTime.getTime() + booking.durationHours * 60 * 60 * 1000,
+        ),
       });
 
       const savedTicket = await queryRunner.manager.save(ticket);
@@ -422,11 +498,14 @@ export class BookingsService {
     return tickets;
   }
 
-  private async calculateCouponDiscount(couponCode: string, totalAmount: number): Promise<number> {
+  private async calculateCouponDiscount(
+    couponCode: string,
+    totalAmount: number,
+  ): Promise<number> {
     // Mock implementation - in real app, fetch from database
     const coupons = {
-      'SAVE20': { type: 'percentage', value: 20, minAmount: 100 },
-      'FLAT50': { type: 'fixed', value: 50, minAmount: 200 },
+      SAVE20: { type: 'percentage', value: 20, minAmount: 100 },
+      FLAT50: { type: 'fixed', value: 50, minAmount: 200 },
     };
 
     const coupon = coupons[couponCode];

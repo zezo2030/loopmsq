@@ -15,7 +15,7 @@ export class QRCodeService {
         },
         width: 256,
       });
-      
+
       return qrCodeDataURL;
     } catch (error: any) {
       throw new Error(`Failed to generate QR code: ${error.message}`);
@@ -26,7 +26,7 @@ export class QRCodeService {
     const timestamp = Date.now().toString();
     const randomBytes = crypto.randomBytes(16).toString('hex');
     const data = `${bookingId}:${ticketId}:${timestamp}:${randomBytes}`;
-    
+
     return crypto.createHash('sha256').update(data).digest('hex');
   }
 

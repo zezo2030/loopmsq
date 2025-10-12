@@ -1,4 +1,10 @@
-import { IsEmail, IsString, IsArray, IsOptional, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  IsArray,
+  IsOptional,
+  MinLength,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '../../../common/decorators/roles.decorator';
 

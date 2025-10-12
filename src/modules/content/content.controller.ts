@@ -13,7 +13,13 @@ import {
   ParseBoolPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ContentService } from './content.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { CreateHallDto } from './dto/create-hall.dto';
@@ -43,7 +49,8 @@ export class ContentController {
   @ApiQuery({ name: 'includeInactive', required: false, type: Boolean })
   @ApiResponse({ status: 200, description: 'Branches retrieved successfully' })
   async findAllBranches(
-    @Query('includeInactive', new ParseBoolPipe({ optional: true })) includeInactive: boolean = false,
+    @Query('includeInactive', new ParseBoolPipe({ optional: true }))
+    includeInactive: boolean = false,
   ) {
     return this.contentService.findAllBranches(includeInactive);
   }
@@ -77,7 +84,10 @@ export class ContentController {
   @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update branch status (Admin/Staff only)' })
-  @ApiResponse({ status: 200, description: 'Branch status updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Branch status updated successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Branch not found' })
@@ -106,9 +116,7 @@ export class ContentController {
   @ApiOperation({ summary: 'Get all halls' })
   @ApiQuery({ name: 'branchId', required: false, type: String })
   @ApiResponse({ status: 200, description: 'Halls retrieved successfully' })
-  async findAllHalls(
-    @Query('branchId') branchId?: string,
-  ) {
+  async findAllHalls(@Query('branchId') branchId?: string) {
     return this.contentService.findAllHalls(branchId);
   }
 
@@ -157,7 +165,10 @@ export class ContentController {
   @ApiOperation({ summary: 'Check hall availability' })
   @ApiQuery({ name: 'startTime', type: String, description: 'ISO date string' })
   @ApiQuery({ name: 'durationHours', type: Number })
-  @ApiResponse({ status: 200, description: 'Availability checked successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Availability checked successfully',
+  })
   @ApiResponse({ status: 404, description: 'Hall not found' })
   async checkHallAvailability(
     @Param('id', ParseUUIDPipe) id: string,
@@ -170,7 +181,7 @@ export class ContentController {
       startDate,
       durationHours,
     );
-    
+
     return { available: isAvailable };
   }
 

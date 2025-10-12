@@ -22,14 +22,14 @@ import { BookingsModule } from './modules/bookings/bookings.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
-    
+
     // Database
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: getDatabaseConfig,
       inject: [ConfigService],
     }),
-    
+
     // Redis & Bull Queue
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -38,7 +38,7 @@ import { BookingsModule } from './modules/bookings/bookings.module';
       }),
       inject: [ConfigService],
     }),
-    
+
     // Rate Limiting
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
@@ -50,10 +50,10 @@ import { BookingsModule } from './modules/bookings/bookings.module';
       ],
       inject: [ConfigService],
     }),
-    
+
     // Task Scheduling
     ScheduleModule.forRoot(),
-    
+
     // Feature Modules
     AuthModule,
     UsersModule,

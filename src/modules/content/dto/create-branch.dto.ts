@@ -1,4 +1,11 @@
-import { IsString, IsInt, IsOptional, IsObject, IsArray, IsPhoneNumber } from 'class-validator';
+import {
+  IsString,
+  IsInt,
+  IsOptional,
+  IsObject,
+  IsArray,
+  IsPhoneNumber,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateBranchDto {
@@ -62,7 +69,7 @@ export class CreateBranchDto {
     example: {
       sunday: { open: '09:00', close: '22:00' },
       monday: { open: '09:00', close: '22:00' },
-      friday: { closed: true }
+      friday: { closed: true },
     },
     required: false,
   })

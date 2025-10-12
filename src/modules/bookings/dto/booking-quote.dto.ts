@@ -1,9 +1,9 @@
-import { 
-  IsUUID, 
-  IsDateString, 
-  IsInt, 
-  IsOptional, 
-  IsArray, 
+import {
+  IsUUID,
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsArray,
   IsString,
   Min,
   Max,

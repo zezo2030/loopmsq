@@ -1,0 +1,39 @@
+import {
+  IsEmail,
+  IsPhoneNumber,
+  IsString,
+  MinLength,
+  IsOptional,
+} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class RegisterSendOtpDto {
+  @ApiProperty({ description: 'Full name of the user', example: 'Ahmed Ali' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ description: 'Email address', example: 'user@example.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({
+    description: 'Phone number in international format',
+    example: '+966501234567',
+  })
+  @IsPhoneNumber()
+  phone: string;
+
+  @ApiProperty({ description: 'Account password', example: 'StrongPass#2025' })
+  @IsString()
+  @MinLength(6)
+  password: string;
+
+  @ApiProperty({
+    description: 'Preferred language',
+    example: 'ar',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  language?: string = 'ar';
+}

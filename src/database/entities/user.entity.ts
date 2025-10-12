@@ -30,7 +30,12 @@ export class User {
   @Column({ type: 'varchar', length: 100 })
   name: string;
 
-  @Column({ type: 'enum', enum: UserRole, array: true, default: [UserRole.USER] })
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    array: true,
+    default: [UserRole.USER],
+  })
   roles: UserRole[];
 
   @Column({ type: 'varchar', length: 255, nullable: true })

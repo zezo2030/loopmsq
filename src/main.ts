@@ -16,7 +16,7 @@ async function bootstrap() {
   // Security
   app.use(helmet());
   app.use(compression());
-  
+
   // CORS
   app.enableCors({
     origin: true,
@@ -58,17 +58,21 @@ async function bootstrap() {
       .addTag('payments', 'Payment processing endpoints')
       .addTag('trips', 'School trips endpoints')
       .build();
-    
+
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
   }
 
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
-  
-  logger.log(`Application is running on: http://localhost:${port}/${apiPrefix}`);
+
+  logger.log(
+    `Application is running on: http://localhost:${port}/${apiPrefix}`,
+  );
   if (configService.get<string>('NODE_ENV') !== 'production') {
-    logger.log(`Swagger documentation: http://localhost:${port}/${apiPrefix}/docs`);
+    logger.log(
+      `Swagger documentation: http://localhost:${port}/${apiPrefix}/docs`,
+    );
   }
 }
 bootstrap();

@@ -10,7 +10,13 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingQuoteDto } from './dto/booking-quote.dto';
@@ -122,7 +128,10 @@ export class BookingsController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.STAFF, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get ticket details by QR token (Staff only)' })
-  @ApiResponse({ status: 200, description: 'Ticket details retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket details retrieved successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Ticket not found' })

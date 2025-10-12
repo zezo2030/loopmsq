@@ -18,6 +18,8 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { StaffLoginDto } from './dto/staff-login.dto';
 import { UserRole } from '../../common/decorators/roles.decorator';
+import { RegisterSendOtpDto } from './dto/register-send-otp.dto';
+import { RegisterVerifyOtpDto } from './dto/register-verify-otp.dto';
 
 @Injectable()
 export class AuthService {
@@ -34,35 +36,111 @@ export class AuthService {
     private encryptionService: EncryptionService,
   ) {}
 
-  async sendOtp(sendOtpDto: SendOtpDto): Promise<{ success: boolean; message: string }> {
+  async sendOtp(
+    sendOtpDto: SendOtpDto,
+  ): Promise<{ success: boolean; message: string }> {
     const language = sendOtpDto.language ?? 'ar';
     const normalizedPhone = this.normalizePhone(sendOtpDto.phone);
 
     // Rate limiting check
     const rateLimitKey = `otp_rate:${normalizedPhone}`;
-    const attempts = await this.redisService.incrementRateLimit(rateLimitKey, 300); // 5 minutes
-    
+    const attempts = await this.redisService.incrementRateLimit(
+      rateLimitKey,
+      300,
+    ); // 5 minutes
+
     if (attempts > 3) {
-      throw new BadRequestException('Too many OTP requests. Please try again later.');
+      throw new BadRequestException(
+        'Too many OTP requests. Please try again later.',
+      );
     }
 
     // Generate OTP
     const otp = this.generateOtp();
-    
+
     // Store OTP in Redis with 5 minutes expiry
     await this.redisService.setOTP(normalizedPhone, otp, 300);
 
     // TODO: Send SMS via Twilio or other SMS provider
     this.logger.log(`OTP for ${normalizedPhone}: ${otp}`); // For development only
 
-    const message = language === 'ar' 
-      ? 'تم إرسال رمز التحقق إلى هاتفك'
-      : 'OTP sent to your phone';
+    const message =
+      language === 'ar'
+        ? 'تم إرسال رمز التحقق إلى هاتفك'
+        : 'OTP sent to your phone';
 
     return {
       success: true,
       message,
     };
+  }
+
+  async registerSendOtp(
+    dto: RegisterSendOtpDto,
+  ): Promise<{ success: boolean; message: string }> {
+    const name = (dto.name || '').trim();
+    const email = (dto.email || '').trim().toLowerCase();
+    const language = dto.language ?? 'ar';
+    const normalizedPhone = this.normalizePhone(dto.phone);
+
+    if (!name) {
+      throw new BadRequestException('Name is required');
+    }
+
+    // Ensure email not used
+    const existingByEmail = await this.userRepository.findOne({
+      where: { email },
+    });
+    if (existingByEmail) {
+      throw new ConflictException('Email already exists');
+    }
+
+    // Ensure phone not used (using decrypt-compare)
+    const existingByPhone =
+      await this.findUserByDecryptedPhone(normalizedPhone);
+    if (existingByPhone) {
+      throw new ConflictException('Phone number already exists');
+    }
+
+    // Rate limiting check
+    const rateLimitKey = `otp_register_rate:${normalizedPhone}`;
+    const attempts = await this.redisService.incrementRateLimit(
+      rateLimitKey,
+      300,
+    );
+    if (attempts > 3) {
+      throw new BadRequestException(
+        'Too many OTP requests. Please try again later.',
+      );
+    }
+
+    // Generate OTP
+    const otp = this.generateOtp();
+
+    // Store OTP and pending registration data (password hashed)
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    await this.redisService.setOTP(normalizedPhone, otp, 300); // 5 minutes for OTP
+    await this.redisService.set(
+      `reg:${normalizedPhone}`,
+      {
+        name,
+        email,
+        passwordHash,
+        language,
+      },
+      900,
+    ); // 15 minutes for registration data
+
+    // TODO: Integrate SMS provider here
+    this.logger.log(`Registration OTP for ${normalizedPhone}: ${otp}`);
+
+    const message =
+      language === 'ar'
+        ? 'تم إرسال رمز التحقق للتسجيل'
+        : 'Registration OTP sent';
+
+    return { success: true, message };
   }
 
   async verifyOtp(verifyOtpDto: VerifyOtpDto): Promise<{
@@ -90,8 +168,12 @@ export class AuthService {
         }
       }
     } catch (e) {
-      this.logger.error(`Redis error while fetching OTP for ${normalizedPhone}: ${String(e)}`);
-      throw new BadRequestException('OTP service temporarily unavailable, please try again');
+      this.logger.error(
+        `Redis error while fetching OTP for ${normalizedPhone}: ${String(e)}`,
+      );
+      throw new BadRequestException(
+        'OTP service temporarily unavailable, please try again',
+      );
     }
     if (!storedOtp || storedOtp !== normalizedOtp) {
       throw new UnauthorizedException('Invalid or expired OTP');
@@ -101,7 +183,9 @@ export class AuthService {
     try {
       await this.redisService.deleteOTP(otpKeyUsed ?? normalizedPhone);
     } catch (e) {
-      this.logger.warn(`Failed to delete OTP for ${normalizedPhone}: ${String(e)}`);
+      this.logger.warn(
+        `Failed to delete OTP for ${normalizedPhone}: ${String(e)}`,
+      );
     }
 
     // Find or create user
@@ -156,6 +240,124 @@ export class AuthService {
     };
   }
 
+  async registerVerifyOtp(dto: RegisterVerifyOtpDto): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: Partial<User>;
+  }> {
+    const normalizedPhone = this.normalizePhone(dto.phone);
+    const normalizedOtp = this.normalizeOtp(dto.otp);
+
+    // Verify OTP (support variants)
+    let storedOtp: string | null = null;
+    let otpKeyUsed: string | null = null;
+    try {
+      const phoneKeyCandidates = this.getPhoneKeyVariants(normalizedPhone);
+      for (const candidate of phoneKeyCandidates) {
+        const candidateOtp = await this.redisService.getOTP(candidate);
+        if (candidateOtp) {
+          storedOtp = candidateOtp;
+          otpKeyUsed = candidate;
+          break;
+        }
+      }
+    } catch (e) {
+      this.logger.error(
+        `Redis error while fetching OTP for ${normalizedPhone}: ${String(e)}`,
+      );
+      throw new BadRequestException(
+        'OTP service temporarily unavailable, please try again',
+      );
+    }
+    if (!storedOtp || storedOtp !== normalizedOtp) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    // Delete OTP after successful verification
+    try {
+      await this.redisService.deleteOTP(otpKeyUsed ?? normalizedPhone);
+    } catch (e) {
+      this.logger.warn(
+        `Failed to delete OTP for ${normalizedPhone}: ${String(e)}`,
+      );
+    }
+
+    // Load pending registration data
+    const pending = (await this.redisService.get(`reg:${normalizedPhone}`)) as {
+      name: string;
+      email: string;
+      passwordHash: string;
+      language?: string;
+    } | null;
+    if (!pending) {
+      throw new BadRequestException(
+        'Registration data expired. Please restart registration.',
+      );
+    }
+
+    const { name, email, passwordHash, language } = pending;
+
+    // Final duplicate checks
+    const existingByEmail = await this.userRepository.findOne({
+      where: { email },
+    });
+    if (existingByEmail) {
+      throw new ConflictException('Email already exists');
+    }
+    const existingByPhone =
+      await this.findUserByDecryptedPhone(normalizedPhone);
+    if (existingByPhone) {
+      throw new ConflictException('Phone number already exists');
+    }
+
+    // Create user
+    let user = this.userRepository.create({
+      phone: this.encryptionService.encrypt(normalizedPhone),
+      email,
+      name,
+      passwordHash,
+      roles: [UserRole.USER],
+      language: language ?? 'ar',
+      isActive: true,
+      lastLoginAt: new Date(),
+    });
+    user = await this.userRepository.save(user);
+
+    // Create wallet
+    const wallet = this.walletRepository.create({
+      userId: user.id,
+      balance: 0,
+      loyaltyPoints: 0,
+    });
+    await this.walletRepository.save(wallet);
+
+    // Clean pending registration data
+    try {
+      await this.redisService.del(`reg:${normalizedPhone}`);
+    } catch (e) {
+      this.logger.warn(
+        `Failed to delete registration cache for ${normalizedPhone}: ${String(
+          e,
+        )}`,
+      );
+    }
+
+    // Generate tokens
+    const tokens = await this.generateTokens(user);
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        phone: normalizedPhone,
+        email: user.email,
+        name: user.name,
+        roles: user.roles,
+        language: user.language,
+      },
+    };
+  }
+
   async staffLogin(staffLoginDto: StaffLoginDto): Promise<{
     accessToken: string;
     refreshToken: string;
@@ -165,7 +367,7 @@ export class AuthService {
 
     // Find staff user
     const user = await this.userRepository.findOne({
-      where: { 
+      where: {
         email,
         isActive: true,
       },
@@ -182,7 +384,10 @@ export class AuthService {
     }
 
     // Check if user has staff or admin role
-    if (!user.roles.includes(UserRole.STAFF) && !user.roles.includes(UserRole.ADMIN)) {
+    if (
+      !user.roles.includes(UserRole.STAFF) &&
+      !user.roles.includes(UserRole.ADMIN)
+    ) {
       throw new UnauthorizedException('Access denied');
     }
 
@@ -217,7 +422,9 @@ export class AuthService {
 
     return {
       id: user.id,
-      phone: user.phone ? this.encryptionService.decrypt(user.phone) : undefined,
+      phone: user.phone
+        ? this.encryptionService.decrypt(user.phone)
+        : undefined,
       email: user.email,
       name: user.name,
       roles: user.roles,
@@ -232,7 +439,7 @@ export class AuthService {
     refreshToken: string;
   }> {
     try {
-      const payload = this.jwtService.verify(refreshToken, {
+      const payload = this.jwtService.verify<{ sub: string }>(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
 
@@ -245,7 +452,7 @@ export class AuthService {
       }
 
       return this.generateTokens(user);
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -269,7 +476,9 @@ export class AuthService {
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('JWT_REFRESH_SECRET') || 'default-refresh-secret',
+      secret:
+        this.configService.get<string>('JWT_REFRESH_SECRET') ||
+        'default-refresh-secret',
       expiresIn: '7d',
     });
 
@@ -299,15 +508,19 @@ export class AuthService {
       .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
   }
 
-  private async findUserByDecryptedPhone(plainPhone: string): Promise<User | null> {
-    const candidates = await this.userRepository.find({ where: { phone: Not(IsNull()) } });
+  private async findUserByDecryptedPhone(
+    plainPhone: string,
+  ): Promise<User | null> {
+    const candidates = await this.userRepository.find({
+      where: { phone: Not(IsNull()) },
+    });
     for (const candidate of candidates) {
       try {
         const decrypted = this.encryptionService.decrypt(candidate.phone);
         if (decrypted && this.normalizePhone(decrypted) === plainPhone) {
           return candidate;
         }
-      } catch (e) {
+      } catch {
         // skip invalid decryption
       }
     }

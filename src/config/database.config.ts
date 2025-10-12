@@ -14,5 +14,8 @@ export const getDatabaseConfig = (
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
   synchronize: configService.get<string>('NODE_ENV') === 'development',
   logging: configService.get<string>('NODE_ENV') === 'development',
-  ssl: configService.get<string>('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
+  ssl:
+    configService.get<string>('NODE_ENV') === 'production'
+      ? { rejectUnauthorized: false }
+      : false,
 });

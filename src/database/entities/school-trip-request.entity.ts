@@ -49,7 +49,11 @@ export class SchoolTripRequest {
   @Column({ type: 'int', default: 2 })
   durationHours: number;
 
-  @Column({ type: 'enum', enum: TripRequestStatus, default: TripRequestStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: TripRequestStatus,
+    default: TripRequestStatus.PENDING,
+  })
   status: TripRequestStatus;
 
   @Column({ type: 'varchar', length: 100 })

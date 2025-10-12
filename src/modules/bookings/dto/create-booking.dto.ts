@@ -1,10 +1,10 @@
-import { 
-  IsUUID, 
-  IsDateString, 
-  IsInt, 
-  IsOptional, 
-  IsArray, 
-  IsString, 
+import {
+  IsUUID,
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsArray,
+  IsString,
   IsPhoneNumber,
   Min,
   Max,
@@ -30,7 +30,7 @@ class AddOnDto {
 
   @ApiProperty({
     description: 'Add-on price',
-    example: 150.00,
+    example: 150.0,
   })
   @IsInt()
   @Min(0)

@@ -7,7 +7,9 @@ export class EncryptionService {
   private readonly encryptionKey: string;
 
   constructor(private configService: ConfigService) {
-    this.encryptionKey = this.configService.get<string>('ENCRYPTION_KEY') || 'default-32-character-key-for-dev';
+    this.encryptionKey =
+      this.configService.get<string>('ENCRYPTION_KEY') ||
+      'default-32-character-key-for-dev';
   }
 
   encrypt(text: string): string {

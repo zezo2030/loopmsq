@@ -28,10 +28,19 @@ export class UsersService {
   ) {}
 
   async createStaff(createStaffDto: CreateStaffDto): Promise<Partial<User>> {
-    const { email, name, password, roles, phone, language = 'ar' } = createStaffDto;
+    const {
+      email,
+      name,
+      password,
+      roles,
+      phone,
+      language = 'ar',
+    } = createStaffDto;
 
     // Check if email already exists
-    const existingUser = await this.userRepository.findOne({ where: { email } });
+    const existingUser = await this.userRepository.findOne({
+      where: { email },
+    });
     if (existingUser) {
       throw new ConflictException('Email already exists');
     }
@@ -39,8 +48,8 @@ export class UsersService {
     // Check if phone already exists (if provided)
     if (phone) {
       const encryptedPhone = this.encryptionService.encrypt(phone);
-      const existingPhoneUser = await this.userRepository.findOne({ 
-        where: { phone: encryptedPhone } 
+      const existingPhoneUser = await this.userRepository.findOne({
+        where: { phone: encryptedPhone },
       });
       if (existingPhoneUser) {
         throw new ConflictException('Phone number already exists');
@@ -49,9 +58,11 @@ export class UsersService {
 
     // Validate roles
     const validRoles = Object.values(UserRole);
-    const invalidRoles = roles.filter(role => !validRoles.includes(role));
+    const invalidRoles = roles.filter((role) => !validRoles.includes(role));
     if (invalidRoles.length > 0) {
-      throw new BadRequestException(`Invalid roles: ${invalidRoles.join(', ')}`);
+      throw new BadRequestException(
+        `Invalid roles: ${invalidRoles.join(', ')}`,
+      );
     }
 
     // Hash password
@@ -80,7 +91,9 @@ export class UsersService {
       await this.walletRepository.save(wallet);
     }
 
-    this.logger.log(`Staff user created: ${savedUser.id} with roles: ${roles.join(', ')}`);
+    this.logger.log(
+      `Staff user created: ${savedUser.id} with roles: ${roles.join(', ')}`,
+    );
 
     return {
       id: savedUser.id,
@@ -94,7 +107,10 @@ export class UsersService {
     };
   }
 
-  async findAll(page: number = 1, limit: number = 10): Promise<{
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
     users: Partial<User>[];
     total: number;
     page: number;
@@ -107,9 +123,11 @@ export class UsersService {
       relations: ['wallet'],
     });
 
-    const decryptedUsers = users.map(user => ({
+    const decryptedUsers = users.map((user) => ({
       id: user.id,
-      phone: user.phone ? this.encryptionService.decrypt(user.phone) : undefined,
+      phone: user.phone
+        ? this.encryptionService.decrypt(user.phone)
+        : undefined,
       email: user.email,
       name: user.name,
       roles: user.roles,
@@ -140,7 +158,9 @@ export class UsersService {
 
     return {
       id: user.id,
-      phone: user.phone ? this.encryptionService.decrypt(user.phone) : undefined,
+      phone: user.phone
+        ? this.encryptionService.decrypt(user.phone)
+        : undefined,
       email: user.email,
       name: user.name,
       roles: user.roles,
@@ -155,7 +175,10 @@ export class UsersService {
     };
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<Partial<User>> {
+  async update(
+    id: string,
+    updateUserDto: UpdateUserDto,
+  ): Promise<Partial<User>> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
@@ -163,8 +186,8 @@ export class UsersService {
 
     // Check email uniqueness if email is being updated
     if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existingUser = await this.userRepository.findOne({ 
-        where: { email: updateUserDto.email } 
+      const existingUser = await this.userRepository.findOne({
+        where: { email: updateUserDto.email },
       });
       if (existingUser) {
         throw new ConflictException('Email already exists');
@@ -179,7 +202,9 @@ export class UsersService {
 
     return {
       id: updatedUser.id,
-      phone: updatedUser.phone ? this.encryptionService.decrypt(updatedUser.phone) : undefined,
+      phone: updatedUser.phone
+        ? this.encryptionService.decrypt(updatedUser.phone)
+        : undefined,
       email: updatedUser.email,
       name: updatedUser.name,
       roles: updatedUser.roles,
@@ -221,8 +246,10 @@ export class UsersService {
     newUsersThisMonth: number;
   }> {
     const totalUsers = await this.userRepository.count();
-    const activeUsers = await this.userRepository.count({ where: { isActive: true } });
-    
+    const activeUsers = await this.userRepository.count({
+      where: { isActive: true },
+    });
+
     const staffUsers = await this.userRepository
       .createQueryBuilder('user')
       .where(':role = ANY(user.roles)', { role: UserRole.STAFF })

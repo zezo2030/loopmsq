@@ -54,7 +54,11 @@ export class SupportTicket {
   @Column({ type: 'enum', enum: TicketCategory })
   category: TicketCategory;
 
-  @Column({ type: 'enum', enum: TicketPriority, default: TicketPriority.MEDIUM })
+  @Column({
+    type: 'enum',
+    enum: TicketPriority,
+    default: TicketPriority.MEDIUM,
+  })
   priority: TicketPriority;
 
   @Column({ type: 'enum', enum: TicketStatus, default: TicketStatus.OPEN })

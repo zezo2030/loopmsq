@@ -1,4 +1,12 @@
-import { IsString, IsInt, IsBoolean, IsOptional, IsObject, IsArray, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsInt,
+  IsBoolean,
+  IsOptional,
+  IsObject,
+  IsArray,
+  IsUUID,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateHallDto {
@@ -30,7 +38,7 @@ export class CreateHallDto {
       hourlyRate: 100,
       weekendMultiplier: 1.5,
       holidayMultiplier: 2.0,
-      decorationPrice: 200
+      decorationPrice: 200,
     },
   })
   @IsObject()

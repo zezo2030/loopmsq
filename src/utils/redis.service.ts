@@ -35,7 +35,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Session Management
-  async setSession(sessionId: string, data: any, ttl: number = 86400): Promise<void> {
+  async setSession(
+    sessionId: string,
+    data: any,
+    ttl: number = 86400,
+  ): Promise<void> {
     await this.client.setex(`session:${sessionId}`, ttl, JSON.stringify(data));
   }
 

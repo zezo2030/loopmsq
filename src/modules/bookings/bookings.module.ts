@@ -10,10 +10,7 @@ import { QRCodeService } from '../../utils/qr-code.service';
 import { RedisService } from '../../utils/redis.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Booking, Ticket, User]),
-    ContentModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Booking, Ticket, User]), ContentModule],
   controllers: [BookingsController],
   providers: [BookingsService, QRCodeService, RedisService],
   exports: [BookingsService],

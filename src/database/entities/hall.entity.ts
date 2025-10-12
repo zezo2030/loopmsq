@@ -38,7 +38,11 @@ export class Hall {
   @Column({ type: 'int' })
   capacity: number;
 
-  @Column({ type: 'enum', enum: ['available', 'maintenance', 'reserved'], default: 'available' })
+  @Column({
+    type: 'enum',
+    enum: ['available', 'maintenance', 'reserved'],
+    default: 'available',
+  })
   status: string;
 
   @Column({ type: 'text', nullable: true })

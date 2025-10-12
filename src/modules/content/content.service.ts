@@ -39,7 +39,7 @@ export class ContentService {
 
   async findAllBranches(includeInactive: boolean = false): Promise<Branch[]> {
     const cacheKey = includeInactive ? 'branches:all' : 'branches:active';
-    
+
     // Try to get from cache first
     const cached = await this.redisService.get(cacheKey);
     if (cached) {
@@ -65,7 +65,7 @@ export class ContentService {
 
   async findBranchById(id: string): Promise<Branch> {
     const cacheKey = `branch:${id}`;
-    
+
     // Try cache first
     const cached = await this.redisService.get(cacheKey);
     if (cached) {
@@ -87,9 +87,12 @@ export class ContentService {
     return branch;
   }
 
-  async updateBranch(id: string, updateData: Partial<CreateBranchDto>): Promise<Branch> {
+  async updateBranch(
+    id: string,
+    updateData: Partial<CreateBranchDto>,
+  ): Promise<Branch> {
     const branch = await this.findBranchById(id);
-    
+
     Object.assign(branch, updateData);
     const updatedBranch = await this.branchRepository.save(branch);
 
@@ -102,9 +105,12 @@ export class ContentService {
     return updatedBranch;
   }
 
-  async updateBranchStatus(id: string, status: 'active' | 'inactive' | 'maintenance'): Promise<Branch> {
+  async updateBranchStatus(
+    id: string,
+    status: 'active' | 'inactive' | 'maintenance',
+  ): Promise<Branch> {
     const branch = await this.findBranchById(id);
-    
+
     branch.status = status;
     const updatedBranch = await this.branchRepository.save(branch);
 
@@ -121,7 +127,7 @@ export class ContentService {
   async createHall(createHallDto: CreateHallDto): Promise<Hall> {
     // Verify branch exists
     const branch = await this.findBranchById(createHallDto.branchId);
-    
+
     const hall = this.hallRepository.create(createHallDto);
     const savedHall = await this.hallRepository.save(hall);
 
@@ -130,13 +136,15 @@ export class ContentService {
     await this.redisService.del('branches:all');
     await this.redisService.del('branches:active');
 
-    this.logger.log(`Hall created: ${savedHall.id} in branch ${createHallDto.branchId}`);
+    this.logger.log(
+      `Hall created: ${savedHall.id} in branch ${createHallDto.branchId}`,
+    );
     return savedHall;
   }
 
   async findAllHalls(branchId?: string): Promise<Hall[]> {
     const cacheKey = branchId ? `halls:branch:${branchId}` : 'halls:all';
-    
+
     // Try cache first
     const cached = await this.redisService.get(cacheKey);
     if (cached) {
@@ -163,7 +171,7 @@ export class ContentService {
 
   async findHallById(id: string): Promise<Hall> {
     const cacheKey = `hall:${id}`;
-    
+
     // Try cache first
     const cached = await this.redisService.get(cacheKey);
     if (cached) {
@@ -185,9 +193,12 @@ export class ContentService {
     return hall;
   }
 
-  async updateHall(id: string, updateData: Partial<CreateHallDto>): Promise<Hall> {
+  async updateHall(
+    id: string,
+    updateData: Partial<CreateHallDto>,
+  ): Promise<Hall> {
     const hall = await this.findHallById(id);
-    
+
     Object.assign(hall, updateData);
     const updatedHall = await this.hallRepository.save(hall);
 
@@ -201,9 +212,12 @@ export class ContentService {
     return updatedHall;
   }
 
-  async updateHallStatus(id: string, status: 'available' | 'maintenance' | 'reserved'): Promise<Hall> {
+  async updateHallStatus(
+    id: string,
+    status: 'available' | 'maintenance' | 'reserved',
+  ): Promise<Hall> {
     const hall = await this.findHallById(id);
-    
+
     hall.status = status;
     const updatedHall = await this.hallRepository.save(hall);
 
@@ -222,9 +236,12 @@ export class ContentService {
     startTime: Date,
     durationHours: number,
   ): Promise<boolean> {
-    const endTime = new Date(startTime.getTime() + durationHours * 60 * 60 * 1000);
+    const endTime = new Date(
+      startTime.getTime() + durationHours * 60 * 60 * 1000,
+    );
 
-    const conflictingBookings = await this.branchRepository.query(`
+    const conflictingBookings = await this.branchRepository.query(
+      `
       SELECT COUNT(*) as count
       FROM bookings b
       WHERE b.hallId = $1
@@ -234,7 +251,9 @@ export class ContentService {
           OR (b.startTime < $3 AND (b.startTime + INTERVAL '1 hour' * b.durationHours) >= $3)
           OR (b.startTime >= $2 AND b.startTime < $3)
         )
-    `, [hallId, startTime, endTime]);
+    `,
+      [hallId, startTime, endTime],
+    );
 
     return parseInt(conflictingBookings[0].count) === 0;
   }
@@ -258,7 +277,7 @@ export class ContentService {
     // Determine multiplier based on day type
     const dayOfWeek = startTime.getDay();
     const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Friday, Saturday
-    
+
     // TODO: Add holiday detection logic
     const isHoliday = false;
 
@@ -271,9 +290,11 @@ export class ContentService {
 
     const basePrice = priceConfig.basePrice;
     const hourlyPrice = priceConfig.hourlyRate * durationHours;
-    const decorationPrice = hall.isDecorated ? (priceConfig.decorationPrice || 0) : 0;
-    
-    const subtotal = (basePrice + hourlyPrice + decorationPrice);
+    const decorationPrice = hall.isDecorated
+      ? priceConfig.decorationPrice || 0
+      : 0;
+
+    const subtotal = basePrice + hourlyPrice + decorationPrice;
     const totalPrice = subtotal * multiplier;
 
     return {
