@@ -20,6 +20,7 @@ import { StaffLoginDto } from './dto/staff-login.dto';
 import { UserRole } from '../../common/decorators/roles.decorator';
 import { RegisterSendOtpDto } from './dto/register-send-otp.dto';
 import { RegisterVerifyOtpDto } from './dto/register-verify-otp.dto';
+import { UserLoginDto } from './dto/user-login.dto';
 
 @Injectable()
 export class AuthService {
@@ -455,6 +456,66 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  async userLogin(dto: UserLoginDto): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: Partial<User>;
+  }> {
+    const identifier = (dto.identifier || '').trim().toLowerCase();
+    const isEmail = identifier.includes('@');
+
+    let user: User | null = null;
+    let decryptedPhone: string | undefined;
+
+    if (isEmail) {
+      user = await this.userRepository.findOne({
+        where: { email: identifier, isActive: true },
+      });
+      if (user?.phone) {
+        try {
+          decryptedPhone = this.encryptionService.decrypt(user.phone);
+        } catch {
+          // ignore decryption errors
+        }
+      }
+    } else {
+      const normalizedPhone = this.normalizePhone(identifier);
+      user = await this.findUserByDecryptedPhone(normalizedPhone);
+      if (user && user.isActive === true) {
+        decryptedPhone = normalizedPhone;
+      }
+    }
+
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    user.lastLoginAt = new Date();
+    await this.userRepository.save(user);
+
+    const tokens = await this.generateTokens(user);
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: decryptedPhone,
+        name: user.name,
+        roles: user.roles,
+        language: user.language,
+      },
+    };
   }
 
   private generateOtp(): string {
