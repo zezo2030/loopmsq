@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { 
   Card, 
   Descriptions, 
-  Tag, 
   Space, 
   Button, 
   Modal, 
@@ -11,14 +10,11 @@ import {
   Input, 
   InputNumber,
   message, 
-  Timeline,
-  Divider,
   Row,
   Col,
   Avatar,
   Badge,
   Steps,
-  Upload,
   Select,
   Alert
 } from 'antd'
@@ -27,13 +23,10 @@ import {
   BookOutlined,
   TeamOutlined,
   CalendarOutlined,
-  EnvironmentOutlined,
   DollarOutlined,
   CheckOutlined,
-  CloseOutlined,
   FileTextOutlined,
   WarningOutlined,
-  UploadOutlined,
   PhoneOutlined,
   MailOutlined,
   EditOutlined,
@@ -94,12 +87,12 @@ export default function TripDetail() {
   
   // Modal states
   const [reviewModalVisible, setReviewModalVisible] = useState(false)
-  const [quoteModalVisible, setQuoteModalVisible] = useState(false)
+  
   const [invoiceModalVisible, setInvoiceModalVisible] = useState(false)
   
   // Forms
   const [reviewForm] = Form.useForm()
-  const [quoteForm] = Form.useForm()
+  
   const [invoiceForm] = Form.useForm()
   
   // Loading states
@@ -239,19 +232,7 @@ export default function TripDetail() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved': return 'success'
-      case 'pending': return 'processing'
-      case 'under_review': return 'warning'
-      case 'rejected': return 'error'
-      case 'invoiced': return 'purple'
-      case 'paid': return 'cyan'
-      case 'completed': return 'default'
-      case 'cancelled': return 'error'
-      default: return 'default'
-    }
-  }
+  
 
   const getStatusText = (status: string) => {
     switch (status) {
@@ -329,8 +310,15 @@ export default function TripDetail() {
                 طلب رحلة مدرسية #{trip.id.slice(-8)}
               </h1>
               <Badge
-                status={trip.status === 'approved' || trip.status === 'completed' ? 'success' : 
-                       trip.status === 'pending' || trip.status === 'under_review' ? 'processing' : 'error'}
+                status={
+                  trip.status === 'approved' || trip.status === 'completed'
+                    ? 'success'
+                    : trip.status === 'pending' || trip.status === 'under_review' || trip.status === 'invoiced' || trip.status === 'paid'
+                    ? 'processing'
+                    : trip.status === 'rejected' || trip.status === 'cancelled'
+                    ? 'error'
+                    : 'default'
+                }
                 text={getStatusText(trip.status)}
               />
             </Space>
@@ -388,7 +376,7 @@ export default function TripDetail() {
             <Card className="custom-card" style={{ marginBottom: '24px' }}>
               <Steps
                 current={getCurrentStep(trip.status)}
-                status={trip.status === 'rejected' || trip.status === 'cancelled' ? 'error' : 'process'}
+                status={'process'}
                 direction="horizontal"
                 size="small"
               >

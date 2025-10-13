@@ -243,7 +243,7 @@ export default function BookingsList() {
             </div>
           )}
           {record.couponCode && (
-            <Tag color="gold" size="small">{record.couponCode}</Tag>
+            <Tag color="gold">{record.couponCode}</Tag>
           )}
         </div>
       ),

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Space, Table, Tag, Input, Select, Card, Statistic, Row, Col, Avatar, Tooltip, Badge } from 'antd'
+import { Button, Space, Table, Tag, Input, Select, Card, Statistic, Row, Col, Avatar, Tooltip } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { 
   GiftOutlined, 
@@ -269,7 +269,7 @@ export default function EventsList() {
                 {getEventTypeText(record.type)}
               </span>
               {record.decorated && (
-                <Tag size="small" color="gold">مُزيّن</Tag>
+                <Tag color="gold">مُزيّن</Tag>
               )}
             </div>
           </div>

@@ -10,7 +10,6 @@ import {
   Form, 
   Input, 
   message, 
-  Timeline,
   Divider,
   Row,
   Col,
@@ -25,8 +24,6 @@ import {
   EnvironmentOutlined,
   DollarOutlined,
   CloseOutlined,
-  CheckCircleOutlined,
-  ClockCircleOutlined,
   WarningOutlined,
   QrcodeOutlined,
   TeamOutlined

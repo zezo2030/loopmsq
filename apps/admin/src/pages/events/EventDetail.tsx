@@ -11,26 +11,21 @@ import {
   Input, 
   InputNumber,
   message, 
-  Timeline,
   Divider,
   Row,
   Col,
   Avatar,
   Badge,
   Steps,
-  Select,
-  Switch,
   Alert
 } from 'antd'
 import { 
   ArrowLeftOutlined,
-  GiftOutlined,
   UserOutlined,
   CalendarOutlined,
   EnvironmentOutlined,
   DollarOutlined,
   CheckOutlined,
-  CloseOutlined,
   FileTextOutlined,
   WarningOutlined,
   PhoneOutlined,
@@ -302,8 +297,15 @@ export default function EventDetail() {
                 طلب حدث خاص #{event.id.slice(-8)}
               </h1>
               <Badge
-                status={event.status === 'confirmed' ? 'success' : 
-                       event.status === 'quoted' || event.status === 'paid' ? 'processing' : 'default'}
+                status={
+                  event.status === 'confirmed'
+                    ? 'success'
+                    : event.status === 'quoted' || event.status === 'paid' || event.status === 'submitted' || event.status === 'under_review' || event.status === 'invoiced'
+                    ? 'processing'
+                    : event.status === 'rejected'
+                    ? 'error'
+                    : 'default'
+                }
                 text={getStatusText(event.status)}
               />
             </Space>
@@ -344,7 +346,7 @@ export default function EventDetail() {
             <Card className="custom-card" style={{ marginBottom: '24px' }}>
               <Steps
                 current={getCurrentStep(event.status)}
-                status={event.status === 'rejected' ? 'error' : 'process'}
+                status={'process'}
                 direction="horizontal"
                 size="small"
               >

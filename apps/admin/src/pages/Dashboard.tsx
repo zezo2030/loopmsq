@@ -1,10 +1,8 @@
-import { Row, Col, Card, Statistic, Progress, List, Avatar, Button, Space, Tag, Divider } from 'antd'
+import { Row, Col, Card, Statistic, List, Avatar, Button, Space, Tag, Divider } from 'antd'
 import { 
   UserOutlined, 
   TeamOutlined, 
-  ShopOutlined, 
   CalendarOutlined,
-  TrophyOutlined,
   RiseOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
@@ -12,7 +10,6 @@ import {
   GiftOutlined,
   DollarOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
   FileTextOutlined
 } from '@ant-design/icons'
 import '../theme.css'
@@ -112,11 +109,7 @@ export default function Dashboard() {
     }
   ]
 
-  const topPerformers = [
-    { name: 'Riyadh Branch', score: 98, bookings: 145 },
-    { name: 'Jeddah Branch', score: 94, bookings: 128 },
-    { name: 'Dammam Branch', score: 89, bookings: 112 }
-  ]
+  
 
   return (
     <div className="page-container">
@@ -270,7 +263,6 @@ export default function Dashboard() {
                                 item.type === 'payment' ? 'gold' :
                                 'default'
                               }
-                              size="small"
                             >
                               {item.type === 'booking' && 'حجز'}
                               {item.type === 'trip' && 'رحلة'}
