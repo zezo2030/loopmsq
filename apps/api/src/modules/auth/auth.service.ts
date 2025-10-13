@@ -393,10 +393,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Check if user has staff or admin role
+    // Allow only ADMIN or BRANCH_MANAGER to access the web dashboard
     if (
-      !user.roles.includes(UserRole.STAFF) &&
-      !user.roles.includes(UserRole.ADMIN)
+      !user.roles.includes(UserRole.ADMIN) &&
+      !user.roles.includes(UserRole.BRANCH_MANAGER)
     ) {
       throw new UnauthorizedException('Access denied');
     }
@@ -537,12 +537,11 @@ export class AuthService {
   }> {
     const payload = {
       sub: user.id,
-      phone: user.phone,
       roles: user.roles,
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      expiresIn: '24h',
+      expiresIn: '4h',
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {

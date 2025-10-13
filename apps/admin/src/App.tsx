@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAdminAuth } from './auth'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
@@ -6,6 +7,7 @@ import './App.css'
 function App() {
   const [count, setCount] = useState(0)
   const [apiHealth, setApiHealth] = useState<string>('checking...')
+  const { status } = useAdminAuth()
 
   useEffect(() => {
     const base = import.meta.env.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE || 'http://localhost:3000/api/v1';
@@ -14,6 +16,22 @@ function App() {
       .then((t) => setApiHealth(t))
       .catch(() => setApiHealth('unreachable'))
   }, [])
+
+  if (status === 'loading') {
+    return (
+      <>
+        <p>Loading...</p>
+      </>
+    )
+  }
+
+  if (status === 'unauthorized') {
+    return (
+      <>
+        <p>Unauthorized. Please login with an admin or branch manager account.</p>
+      </>
+    )
+  }
 
   return (
     <>

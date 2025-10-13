@@ -8,7 +8,6 @@ import { User } from '../../../database/entities/user.entity';
 
 export interface JwtPayload {
   sub: string;
-  phone: string;
   roles: string[];
   iat?: number;
   exp?: number;
