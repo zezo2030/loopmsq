@@ -9,6 +9,7 @@ import {
   Index,
 } from 'typeorm';
 import { User } from './user.entity';
+import { PaymentMethod } from './payment.entity';
 
 export enum TripRequestStatus {
   PENDING = 'pending',
@@ -96,6 +97,17 @@ export class SchoolTripRequest {
 
   @Column({ type: 'text', nullable: true })
   adminNotes: string;
+
+  @Column({ type: 'json', nullable: true })
+  addOns: {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+  }[];
+
+  @Column({ type: 'enum', enum: PaymentMethod, nullable: true })
+  paymentMethod?: PaymentMethod;
 
   @CreateDateColumn()
   createdAt: Date;

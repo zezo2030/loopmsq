@@ -1,5 +1,27 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsEmail, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
+import { IsArray, IsDateString, IsEmail, IsEnum, IsInt, IsOptional, IsString, Length, Max, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { PaymentMethod } from '../../../database/entities/payment.entity';
+
+class AddOnDto {
+  @ApiProperty({ description: 'Add-on ID', example: 'addon-uuid' })
+  @IsString()
+  id: string;
+
+  @ApiProperty({ description: 'Add-on name', example: 'Meals' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ description: 'Add-on price', example: 20 })
+  @IsInt()
+  @Min(0)
+  price: number;
+
+  @ApiProperty({ description: 'Quantity', example: 1 })
+  @IsInt()
+  @Min(1)
+  quantity: number;
+}
 
 export class CreateTripRequestDto {
   @ApiProperty()
@@ -22,7 +44,7 @@ export class CreateTripRequestDto {
 
   @ApiProperty()
   @IsDateString()
-  preferredDate: string as unknown as Date;
+  preferredDate: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -57,6 +79,18 @@ export class CreateTripRequestDto {
   @IsString()
   @Length(0, 1000)
   specialRequirements?: string;
+
+  @ApiPropertyOptional({ description: 'Add-ons (meals, drinks)', type: Array })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AddOnDto)
+  addOns?: AddOnDto[];
+
+  @ApiPropertyOptional({ enum: PaymentMethod })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
 }
 
 

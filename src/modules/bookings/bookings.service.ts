@@ -302,6 +302,17 @@ export class BookingsService {
       };
     }
 
+    // Enforce branch restriction: staff can only scan tickets for their branch (if staff has branch)
+    const staff = await this.userRepository.findOne({ where: { id: staffId } });
+    if (staff?.branchId && staff.branchId !== ticket.booking.branchId) {
+      return {
+        success: false,
+        ticket,
+        booking: ticket.booking,
+        message: 'Forbidden: ticket belongs to a different branch',
+      };
+    }
+
     // Check ticket status
     if (ticket.status === TicketStatus.USED) {
       return {
@@ -378,6 +389,17 @@ export class BookingsService {
       ticket,
       booking: ticket.booking,
     };
+  }
+
+  async getStaffScans(staffId: string): Promise<{
+    scans: Ticket[];
+  }> {
+    const scans = await this.ticketRepository.find({
+      where: { staffId },
+      order: { scannedAt: 'DESC' },
+      relations: ['booking', 'booking.branch', 'booking.hall'],
+    } as any);
+    return { scans };
   }
 
   async cancelBooking(

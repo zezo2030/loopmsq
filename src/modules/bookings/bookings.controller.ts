@@ -138,4 +138,12 @@ export class BookingsController {
   async getTicketByToken(@Param('token') token: string) {
     return this.bookingsService.getTicketByToken(token);
   }
+
+  @Get('staff/scans/me')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.STAFF, UserRole.ADMIN)
+  @ApiOperation({ summary: 'List tickets scanned by current staff' })
+  async getMyScans(@CurrentUser() user: User) {
+    return this.bookingsService.getStaffScans(user.id);
+  }
 }

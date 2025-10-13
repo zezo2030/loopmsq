@@ -7,10 +7,13 @@ import {
   OneToMany,
   OneToOne,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { UserRole } from '../../common/decorators/roles.decorator';
 import { Booking } from './booking.entity';
 import { Wallet } from './wallet.entity';
+import { Branch } from './branch.entity';
 import { SupportTicket } from './support-ticket.entity';
 import { SchoolTripRequest } from './school-trip-request.entity';
 
@@ -68,4 +71,11 @@ export class User {
 
   @OneToMany(() => SchoolTripRequest, (request) => request.requester)
   schoolTripRequests: SchoolTripRequest[];
+
+  @ManyToOne(() => Branch, (branch) => branch.bookings, { nullable: true })
+  @JoinColumn({ name: 'branchId' })
+  branch?: Branch;
+
+  @Column({ type: 'uuid', nullable: true })
+  branchId?: string;
 }

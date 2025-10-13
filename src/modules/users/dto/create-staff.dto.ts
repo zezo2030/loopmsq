@@ -57,4 +57,13 @@ export class CreateStaffDto {
   @IsOptional()
   @IsString()
   language?: string = 'ar';
+
+  @ApiProperty({
+    description: 'Branch ID for staff (optional, required if staff)',
+    example: 'a3c5a1d2-4e5f-6789-9abc-def012345678',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }

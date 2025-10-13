@@ -35,6 +35,7 @@ export class UsersService {
       roles,
       phone,
       language = 'ar',
+      branchId,
     } = createStaffDto;
 
     // Check if email already exists
@@ -77,6 +78,7 @@ export class UsersService {
       phone: phone ? this.encryptionService.encrypt(phone) : undefined,
       language,
       isActive: true,
+      branchId,
     });
 
     const savedUser = await this.userRepository.save(user);

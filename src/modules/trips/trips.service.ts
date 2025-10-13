@@ -1,13 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { SchoolTripRequest, TripRequestStatus } from '../../database/entities/school-trip-request.entity';
 import * as XLSX from 'xlsx';
 import { InvoiceTripRequestDto } from './dto/invoice-trip-request.dto';
 import { IssueTicketsDto } from './dto/issue-tickets.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Booking } from '../../database/entities/booking.entity';
+import { Booking, BookingStatus } from '../../database/entities/booking.entity';
+import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
+import { User } from '../../database/entities/user.entity';
 import { CreateTripRequestDto } from './dto/create-trip-request.dto';
 import { SubmitTripRequestDto } from './dto/submit-trip-request.dto';
 
@@ -18,6 +18,10 @@ export class TripsService {
     private readonly tripRepo: Repository<SchoolTripRequest>,
     @InjectRepository(Booking)
     private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Ticket)
+    private readonly ticketRepo: Repository<Ticket>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
 
   async createRequest(userId: string, dto: CreateTripRequestDto) {
@@ -26,13 +30,15 @@ export class TripsService {
       schoolName: dto.schoolName,
       studentsCount: dto.studentsCount,
       accompanyingAdults: dto.accompanyingAdults,
-      preferredDate: dto.preferredDate,
+      preferredDate: new Date(dto.preferredDate as any),
       preferredTime: dto.preferredTime,
       durationHours: dto.durationHours ?? 2,
       contactPersonName: dto.contactPersonName,
       contactPhone: dto.contactPhone,
       contactEmail: dto.contactEmail,
       specialRequirements: dto.specialRequirements,
+      addOns: dto.addOns,
+      paymentMethod: dto.paymentMethod,
       status: TripRequestStatus.PENDING,
     });
     const saved = await this.tripRepo.save(req);
@@ -112,7 +118,8 @@ export class TripsService {
     }
     const baseCount = (req.studentsList?.length || req.studentsCount) + (req.accompanyingAdults || 0);
     const pricePerPerson = 50; // SAR mock pricing
-    const total = dto.overrideAmount ?? baseCount * pricePerPerson;
+    const addOnsTotal = (req.addOns || []).reduce((sum, a) => sum + (a.price * a.quantity), 0);
+    const total = dto.overrideAmount ?? baseCount * pricePerPerson + addOnsTotal;
     req.quotedPrice = total;
     req.status = TripRequestStatus.INVOICED;
     req.invoiceId = `inv_${req.id}`;
@@ -128,20 +135,51 @@ export class TripsService {
     }
     // Create a booking representing the trip
     const persons = (req.studentsList?.length || req.studentsCount) + (req.accompanyingAdults || 0);
-    const booking = this.bookingRepo.create({
+    // derive branch from issuer if available
+    const issuer = await this.userRepo.findOne({ where: { id: issuerId } });
+    const bookingData: Partial<Booking> = {
       userId: req.requesterId,
-      branchId: '00000000-0000-0000-0000-000000000000',
-      hallId: null,
+      branchId: (req as any).branchId || issuer?.branchId,
       startTime: new Date(dto.startTime),
-      durationHours: dto.durationHours,
-      persons,
-      totalPrice: req.quotedPrice || persons * 50,
-      status: 1 as any, // will be set by BookingsService when paid normally; here just placeholder
-    });
-    await this.bookingRepo.save(booking);
+      durationHours: dto.durationHours as any,
+      persons: persons as any,
+      totalPrice: Number(req.quotedPrice ?? persons * 50) as any,
+      status: BookingStatus.CONFIRMED,
+    };
+    const booking = this.bookingRepo.create(bookingData);
+    const savedBooking = await this.bookingRepo.save(booking);
+
+    // Generate tickets for each participant/person
+    const tickets: Ticket[] = [];
+    for (let i = 0; i < persons; i++) {
+      const t = this.ticketRepo.create({
+        bookingId: savedBooking.id,
+        qrTokenHash: '', // will be filled later by QR flow; keep valid placeholder
+        status: TicketStatus.VALID,
+        personCount: 1,
+        validFrom: savedBooking.startTime as any,
+        validUntil: new Date(
+          (savedBooking.startTime as any as Date).getTime() + (savedBooking.durationHours as any as number) * 3600 * 1000,
+        ),
+      } as Partial<Ticket>);
+      tickets.push(t);
+    }
+    await this.ticketRepo.save(tickets);
+    // TODO: send notifications with dto.welcomeMessage (Phase 05)
     req.status = TripRequestStatus.COMPLETED;
     await this.tripRepo.save(req);
-    return { bookingId: booking.id };
+    return { bookingId: savedBooking.id };
+  }
+
+  async markPaid(approverId: string, id: string, dto: any) {
+    const req = await this.tripRepo.findOne({ where: { id } });
+    if (!req) throw new NotFoundException('Request not found');
+    if (req.status !== TripRequestStatus.INVOICED) {
+      throw new BadRequestException('Only invoiced requests can be marked paid');
+    }
+    req.status = TripRequestStatus.PAID;
+    await this.tripRepo.save(req);
+    return { success: true };
   }
 }
 

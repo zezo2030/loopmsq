@@ -55,8 +55,8 @@ export class TicketsService {
 
   async giftTicket(userId: string, ticketId: string, dto: GiftTicketDto) {
     const { ticket } = await this.ensureOwner(userId, ticketId);
-    ticket.holderName = dto.holderName;
-    ticket.holderPhone = dto.holderPhone;
+    ticket.holderName = dto.holderName ?? ticket.holderName;
+    ticket.holderPhone = dto.holderPhone ?? ticket.holderPhone;
     await this.ticketRepo.save(ticket);
     return { success: true };
   }

@@ -16,6 +16,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { InvoiceTripRequestDto } from './dto/invoice-trip-request.dto';
 import { IssueTicketsDto } from './dto/issue-tickets.dto';
+import { MarkPaidDto } from './dto/mark-paid.dto';
 import { TripsService } from './trips.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateTripRequestDto } from './dto/create-trip-request.dto';
@@ -116,6 +117,18 @@ export class TripsController {
     @Body() dto: IssueTicketsDto,
   ) {
     return this.tripsService.issueTickets(user.id, id, dto);
+  }
+
+  @Post('requests/:id/mark-paid')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @ApiOperation({ summary: 'Mark a trip request as paid (manual/cash)' })
+  markPaid(
+    @CurrentUser() user: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: MarkPaidDto,
+  ) {
+    return this.tripsService.markPaid(user.id, id, dto);
   }
 }
 
