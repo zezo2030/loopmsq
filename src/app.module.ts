@@ -16,6 +16,7 @@ import { ContentModule } from './modules/content/content.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
+import { TripsModule } from './modules/trips/trips.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { TicketsModule } from './modules/tickets/tickets.module';
     BookingsModule,
     PaymentsModule,
     TicketsModule,
+    TripsModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],
