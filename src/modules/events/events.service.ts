@@ -1,0 +1,90 @@
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { EventRequest, EventRequestStatus } from '../../database/entities/event-request.entity';
+import { CreateEventRequestDto } from './dto/create-event-request.dto';
+import { QuoteEventRequestDto } from './dto/quote-event-request.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+
+@Injectable()
+export class EventsService {
+  constructor(
+    @InjectRepository(EventRequest)
+    private readonly eventRepo: Repository<EventRequest>,
+    private readonly notifications: NotificationsService,
+  ) {}
+
+  async createRequest(userId: string, dto: CreateEventRequestDto) {
+    const req = this.eventRepo.create({
+      requesterId: userId,
+      type: dto.type,
+      decorated: dto.decorated || false,
+      branchId: dto.branchId,
+      hallId: dto.hallId,
+      startTime: new Date(dto.startTime),
+      durationHours: dto.durationHours,
+      persons: dto.persons,
+      addOns: dto.addOns,
+      notes: dto.notes,
+      status: EventRequestStatus.SUBMITTED,
+    });
+    const saved = await this.eventRepo.save(req);
+    // status submitted
+    await this.notifications.enqueue({
+      type: 'EVENT_STATUS',
+      to: { userId },
+      data: { status: 'SUBMITTED' },
+      channels: ['sms', 'push'],
+    });
+    return { id: saved.id };
+  }
+
+  async getRequest(user: any, id: string) {
+    const req = await this.eventRepo.findOne({ where: { id } });
+    if (!req) throw new NotFoundException('Request not found');
+    const isOwner = req.requesterId === user.id;
+    const roles: string[] = user.roles || [];
+    const isStaff = roles.includes('staff') || roles.includes('admin');
+    if (!isOwner && !isStaff) throw new ForbiddenException('Not allowed');
+    return req;
+  }
+
+  async quote(id: string, dto: QuoteEventRequestDto) {
+    const req = await this.eventRepo.findOne({ where: { id } });
+    if (!req) throw new NotFoundException('Request not found');
+    if (req.status !== EventRequestStatus.SUBMITTED && req.status !== EventRequestStatus.UNDER_REVIEW) {
+      throw new BadRequestException('Only submitted/under_review can be quoted');
+    }
+    const base = dto.basePrice ?? 0;
+    const addOnsTotal = (req.addOns || []).reduce((s, a) => s + a.price * a.quantity, 0);
+    req.quotedPrice = base + addOnsTotal;
+    req.status = EventRequestStatus.QUOTED;
+    await this.eventRepo.save(req);
+    await this.notifications.enqueue({
+      type: 'EVENT_STATUS',
+      to: { userId: req.requesterId },
+      data: { status: 'QUOTED' },
+      channels: ['sms', 'push'],
+    });
+    return { quotedPrice: req.quotedPrice };
+  }
+
+  async confirm(id: string) {
+    const req = await this.eventRepo.findOne({ where: { id } });
+    if (!req) throw new NotFoundException('Request not found');
+    if (req.status !== EventRequestStatus.PAID && req.status !== EventRequestStatus.QUOTED) {
+      throw new BadRequestException('Only paid/quoted can be confirmed');
+    }
+    req.status = EventRequestStatus.CONFIRMED;
+    await this.eventRepo.save(req);
+    await this.notifications.enqueue({
+      type: 'EVENT_STATUS',
+      to: { userId: req.requesterId },
+      data: { status: 'CONFIRMED' },
+      channels: ['sms', 'push'],
+    });
+    return { success: true };
+  }
+}
+
+

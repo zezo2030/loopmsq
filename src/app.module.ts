@@ -17,6 +17,8 @@ import { BookingsModule } from './modules/bookings/bookings.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { TripsModule } from './modules/trips/trips.module';
+import { EventsModule } from './modules/events/events.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -65,6 +67,8 @@ import { TripsModule } from './modules/trips/trips.module';
     PaymentsModule,
     TicketsModule,
     TripsModule,
+    EventsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],

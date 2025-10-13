@@ -8,9 +8,10 @@ import { User } from '../../database/entities/user.entity';
 import { ContentModule } from '../content/content.module';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { RedisService } from '../../utils/redis.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Booking, Ticket, User]), ContentModule],
+  imports: [TypeOrmModule.forFeature([Booking, Ticket, User]), ContentModule, NotificationsModule],
   controllers: [BookingsController],
   providers: [BookingsService, QRCodeService, RedisService],
   exports: [BookingsService],

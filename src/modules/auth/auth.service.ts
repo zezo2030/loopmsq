@@ -21,6 +21,7 @@ import { UserRole } from '../../common/decorators/roles.decorator';
 import { RegisterSendOtpDto } from './dto/register-send-otp.dto';
 import { RegisterVerifyOtpDto } from './dto/register-verify-otp.dto';
 import { UserLoginDto } from './dto/user-login.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AuthService {
@@ -35,12 +36,14 @@ export class AuthService {
     private configService: ConfigService,
     private redisService: RedisService,
     private encryptionService: EncryptionService,
+    private notifications: NotificationsService,
   ) {}
 
   async sendOtp(
     sendOtpDto: SendOtpDto,
   ): Promise<{ success: boolean; message: string }> {
     const language = sendOtpDto.language ?? 'ar';
+    const lang: 'ar' | 'en' = language === 'en' ? 'en' : 'ar';
     const normalizedPhone = this.normalizePhone(sendOtpDto.phone);
 
     // Rate limiting check
@@ -62,8 +65,14 @@ export class AuthService {
     // Store OTP in Redis with 5 minutes expiry
     await this.redisService.setOTP(normalizedPhone, otp, 300);
 
-    // TODO: Send SMS via Twilio or other SMS provider
-    this.logger.log(`OTP for ${normalizedPhone}: ${otp}`); // For development only
+    // Enqueue SMS OTP
+    await this.notifications.enqueue({
+      type: 'OTP',
+      to: { phone: normalizedPhone },
+      data: { otp },
+      lang,
+      channels: ['sms'],
+    });
 
     const message =
       language === 'ar'

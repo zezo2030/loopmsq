@@ -9,6 +9,7 @@ import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { User } from '../../database/entities/user.entity';
 import { CreateTripRequestDto } from './dto/create-trip-request.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SubmitTripRequestDto } from './dto/submit-trip-request.dto';
 
 @Injectable()
@@ -22,6 +23,7 @@ export class TripsService {
     private readonly ticketRepo: Repository<Ticket>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async createRequest(userId: string, dto: CreateTripRequestDto) {
@@ -63,6 +65,13 @@ export class TripsService {
     }
     req.status = TripRequestStatus.UNDER_REVIEW;
     await this.tripRepo.save(req);
+    // notify status
+    await this.notifications.enqueue({
+      type: 'TRIP_STATUS',
+      to: { userId },
+      data: { status: 'UNDER_REVIEW' },
+      channels: ['sms'],
+    });
     return { success: true };
   }
 
@@ -76,6 +85,12 @@ export class TripsService {
     req.approvedAt = new Date();
     req.approvedBy = approverId;
     await this.tripRepo.save(req);
+    await this.notifications.enqueue({
+      type: 'TRIP_STATUS',
+      to: { userId: req.requesterId },
+      data: { status: 'APPROVED' },
+      channels: ['sms'],
+    });
     return { success: true };
   }
 
@@ -124,6 +139,12 @@ export class TripsService {
     req.status = TripRequestStatus.INVOICED;
     req.invoiceId = `inv_${req.id}`;
     await this.tripRepo.save(req);
+    await this.notifications.enqueue({
+      type: 'TRIP_STATUS',
+      to: { userId: req.requesterId },
+      data: { status: 'INVOICED' },
+      channels: ['sms', 'push'],
+    });
     return { invoiceId: req.invoiceId, amount: total, currency: dto.currency || 'SAR' };
   }
 
@@ -165,7 +186,14 @@ export class TripsService {
       tickets.push(t);
     }
     await this.ticketRepo.save(tickets);
-    // TODO: send notifications with dto.welcomeMessage (Phase 05)
+    // Send notifications (welcome message / tickets issued)
+    await this.notifications.enqueue({
+      type: 'TICKETS_ISSUED',
+      to: { userId: req.requesterId },
+      data: { bookingId: savedBooking.id, welcomeMessage: dto.welcomeMessage },
+      lang: 'ar',
+      channels: ['sms'],
+    });
     req.status = TripRequestStatus.COMPLETED;
     await this.tripRepo.save(req);
     return { bookingId: savedBooking.id };
@@ -179,6 +207,12 @@ export class TripsService {
     }
     req.status = TripRequestStatus.PAID;
     await this.tripRepo.save(req);
+    await this.notifications.enqueue({
+      type: 'TRIP_STATUS',
+      to: { userId: req.requesterId },
+      data: { status: 'PAID' },
+      channels: ['sms', 'push'],
+    });
     return { success: true };
   }
 }

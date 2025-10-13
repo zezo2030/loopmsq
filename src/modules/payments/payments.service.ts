@@ -19,6 +19,7 @@ import { WebhookEventDto } from './dto/webhook-event.dto';
 import { RefundDto } from './dto/refund.dto';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../../utils/redis.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService {
@@ -32,6 +33,7 @@ export class PaymentsService {
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async createIntent(userId: string, dto: CreatePaymentIntentDto) {
@@ -81,21 +83,21 @@ export class PaymentsService {
         method: dto.method,
       });
 
-      const saved = await queryRunner.manager.save(payment);
+      const savedPayment = await queryRunner.manager.save(payment);
 
       // Mock gateway: create session/secret
-      const clientSecret = `mock_secret_${saved.id}`;
-      saved.gatewayRef = clientSecret;
-      saved.status = PaymentStatus.PROCESSING;
-      await queryRunner.manager.save(saved);
+      const clientSecret = `mock_secret_${savedPayment.id}`;
+      savedPayment.gatewayRef = clientSecret;
+      savedPayment.status = PaymentStatus.PROCESSING;
+      await queryRunner.manager.save(savedPayment);
 
       await queryRunner.commitTransaction();
       const response = {
-        paymentId: saved.id,
+        paymentId: savedPayment.id,
         clientSecret,
-        amount: saved.amount,
-        currency: saved.currency,
-        status: saved.status,
+        amount: savedPayment.amount,
+        currency: savedPayment.currency,
+        status: savedPayment.status,
       };
 
       await this.redisService.set(idempotencyKey, response, 120);
@@ -138,6 +140,19 @@ export class PaymentsService {
       await queryRunner.manager.save(booking);
 
       await queryRunner.commitTransaction();
+      // Notify payment success and booking confirmed
+      await this.notifications.enqueue({
+        type: 'PAYMENT_SUCCESS',
+        to: { userId },
+        data: { amount: payment.amount, currency: payment.currency },
+        channels: ['sms', 'push'],
+      });
+      await this.notifications.enqueue({
+        type: 'BOOKING_CONFIRMED',
+        to: { userId },
+        data: { bookingId: booking.id },
+        channels: ['sms', 'push'],
+      });
       return { success: true, paymentId: payment.id };
     } catch (e) {
       await queryRunner.rollbackTransaction();

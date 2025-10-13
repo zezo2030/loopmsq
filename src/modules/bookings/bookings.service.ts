@@ -18,6 +18,7 @@ import { ScanTicketDto } from './dto/scan-ticket.dto';
 import { ContentService } from '../content/content.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { RedisService } from '../../utils/redis.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class BookingsService {
@@ -34,6 +35,7 @@ export class BookingsService {
     private qrCodeService: QRCodeService,
     private redisService: RedisService,
     private dataSource: DataSource,
+    private notifications: NotificationsService,
   ) {}
 
   async getQuote(quoteDto: BookingQuoteDto): Promise<{
@@ -198,6 +200,42 @@ export class BookingsService {
 
       // Clear cache
       await this.redisService.del(`user:${userId}:bookings`);
+
+      // Schedule reminders: 24h and 2h before start, and at end time
+      const startDate = new Date(startTime);
+      const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
+      const now = new Date();
+      const ms24h = startDate.getTime() - now.getTime() - 24 * 60 * 60 * 1000;
+      const ms2h = startDate.getTime() - now.getTime() - 2 * 60 * 60 * 1000;
+      const msEnd = endDate.getTime() - now.getTime();
+
+      if (ms24h > 0) {
+        await this.notifications.enqueue({
+          type: 'BOOKING_REMINDER',
+          to: { userId },
+          data: { bookingId: savedBooking.id, startTime },
+          channels: ['sms', 'push'],
+          delayMs: ms24h,
+        });
+      }
+      if (ms2h > 0) {
+        await this.notifications.enqueue({
+          type: 'BOOKING_REMINDER',
+          to: { userId },
+          data: { bookingId: savedBooking.id, startTime },
+          channels: ['sms', 'push'],
+          delayMs: ms2h,
+        });
+      }
+      if (msEnd > 0) {
+        await this.notifications.enqueue({
+          type: 'BOOKING_END',
+          to: { userId },
+          data: { bookingId: savedBooking.id },
+          channels: ['sms', 'push'],
+          delayMs: msEnd,
+        });
+      }
 
       return savedBooking;
     } catch (error) {
@@ -457,6 +495,14 @@ export class BookingsService {
 
       // Clear cache
       await this.redisService.del(`user:${userId}:bookings`);
+
+      // Notify cancellation
+      await this.notifications.enqueue({
+        type: 'BOOKING_CANCELLED',
+        to: { userId },
+        data: { bookingId: booking.id, reason },
+        channels: ['sms', 'push'],
+      });
 
       return booking;
     } catch (error) {

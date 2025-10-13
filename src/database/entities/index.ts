@@ -20,3 +20,4 @@ export {
   TicketPriority,
 } from './support-ticket.entity';
 export { Role } from './role.entity';
+export { DeviceToken } from './device-token.entity';
