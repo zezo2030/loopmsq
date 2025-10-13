@@ -16,7 +16,7 @@ export class NotificationsController {
   @Post('promo')
   @HttpCode(HttpStatus.OK)
   async sendPromo(@Body() body: { userId?: string; phone?: string; email?: string; message: string; lang?: 'ar' | 'en'; channels?: NotificationChannel[] }) {
-    const channels: NotificationChannel[] = body.channels && body.channels.length ? body.channels : (['sms'] as NotificationChannel[]);
+    const channels: NotificationChannel[] = body.channels && body.channels.length ? body.channels : (['sms', 'push'] as NotificationChannel[]);
     await this.notifications.enqueue({
       type: 'PROMO',
       to: { userId: body.userId, phone: body.phone, email: body.email },

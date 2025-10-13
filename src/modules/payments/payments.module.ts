@@ -7,6 +7,7 @@ import { Payment } from '../../database/entities/payment.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { RedisService } from '../../utils/redis.service';
 
 @Module({
@@ -15,6 +16,7 @@ import { RedisService } from '../../utils/redis.service';
     TypeOrmModule.forFeature([Payment, Booking]),
     UsersModule,
     NotificationsModule,
+    LoyaltyModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, RedisService],

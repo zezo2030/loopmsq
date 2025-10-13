@@ -21,7 +21,9 @@ export interface EnqueueNotification {
     | 'TRIP_STATUS'
     | 'EVENT_STATUS'
     | 'PROMO'
-    | 'ADMIN_MESSAGE';
+    | 'ADMIN_MESSAGE'
+    | 'LOYALTY_EARN'
+    | 'LOYALTY_REDEEM';
   to: { phone?: string; email?: string; userId?: string };
   template?: string;
   data: Record<string, unknown>;
@@ -185,6 +187,14 @@ export class NotificationsService {
         return String(d.message || (lang === 'ar' ? 'عرض ترويجي' : 'Promotion'));
       case 'ADMIN_MESSAGE':
         return String(d.message || (lang === 'ar' ? 'رسالة من الإدارة' : 'Admin Message'));
+      case 'LOYALTY_EARN':
+        return lang === 'ar'
+          ? `تم إضافة ${d.points} نقطة إلى رصيدك. الإجمالي: ${d.totalPoints}`
+          : `${d.points} points added to your balance. Total: ${d.totalPoints}`;
+      case 'LOYALTY_REDEEM':
+        return lang === 'ar'
+          ? `تم استبدال ${d.points} نقطة بقيمة ${d.credit}. المتبقي: ${d.totalPoints}`
+          : `Redeemed ${d.points} points for ${d.credit}. Remaining: ${d.totalPoints}`;
       default:
         return String(d.message || (lang === 'ar' ? 'تنبيه' : 'Notification'));
     }

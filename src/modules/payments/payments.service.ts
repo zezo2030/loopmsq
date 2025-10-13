@@ -20,6 +20,7 @@ import { RefundDto } from './dto/refund.dto';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../../utils/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 
 @Injectable()
 export class PaymentsService {
@@ -34,6 +35,7 @@ export class PaymentsService {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly notifications: NotificationsService,
+    private readonly loyalty: LoyaltyService,
   ) {}
 
   async createIntent(userId: string, dto: CreatePaymentIntentDto) {
@@ -153,6 +155,8 @@ export class PaymentsService {
         data: { bookingId: booking.id },
         channels: ['sms', 'push'],
       });
+      // Award loyalty points
+      await this.loyalty.awardPoints(userId, Number(payment.amount), booking.id);
       return { success: true, paymentId: payment.id };
     } catch (e) {
       await queryRunner.rollbackTransaction();
