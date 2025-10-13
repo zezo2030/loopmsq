@@ -15,6 +15,7 @@ import { UsersModule } from './modules/users/users.module';
 import { ContentModule } from './modules/content/content.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { TicketsModule } from './modules/tickets/tickets.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     ContentModule,
     BookingsModule,
     PaymentsModule,
+    TicketsModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],

@@ -287,8 +287,9 @@ export class BookingsService {
   }> {
     const { qrToken } = scanTicketDto;
 
-    // Find ticket by QR token hash
-    const qrTokenHash = this.qrCodeService.generateQRTokenHash(qrToken);
+    // Resolve ephemeral QR token mapping from Redis if exists, else hash directly
+    const mappedHash = await this.redisService.get(`share:qr:${qrToken}`);
+    const qrTokenHash = mappedHash || this.qrCodeService.generateQRTokenHash(qrToken);
     const ticket = await this.ticketRepository.findOne({
       where: { qrTokenHash },
       relations: ['booking', 'booking.branch', 'booking.hall', 'booking.user'],
@@ -360,7 +361,10 @@ export class BookingsService {
     ticket: Ticket;
     booking: Booking;
   }> {
-    const qrTokenHash = this.qrCodeService.generateQRTokenHash(token);
+    // Accept ephemeral share tokens (resolve to qrTokenHash if present)
+    const redis = this.redisService.getClient();
+    const mappedHash = await redis.get(`share:qr:${token}`);
+    const qrTokenHash = mappedHash || this.qrCodeService.generateQRTokenHash(token);
     const ticket = await this.ticketRepository.findOne({
       where: { qrTokenHash },
       relations: ['booking', 'booking.branch', 'booking.hall', 'booking.user'],
