@@ -23,7 +23,8 @@ export interface EnqueueNotification {
     | 'PROMO'
     | 'ADMIN_MESSAGE'
     | 'LOYALTY_EARN'
-    | 'LOYALTY_REDEEM';
+    | 'LOYALTY_REDEEM'
+    | 'RATING_REQUEST';
   to: { phone?: string; email?: string; userId?: string };
   template?: string;
   data: Record<string, unknown>;
@@ -130,6 +131,8 @@ export class NotificationsService {
         return lang === 'ar' ? 'تذكير بالحجز' : 'Booking Reminder';
       case 'BOOKING_END':
         return lang === 'ar' ? 'انتهاء الحجز' : 'Booking Ended';
+      case 'RATING_REQUEST':
+        return lang === 'ar' ? 'تقييم تجربتك' : 'Rate Your Experience';
       case 'BOOKING_CANCELLED':
         return lang === 'ar' ? 'إلغاء الحجز' : 'Booking Cancelled';
       case 'PAYMENT_SUCCESS':
@@ -195,6 +198,10 @@ export class NotificationsService {
         return lang === 'ar'
           ? `تم استبدال ${d.points} نقطة بقيمة ${d.credit}. المتبقي: ${d.totalPoints}`
           : `Redeemed ${d.points} points for ${d.credit}. Remaining: ${d.totalPoints}`;
+      case 'RATING_REQUEST':
+        return lang === 'ar'
+          ? `نود معرفة رأيك بخدمتنا لحجزك رقم ${d.bookingId}. شاركنا تقييمك وملاحظاتك.`
+          : `We'd love your feedback on booking ${d.bookingId}. Please rate your experience.`;
       default:
         return String(d.message || (lang === 'ar' ? 'تنبيه' : 'Notification'));
     }

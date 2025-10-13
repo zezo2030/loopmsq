@@ -208,6 +208,7 @@ export class BookingsService {
       const ms24h = startDate.getTime() - now.getTime() - 24 * 60 * 60 * 1000;
       const ms2h = startDate.getTime() - now.getTime() - 2 * 60 * 60 * 1000;
       const msEnd = endDate.getTime() - now.getTime();
+      const msRating = msEnd + 5 * 60 * 60 * 1000; // 5 hours after end
 
       if (ms24h > 0) {
         await this.notifications.enqueue({
@@ -234,6 +235,16 @@ export class BookingsService {
           data: { bookingId: savedBooking.id },
           channels: ['sms', 'push'],
           delayMs: msEnd,
+        });
+      }
+
+      if (msRating > 0) {
+        await this.notifications.enqueue({
+          type: 'RATING_REQUEST',
+          to: { userId },
+          data: { bookingId: savedBooking.id },
+          channels: ['sms', 'push'],
+          delayMs: msRating,
         });
       }
 

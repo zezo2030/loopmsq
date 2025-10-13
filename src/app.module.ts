@@ -21,6 +21,7 @@ import { EventsModule } from './modules/events/events.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { SupportModule } from './modules/support/support.module';
+import { FavoritesModule } from './modules/favorites/favorites.module';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { SupportModule } from './modules/support/support.module';
     NotificationsModule,
     LoyaltyModule,
     SupportModule,
+    FavoritesModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],
