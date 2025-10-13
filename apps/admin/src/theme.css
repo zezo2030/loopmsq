@@ -423,6 +423,209 @@ body {
   }
 }
 
+/* Enhanced User Management Dropdown Styles */
+.admin-menu .ant-menu-submenu {
+  margin: 6px 0 !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-menu .ant-menu-submenu::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.admin-menu .ant-menu-submenu .ant-menu-submenu-title {
+  border-radius: var(--radius-sm) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  margin-bottom: 8px !important;
+  padding: 0 16px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-menu .ant-menu-submenu-open .ant-menu-submenu-title {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.admin-menu .ant-menu-submenu:hover::before,
+.admin-menu .ant-menu-submenu-open::before {
+  opacity: 1;
+}
+
+.admin-menu .ant-menu-submenu .ant-menu-submenu-title:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  transform: translateX(4px);
+}
+
+.admin-menu .ant-menu-submenu .ant-menu-submenu-arrow {
+  color: rgba(255, 255, 255, 0.7) !important;
+  transition: all 0.3s ease;
+}
+
+.admin-menu .ant-menu-submenu-open .ant-menu-submenu-arrow {
+  color: white !important;
+  transform: rotate(180deg);
+}
+
+.admin-menu .ant-menu-sub {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-radius: var(--radius-md) !important;
+  margin: 8px 0 16px 0 !important;
+  padding: 12px 0 !important;
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-menu .ant-menu-sub::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+}
+
+.admin-menu .ant-menu-sub .ant-menu-item {
+  margin: 4px 8px !important;
+  padding: 0 16px !important;
+  height: auto !important;
+  line-height: normal !important;
+  border-radius: var(--radius-sm) !important;
+  transition: all 0.2s ease;
+  background: transparent !important;
+}
+
+.admin-menu .ant-menu-sub .ant-menu-item:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08)) !important;
+  transform: translateX(8px) scale(1.02);
+  box-shadow: 0 6px 16px rgba(255, 255, 255, 0.15);
+  border-left: 3px solid rgba(59, 130, 246, 0.8);
+}
+
+.admin-menu .ant-menu-sub .ant-menu-item-selected {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(16, 185, 129, 0.15)) !important;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.2);
+  border-left: 3px solid #3b82f6 !important;
+  transform: translateX(6px);
+}
+
+.user-dropdown-link {
+  display: block !important;
+  color: inherit !important;
+  text-decoration: none !important;
+  padding: 12px 0 !important;
+}
+
+.user-dropdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dropdown-item-text {
+  font-weight: 600;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.2;
+}
+
+.dropdown-item-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.admin-menu .ant-menu-sub .ant-menu-item:hover .dropdown-item-text {
+  color: white;
+}
+
+.admin-menu .ant-menu-sub .ant-menu-item:hover .dropdown-item-desc {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.admin-menu .ant-menu-sub .ant-menu-item-selected .dropdown-item-text {
+  color: white;
+}
+
+.admin-menu .ant-menu-sub .ant-menu-item-selected .dropdown-item-desc {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Enhanced submenu icons */
+.admin-menu .ant-menu-sub .ant-menu-item .anticon {
+  margin-right: 12px !important;
+  font-size: 16px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  transition: all 0.2s ease;
+}
+
+.admin-menu .ant-menu-sub .ant-menu-item:hover .anticon {
+  color: white !important;
+  transform: scale(1.1);
+}
+
+.admin-menu .ant-menu-sub .ant-menu-item-selected .anticon {
+  color: white !important;
+}
+
+/* Smooth animations for dropdown */
+.admin-menu .ant-menu-submenu-inline > .ant-menu-submenu-title .ant-menu-submenu-arrow {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Add subtle pulse animation for active dropdown */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.5);
+  }
+}
+
+.admin-menu .ant-menu-submenu-open .ant-menu-submenu-title {
+  animation: pulse-glow 2s infinite;
+}
+
+/* Add ripple effect on click */
+.admin-menu .ant-menu-submenu .ant-menu-submenu-title {
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-menu .ant-menu-submenu .ant-menu-submenu-title::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+  pointer-events: none;
+}
+
+.admin-menu .ant-menu-submenu .ant-menu-submenu-title:active::after {
+  width: 200px;
+  height: 200px;
+}
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
   width: 6px;

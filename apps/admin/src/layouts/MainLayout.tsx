@@ -6,7 +6,13 @@ import {
   TeamOutlined,
   LogoutOutlined,
   SettingOutlined,
-  BellOutlined
+  BellOutlined,
+  UsergroupAddOutlined,
+  UserAddOutlined,
+  CrownOutlined,
+  CalendarOutlined,
+  BookOutlined,
+  GiftOutlined
 } from '@ant-design/icons'
 import '../theme.css'
 
@@ -17,6 +23,15 @@ export default function MainLayout() {
     const path = location.pathname
     if (path.startsWith('/users') || path.startsWith('/staff') || path.startsWith('/branch-managers')) {
       return ['users']
+    }
+    if (path.startsWith('/bookings')) {
+      return ['bookings']
+    }
+    if (path.startsWith('/trips')) {
+      return ['trips']
+    }
+    if (path.startsWith('/events')) {
+      return ['events']
     }
     return [path === '/' ? 'dashboard' : path.replace('/', '')]
   }
@@ -61,17 +76,50 @@ export default function MainLayout() {
       children: [
         {
           key: 'users-list',
-          label: <Link to="/users">All Users</Link>,
+          icon: <UsergroupAddOutlined />,
+          label: <Link to="/users" className="user-dropdown-link">
+            <div className="user-dropdown-item">
+              <span className="dropdown-item-text">All Users</span>
+              <span className="dropdown-item-desc">Manage system users</span>
+            </div>
+          </Link>,
         },
         {
           key: 'create-staff',
-          label: <Link to="/staff/new">Add Staff</Link>,
+          icon: <UserAddOutlined />,
+          label: <Link to="/staff/new" className="user-dropdown-link">
+            <div className="user-dropdown-item">
+              <span className="dropdown-item-text">Add Staff</span>
+              <span className="dropdown-item-desc">Add new staff member</span>
+            </div>
+          </Link>,
         },
         {
           key: 'create-manager',
-          label: <Link to="/branch-managers/new">Add Manager</Link>,
+          icon: <CrownOutlined />,
+          label: <Link to="/branch-managers/new" className="user-dropdown-link">
+            <div className="user-dropdown-item">
+              <span className="dropdown-item-text">Add Manager</span>
+              <span className="dropdown-item-desc">Add branch manager</span>
+            </div>
+          </Link>,
         },
       ],
+    },
+    {
+      key: 'bookings',
+      icon: <CalendarOutlined />,
+      label: <Link to="/bookings">Bookings Management</Link>,
+    },
+    {
+      key: 'trips',
+      icon: <BookOutlined />,
+      label: <Link to="/trips">School Trips</Link>,
+    },
+    {
+      key: 'events',
+      icon: <GiftOutlined />,
+      label: <Link to="/events">Special Events</Link>,
     },
   ]
 
@@ -140,10 +188,25 @@ export default function MainLayout() {
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/') return 'Dashboard Overview'
+  
+  // Users Management
   if (pathname === '/users') return 'User Management'
   if (pathname.startsWith('/users/')) return 'User Details'
   if (pathname === '/staff/new') return 'Create Staff Member'
   if (pathname === '/branch-managers/new') return 'Create Branch Manager'
+  
+  // Bookings Management
+  if (pathname === '/bookings') return 'Bookings Management'
+  if (pathname.startsWith('/bookings/')) return 'Booking Details'
+  
+  // School Trips
+  if (pathname === '/trips') return 'School Trips'
+  if (pathname.startsWith('/trips/')) return 'Trip Details'
+  
+  // Special Events
+  if (pathname === '/events') return 'Special Events'
+  if (pathname.startsWith('/events/')) return 'Event Details'
+  
   return 'Admin Control Panel'
 }
 
