@@ -5,7 +5,11 @@ const { Header, Sider, Content } = Layout
 
 export default function MainLayout() {
   const location = useLocation()
-  const selected = location.pathname === '/' ? ['dashboard'] : []
+  const selected = location.pathname.startsWith('/users')
+    ? ['users']
+    : location.pathname === '/'
+    ? ['dashboard']
+    : []
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -13,6 +17,7 @@ export default function MainLayout() {
         <div style={{ height: 48, margin: 16, background: 'rgba(255,255,255,0.2)' }} />
         <Menu theme="dark" mode="inline" selectedKeys={selected} items={[
           { key: 'dashboard', label: <Link to="/">Dashboard</Link> },
+          { key: 'users', label: <Link to="/users">Users</Link> },
         ]} />
       </Sider>
       <Layout>

@@ -112,18 +112,26 @@ export class UsersService {
   async findAll(
     page: number = 1,
     limit: number = 10,
+    requester?: User,
   ): Promise<{
     users: Partial<User>[];
     total: number;
     page: number;
     totalPages: number;
   }> {
-    const [users, total] = await this.userRepository.findAndCount({
-      skip: (page - 1) * limit,
-      take: limit,
-      order: { createdAt: 'DESC' },
-      relations: ['wallet'],
-    });
+    const qb = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.wallet', 'wallet')
+      .orderBy('user.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    // Branch Manager can only see users in their branch
+    if (requester?.roles?.includes(UserRole.BRANCH_MANAGER) && requester.branchId) {
+      qb.andWhere('user.branchId = :branchId', { branchId: requester.branchId });
+    }
+
+    const [users, total] = await qb.getManyAndCount();
 
     const decryptedUsers = users.map((user) => ({
       id: user.id,
@@ -148,13 +156,23 @@ export class UsersService {
     };
   }
 
-  async findOne(id: string): Promise<Partial<User>> {
+  async findOne(id: string, requester?: User): Promise<Partial<User>> {
     const user = await this.userRepository.findOne({
       where: { id },
       relations: ['wallet', 'bookings', 'supportTickets'],
     });
 
     if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Branch Manager restriction: cannot access users outside own branch
+    if (
+      requester?.roles?.includes(UserRole.BRANCH_MANAGER) &&
+      requester.branchId &&
+      user.branchId &&
+      requester.branchId !== user.branchId
+    ) {
       throw new NotFoundException('User not found');
     }
 

@@ -58,8 +58,8 @@ export class UsersController {
 
   @Get()
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.STAFF)
-  @ApiOperation({ summary: 'Get all users (Admin/Staff only)' })
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Get all users (Admin/Branch Manager only)' })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -76,10 +76,11 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async findAll(
+    @CurrentUser() requester: User,
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
   ) {
-    return this.usersService.findAll(page, limit);
+    return this.usersService.findAll(page, limit, requester);
   }
 
   @Get('stats')
@@ -109,14 +110,14 @@ export class UsersController {
 
   @Get(':id')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.STAFF)
-  @ApiOperation({ summary: 'Get user by ID (Admin/Staff only)' })
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Get user by ID (Admin/Branch Manager only)' })
   @ApiResponse({ status: 200, description: 'User retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.findOne(id);
+  async findOne(@CurrentUser() requester: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.findOne(id, requester);
   }
 
   @Put('profile')
