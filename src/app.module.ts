@@ -24,6 +24,8 @@ import { SupportModule } from './modules/support/support.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { HomeModule } from './modules/home/home.module';
 import { HomeAdminModule } from './modules/home-admin/home-admin.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -79,6 +81,8 @@ import { HomeAdminModule } from './modules/home-admin/home-admin.module';
     FavoritesModule,
     HomeModule,
     HomeAdminModule,
+    ReviewsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],
