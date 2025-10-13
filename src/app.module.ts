@@ -22,6 +22,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { SupportModule } from './modules/support/support.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
+import { HomeModule } from './modules/home/home.module';
+import { HomeAdminModule } from './modules/home-admin/home-admin.module';
 
 @Module({
   imports: [
@@ -75,6 +77,8 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
     LoyaltyModule,
     SupportModule,
     FavoritesModule,
+    HomeModule,
+    HomeAdminModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],

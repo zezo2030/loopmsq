@@ -50,6 +50,9 @@ export class Branch {
   @Column({ type: 'json', nullable: true })
   amenities: string[];
 
+  @Column({ type: 'text', nullable: true })
+  videoUrl: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
