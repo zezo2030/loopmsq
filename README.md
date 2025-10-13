@@ -269,6 +269,39 @@ docker build -t booking-backend .
 docker run -p 3000:3000 booking-backend
 ```
 
+## Payments - Quick Test
+
+- Create intent (requires JWT):
+```bash
+curl -X POST http://localhost:3000/api/v1/payments/intent \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"bookingId":"<BOOKING_ID>","method":"credit_card"}'
+```
+
+- Confirm payment:
+```bash
+curl -X POST http://localhost:3000/api/v1/payments/confirm \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"bookingId":"<BOOKING_ID>","paymentId":"<PAYMENT_ID>","gatewayPayload":{"clientSecret":"<CLIENT_SECRET>"}}'
+```
+
+- Webhook (no auth) with signature:
+```bash
+curl -X POST http://localhost:3000/api/v1/payments/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"eventType":"payment.succeeded","data":{"paymentId":"<PAYMENT_ID>","secret":"dev-webhook-secret"}}'
+```
+
+- Refund (admin only):
+```bash
+curl -X POST http://localhost:3000/api/v1/payments/refund \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"paymentId":"<PAYMENT_ID>","amount":50,"reason":"test"}'
+```
+
 ## Contributing
 
 1. Fork the repository

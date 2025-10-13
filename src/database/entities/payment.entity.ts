@@ -30,6 +30,9 @@ export enum PaymentMethod {
 @Entity('payments')
 @Index(['gatewayRef'])
 @Index(['bookingId'])
+@Index(['bookingId', 'status'])
+@Index(['transactionId'])
+@Index(['paidAt'])
 export class Payment {
   @PrimaryGeneratedColumn('uuid')
   id: string;

@@ -6,6 +6,7 @@ import { PaymentsService } from './payments.service';
 import { Payment } from '../../database/entities/payment.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { UsersModule } from '../users/users.module';
+import { RedisService } from '../../utils/redis.service';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { UsersModule } from '../users/users.module';
     UsersModule,
   ],
   controllers: [PaymentsController],
-  providers: [PaymentsService],
+  providers: [PaymentsService, RedisService],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

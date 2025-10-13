@@ -26,12 +26,12 @@ import { RefundDto } from './dto/refund.dto';
 
 @ApiTags('payments')
 @Controller('payments')
-@UseGuards(AuthGuard('jwt'))
-@ApiBearerAuth()
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post('intent')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create payment intent for booking' })
   @ApiResponse({ status: 201, description: 'Payment intent created' })
   async createIntent(
@@ -42,6 +42,8 @@ export class PaymentsController {
   }
 
   @Post('confirm')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Confirm payment' })
   @ApiResponse({ status: 200, description: 'Payment confirmed' })
   async confirmPayment(
@@ -53,7 +55,6 @@ export class PaymentsController {
 
   // Webhook - no auth
   @Post('webhook')
-  @UseGuards()
   @ApiOperation({ summary: 'Payment gateway webhook (no auth)' })
   @ApiResponse({ status: 200, description: 'Webhook processed' })
   async handleWebhook(@Body() dto: WebhookEventDto) {
@@ -61,7 +62,7 @@ export class PaymentsController {
   }
 
   @Post('refund')
-  @UseGuards(RolesGuard)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Refund a payment (Admin only)' })
   @ApiResponse({ status: 200, description: 'Refund processed' })
@@ -70,6 +71,8 @@ export class PaymentsController {
   }
 
   @Get(':id')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get payment by ID' })
   async getPaymentById(
     @CurrentUser() user: User,

@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -16,6 +17,8 @@ import { CreatePaymentIntentDto } from './dto/create-intent.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { WebhookEventDto } from './dto/webhook-event.dto';
 import { RefundDto } from './dto/refund.dto';
+import { ConfigService } from '@nestjs/config';
+import { RedisService } from '../../utils/redis.service';
 
 @Injectable()
 export class PaymentsService {
@@ -27,6 +30,8 @@ export class PaymentsService {
     @InjectRepository(Booking)
     private readonly bookingRepository: Repository<Booking>,
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
   ) {}
 
   async createIntent(userId: string, dto: CreatePaymentIntentDto) {
@@ -56,6 +61,13 @@ export class PaymentsService {
       };
     }
 
+    // Idempotency by key
+    const idempotencyKey = `pay:intent:${booking.id}:${dto.method}`;
+    const exists = await this.redisService.get(idempotencyKey);
+    if (exists) {
+      return JSON.parse(exists);
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -78,14 +90,16 @@ export class PaymentsService {
       await queryRunner.manager.save(saved);
 
       await queryRunner.commitTransaction();
-
-      return {
+      const response = {
         paymentId: saved.id,
         clientSecret,
         amount: saved.amount,
         currency: saved.currency,
         status: saved.status,
       };
+
+      await this.redisService.set(idempotencyKey, response, 120);
+      return response;
     } catch (e) {
       await queryRunner.rollbackTransaction();
       throw e;
@@ -134,9 +148,23 @@ export class PaymentsService {
   }
 
   async handleWebhook(dto: WebhookEventDto) {
-    // Mock signature verification and idempotency key
+    // Signature verification (mock but enforced via shared secret)
+    const expectedSecret = this.configService.get<string>('PAYMENT_WEBHOOK_SECRET') || 'dev-webhook-secret';
+    // In real gateway, you would compute signature from raw body + header secret
+    const providedSecret = (dto as any).secret || dto.data?.secret;
+    if (expectedSecret && providedSecret !== expectedSecret) {
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
+
     if (!dto.eventType || !dto.data?.paymentId) {
       throw new BadRequestException('Invalid webhook');
+    }
+
+    // Idempotency for webhook processing
+    const idempotencyKey = `pay:webhook:${dto.eventType}:${dto.data.paymentId}`;
+    const processed = await this.redisService.get(idempotencyKey);
+    if (processed) {
+      return { received: true, idempotent: true };
     }
 
     const payment = await this.paymentRepository.findOne({
@@ -157,6 +185,7 @@ export class PaymentsService {
       }
     }
 
+    await this.redisService.set(idempotencyKey, { ok: true }, 300);
     return { received: true };
   }
 
