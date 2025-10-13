@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Button, Card, Form, Input, Typography, message } from 'antd'
+import { Button, Card, Form, Input, Typography, message, Space } from 'antd'
+import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons'
+import '../theme.css'
 
 function getApiBase(): string {
   const base = (import.meta as any).env?.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE
@@ -20,32 +22,89 @@ export default function Login() {
       if (!resp.ok) throw new Error('Invalid credentials')
       const data = await resp.json()
       localStorage.setItem('accessToken', data.accessToken)
-      message.success('Logged in successfully')
+      message.success('تم تسجيل الدخول بنجاح')
       window.location.href = '/'
     } catch (e: any) {
-      message.error(e?.message || 'Login failed')
+      message.error(e?.message || 'فشل تسجيل الدخول')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-      <Card title="Admin Login" style={{ width: 360 }}>
-        <Form layout="vertical" onFinish={onFinish}>
-          <Form.Item label="Email" name="email" rules={[{ required: true, message: 'Email is required' }]}>
-            <Input type="email" placeholder="admin@example.com" />
+    <div className="login-container">
+      <Card 
+        className="login-card"
+        title={
+          <Space direction="vertical" align="center" style={{ width: '100%' }}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>🏢</div>
+            <Typography.Title level={3} style={{ margin: 0, color: '#262626' }}>
+              Admin Dashboard
+            </Typography.Title>
+            <Typography.Text type="secondary">
+              Welcome back! Please sign in to continue
+            </Typography.Text>
+          </Space>
+        }
+        bordered={false}
+      >
+        <Form 
+          layout="vertical" 
+          onFinish={onFinish}
+          className="custom-form"
+          style={{ padding: '20px 0' }}
+        >
+          <Form.Item 
+            label="Email Address" 
+            name="email" 
+            rules={[
+              { required: true, message: 'Please enter your email' },
+              { type: 'email', message: 'Please enter a valid email' }
+            ]}
+          >
+            <Input 
+              prefix={<UserOutlined />}
+              type="email" 
+              placeholder="admin@example.com"
+              size="large"
+            />
           </Form.Item>
-          <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Password is required' }]}>
-            <Input.Password placeholder="••••••••" />
+          
+          <Form.Item 
+            label="Password" 
+            name="password" 
+            rules={[{ required: true, message: 'Please enter your password' }]}
+          >
+            <Input.Password 
+              prefix={<LockOutlined />}
+              placeholder="Enter your password"
+              size="large"
+            />
           </Form.Item>
-          <Button type="primary" htmlType="submit" loading={loading} block>
-            Login
-          </Button>
+          
+          <Form.Item style={{ marginBottom: '12px' }}>
+            <Button 
+              type="primary" 
+              htmlType="submit" 
+              loading={loading}
+              size="large"
+              icon={<LoginOutlined />}
+              className="btn-primary"
+              block
+            >
+              Sign In
+            </Button>
+          </Form.Item>
         </Form>
-        <Typography.Paragraph type="secondary" style={{ marginTop: 12 }}>
-          Only Admin or Branch Manager accounts are allowed.
-        </Typography.Paragraph>
+        
+        <div style={{ textAlign: 'center', padding: '16px 0' }}>
+          <Typography.Paragraph 
+            type="secondary" 
+            style={{ margin: 0, fontSize: '12px' }}
+          >
+            🔒 Secure access for Admin and Branch Manager accounts only
+          </Typography.Paragraph>
+        </div>
       </Card>
     </div>
   )

@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import { Button, Card, Form, Input, Select, message } from 'antd'
+import { Button, Form, Input, Select, message, Space, Row, Col } from 'antd'
+import { UserAddOutlined, SaveOutlined } from '@ant-design/icons'
 import { apiPost } from '../../api'
+import '../../theme.css'
 
 export default function CreateStaff() {
   const [loading, setLoading] = useState(false)
+  const [form] = Form.useForm()
 
   async function onFinish(values: any) {
     setLoading(true)
@@ -17,44 +20,148 @@ export default function CreateStaff() {
         language: values.language || 'ar',
         branchId: values.branchId || undefined,
       })
-      message.success('Staff created')
+      message.success('Staff member created successfully!')
+      form.resetFields()
     } catch (e: any) {
-      message.error(e?.message || 'Create failed')
+      message.error(e?.message || 'Failed to create staff member')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Card title="Create Staff">
-      <Form layout="vertical" onFinish={onFinish}>
-        <Form.Item label="Name" name="name" rules={[{ required: true }]}>
-          <Input />
-        </Form.Item>
-        <Form.Item label="Email" name="email" rules={[{ required: true, type: 'email' }]}>
-          <Input type="email" />
-        </Form.Item>
-        <Form.Item label="Password" name="password" rules={[{ required: true, min: 6 }]}>
-          <Input.Password />
-        </Form.Item>
-        <Form.Item label="Roles" name="roles" rules={[{ required: true }]}>
-          <Select mode="multiple" options={[
-            { label: 'staff', value: 'staff' },
-            { label: 'user', value: 'user' },
-          ]} />
-        </Form.Item>
-        <Form.Item label="Phone" name="phone">
-          <Input />
-        </Form.Item>
-        <Form.Item label="Language" name="language" initialValue="ar">
-          <Input />
-        </Form.Item>
-        <Form.Item label="Branch ID" name="branchId">
-          <Input />
-        </Form.Item>
-        <Button type="primary" htmlType="submit" loading={loading}>Create</Button>
-      </Form>
-    </Card>
+    <div className="page-container">
+      <div className="page-header">
+        <div className="page-header-content">
+          <div>
+            <h1 className="page-title">
+              <UserAddOutlined style={{ marginRight: '12px' }} />
+              Create Staff Member
+            </h1>
+            <p className="page-subtitle">Add a new staff member to your team</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="page-content">
+        <div className="page-content-inner">
+          <div className="custom-form">
+            <Form 
+              form={form}
+              layout="vertical" 
+              onFinish={onFinish}
+              initialValues={{ language: 'ar', roles: ['staff'] }}
+            >
+              <Row gutter={24}>
+                <Col xs={24} md={12}>
+                  <Form.Item 
+                    label="Full Name" 
+                    name="name" 
+                    rules={[{ required: true, message: 'Please enter full name' }]}
+                  >
+                    <Input placeholder="Enter staff member's full name" size="large" />
+                  </Form.Item>
+                </Col>
+                
+                <Col xs={24} md={12}>
+                  <Form.Item 
+                    label="Email Address" 
+                    name="email" 
+                    rules={[
+                      { required: true, message: 'Please enter email' },
+                      { type: 'email', message: 'Please enter a valid email' }
+                    ]}
+                  >
+                    <Input type="email" placeholder="staff@company.com" size="large" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={24}>
+                <Col xs={24} md={12}>
+                  <Form.Item 
+                    label="Password" 
+                    name="password" 
+                    rules={[
+                      { required: true, message: 'Please enter password' },
+                      { min: 6, message: 'Password must be at least 6 characters' }
+                    ]}
+                  >
+                    <Input.Password placeholder="Create a secure password" size="large" />
+                  </Form.Item>
+                </Col>
+                
+                <Col xs={24} md={12}>
+                  <Form.Item 
+                    label="Phone Number" 
+                    name="phone"
+                  >
+                    <Input placeholder="+966 50 123 4567" size="large" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={24}>
+                <Col xs={24} md={8}>
+                  <Form.Item 
+                    label="Roles" 
+                    name="roles" 
+                    rules={[{ required: true, message: 'Please select at least one role' }]}
+                  >
+                    <Select 
+                      mode="multiple" 
+                      placeholder="Select roles"
+                      size="large"
+                      options={[
+                        { label: 'Staff Member', value: 'staff' },
+                        { label: 'User Access', value: 'user' },
+                      ]} 
+                    />
+                  </Form.Item>
+                </Col>
+                
+                <Col xs={24} md={8}>
+                  <Form.Item label="Language" name="language">
+                    <Select 
+                      placeholder="Select language"
+                      size="large"
+                      options={[
+                        { label: 'Arabic', value: 'ar' },
+                        { label: 'English', value: 'en' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+                
+                <Col xs={24} md={8}>
+                  <Form.Item label="Branch ID" name="branchId">
+                    <Input placeholder="Enter branch ID (optional)" size="large" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item style={{ marginTop: '32px', textAlign: 'center' }}>
+                <Space size="middle">
+                  <Button size="large" onClick={() => form.resetFields()}>
+                    Reset Form
+                  </Button>
+                  <Button 
+                    type="primary" 
+                    htmlType="submit" 
+                    loading={loading}
+                    size="large"
+                    icon={<SaveOutlined />}
+                    className="btn-primary"
+                  >
+                    Create Staff Member
+                  </Button>
+                </Space>
+              </Form.Item>
+            </Form>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
