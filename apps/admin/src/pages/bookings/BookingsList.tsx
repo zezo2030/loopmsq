@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Space, Table, Tag, Input, Select, DatePicker, Card, Statistic, Row, Col, Avatar, Tooltip } from 'antd'
+import { Button, Space, Table, Tag, Input, Select, DatePicker, Card, Statistic, Row, Col, Avatar, Tooltip, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   CalendarOutlined, 
@@ -10,7 +10,9 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
-  DollarOutlined
+  DollarOutlined,
+  ReloadOutlined,
+  DownloadOutlined
 } from '@ant-design/icons'
 import { apiGet } from '../../api'
 import '../../theme.css'
@@ -77,6 +79,14 @@ export default function BookingsList() {
   const [halls, setHalls] = useState<Array<{ id: string; name: string; branchId: string }>>([])
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+
+  function formatSAR(value: number): string {
+    try {
+      return new Intl.NumberFormat('ar-SA').format(value)
+    } catch {
+      return String(value)
+    }
+  }
 
   useEffect(() => {
     // Initialize filters from URL
@@ -146,6 +156,7 @@ export default function BookingsList() {
       })
     } catch (error) {
       console.error('Failed to load bookings:', error)
+      message.warning('تعذّر تحميل الحجوزات، يتم عرض بيانات تجريبية')
       // Set mock data for development
       setBookings([
         {
@@ -174,6 +185,14 @@ export default function BookingsList() {
     } finally {
       setLoading(false)
     }
+  }
+
+  function clearFilters() {
+    setSearchText('')
+    setStatusFilter('')
+    setBranchFilter('')
+    setHallFilter('')
+    setDateRange(null)
   }
 
   async function loadBranches() {
@@ -303,11 +322,11 @@ export default function BookingsList() {
       render: (_: any, record: BookingRow) => (
         <div>
           <div style={{ fontWeight: '600', fontSize: '14px', color: '#52c41a' }}>
-            {record.totalPrice.toLocaleString()} ر.س
+            {formatSAR(record.totalPrice)} ر.س
           </div>
           {record.discountAmount && (
             <div style={{ color: '#ff4d4f', fontSize: '12px' }}>
-              خصم: {record.discountAmount} ر.س
+              خصم: {formatSAR(record.discountAmount)} ر.س
             </div>
           )}
           {record.couponCode && (
@@ -418,7 +437,8 @@ export default function BookingsList() {
 
           {/* Search and Filters */}
           <Card className="custom-card" style={{ marginBottom: '24px' }}>
-            <Space size="middle" wrap style={{ width: '100%' }}>
+            <Space size="middle" wrap style={{ width: '100%', justifyContent: 'space-between' }}>
+              <Space size="middle" wrap>
               <Input
                 placeholder="البحث بالاسم، الإيميل، الهاتف، أو اسم القاعة..."
                 prefix={<SearchOutlined />}
@@ -473,6 +493,45 @@ export default function BookingsList() {
                 size="large"
                 style={{ width: 250 }}
               />
+              </Space>
+              <Space>
+                <Button icon={<ReloadOutlined />} onClick={loadBookings} size="large">
+                  تحديث
+                </Button>
+                <Button onClick={clearFilters} size="large">
+                  مسح الفلاتر
+                </Button>
+                <Button icon={<DownloadOutlined />} size="large" onClick={() => {
+                  try {
+                    const rows = filteredBookings.map(b => ({
+                      id: b.id,
+                      user: b.user.name,
+                      email: b.user.email,
+                      phone: b.user.phone,
+                      branch: b.branch.name,
+                      hall: b.hall?.name || '',
+                      startTime: new Date(b.startTime).toISOString(),
+                      persons: b.persons,
+                      totalPrice: b.totalPrice,
+                      status: b.status,
+                    }))
+                    const header = Object.keys(rows[0] || {}).join(',')
+                    const body = rows.map(r => Object.values(r).map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+                    const csv = `${header}\n${body}`
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = 'bookings.csv'
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  } catch {
+                    message.error('تعذّر التصدير')
+                  }
+                }}>
+                  تصدير
+                </Button>
+              </Space>
             </Space>
           </Card>
 
@@ -483,6 +542,41 @@ export default function BookingsList() {
               dataSource={filteredBookings}
               columns={columns}
               loading={loading}
+              expandable={{
+                expandedRowRender: (record) => (
+                  <div style={{ paddingInlineEnd: '24px' }}>
+                    <Row gutter={[16, 8]}>
+                      <Col xs={24} md={12}>
+                        <div style={{ fontWeight: 600, marginBottom: 8 }}>الإضافات</div>
+                        {(record.addOns && record.addOns.length > 0) ? (
+                          <ul style={{ margin: 0, paddingInlineStart: 18 }}>
+                            {record.addOns.map(a => (
+                              <li key={a.id}>
+                                {a.name} × {a.quantity} — {formatSAR(a.price * a.quantity)} ر.س
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div style={{ color: '#8c8c8c' }}>لا توجد إضافات</div>
+                        )}
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <div style={{ fontWeight: 600, marginBottom: 8 }}>الكوبون والخصم</div>
+                        {record.couponCode ? (
+                          <Space>
+                            <Tag color="gold">{record.couponCode}</Tag>
+                            {record.discountAmount ? (
+                              <span style={{ color: '#ff4d4f' }}>-{formatSAR(record.discountAmount)} ر.س</span>
+                            ) : null}
+                          </Space>
+                        ) : (
+                          <div style={{ color: '#8c8c8c' }}>لا يوجد كوبون</div>
+                        )}
+                      </Col>
+                    </Row>
+                  </div>
+                )
+              }}
               pagination={{
                 total: filteredBookings.length,
                 pageSize: 20,
