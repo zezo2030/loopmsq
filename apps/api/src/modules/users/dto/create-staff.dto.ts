@@ -4,6 +4,8 @@ import {
   IsArray,
   IsOptional,
   MinLength,
+  IsEnum,
+  IsUUID,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '../../../common/decorators/roles.decorator';
@@ -38,6 +40,7 @@ export class CreateStaffDto {
     isArray: true,
   })
   @IsArray()
+  @IsEnum(UserRole, { each: true })
   roles: UserRole[];
 
   @ApiProperty({
@@ -64,6 +67,6 @@ export class CreateStaffDto {
     required: false,
   })
   @IsOptional()
-  @IsString()
+  @IsUUID('4')
   branchId?: string;
 }

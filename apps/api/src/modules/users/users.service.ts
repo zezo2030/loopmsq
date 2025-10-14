@@ -81,7 +81,21 @@ export class UsersService {
       branchId,
     });
 
-    const savedUser = await this.userRepository.save(user);
+    let savedUser: User;
+    try {
+      savedUser = await this.userRepository.save(user);
+    } catch (e: any) {
+      // Handle common DB errors to avoid 500
+      if (e?.code === '23505') {
+        // unique_violation
+        throw new ConflictException('Email or phone already exists');
+      }
+      if (e?.code === '22P02') {
+        // invalid_text_representation (e.g., invalid UUID for branchId)
+        throw new BadRequestException('Invalid input format');
+      }
+      throw e;
+    }
 
     // Create wallet if user role is included
     if (roles.includes(UserRole.USER)) {
@@ -90,7 +104,12 @@ export class UsersService {
         balance: 0,
         loyaltyPoints: 0,
       });
-      await this.walletRepository.save(wallet);
+      try {
+        await this.walletRepository.save(wallet);
+      } catch (e: any) {
+        // If wallet creation fails due to constraint, log and continue to return user
+        this.logger.error(`Wallet creation failed for user ${savedUser.id}: ${e?.message || e}`);
+      }
     }
 
     this.logger.log(
