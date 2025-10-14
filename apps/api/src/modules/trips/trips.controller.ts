@@ -4,13 +4,15 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  ParseIntPipe,
   Post,
   UseGuards,
   UploadedFile,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -39,6 +41,20 @@ export class TripsController {
     @Body() dto: CreateTripRequestDto,
   ) {
     return this.tripsService.createRequest(user.id, dto);
+  }
+
+  // Admin: list all trip requests with basic stats
+  @Get('admin/all')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List all school trip requests (Admin only)' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async adminListAll(
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
+  ) {
+    return this.tripsService.findAllRequests(page, limit);
   }
 
   @Get('requests/:id')

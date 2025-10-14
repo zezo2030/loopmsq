@@ -85,6 +85,52 @@ export class EventsService {
     });
     return { success: true };
   }
+
+  async findAllRequests(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    requests: EventRequest[];
+    total: number;
+    page: number;
+    totalPages: number;
+    stats: {
+      total: number;
+      pending: number; // submitted or under_review
+      quoted: number;
+      confirmed: number;
+      totalRevenue: number;
+    };
+  }> {
+    const [requests, total] = await this.eventRepo.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    } as any);
+
+    const pending = await this.eventRepo.count({ where: [{ status: 'submitted' as any }, { status: 'under_review' as any }] as any });
+    const quoted = await this.eventRepo.count({ where: { status: 'quoted' as any } });
+    const confirmed = await this.eventRepo.count({ where: { status: 'confirmed' as any } });
+    const paidList = await this.eventRepo.find({ where: { status: 'paid' as any } });
+    const confirmedList = await this.eventRepo.find({ where: { status: 'confirmed' as any } });
+    const totalRevenue = [...paidList, ...confirmedList]
+      .map((r) => Number(r.quotedPrice || 0))
+      .reduce((a, b) => a + b, 0);
+
+    return {
+      requests,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      stats: {
+        total,
+        pending,
+        quoted,
+        confirmed,
+        totalRevenue,
+      },
+    };
+  }
 }
 
 

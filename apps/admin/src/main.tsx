@@ -19,6 +19,7 @@ import TripsList from './pages/trips/TripsList'
 import TripDetail from './pages/trips/TripDetail'
 import EventsList from './pages/events/EventsList'
 import EventDetail from './pages/events/EventDetail'
+import Notifications from './pages/notifications/Notifications'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -46,6 +47,9 @@ const router = createBrowserRouter([
       // Special Events Management
       { path: 'events', element: <EventsList /> },
       { path: 'events/:id', element: <EventDetail /> },
+
+      // Notifications
+      { path: 'notifications', element: <Notifications /> },
     ],
   },
 ])

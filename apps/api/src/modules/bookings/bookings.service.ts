@@ -328,6 +328,30 @@ export class BookingsService {
     return { bookings, total, page, totalPages: Math.ceil(total / limit) };
   }
 
+  async findAllBookings(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    bookings: Booking[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const [bookings, total] = await this.bookingRepository.findAndCount({
+      relations: ['user', 'branch', 'hall', 'tickets', 'payments'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    } as any);
+
+    return {
+      bookings,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async findBookingById(id: string, userId?: string): Promise<Booking> {
     const booking = await this.bookingRepository.findOne({
       where: { id, ...(userId && { userId }) },

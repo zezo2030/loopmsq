@@ -70,6 +70,20 @@ export class BookingsController {
     return this.bookingsService.findUserBookings(user.id, page, limit);
   }
 
+  // Admin: list all bookings
+  @Get('admin/all')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List all bookings (Admin only)' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async adminListAll(
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
+  ) {
+    return this.bookingsService.findAllBookings(page, limit);
+  }
+
   // Branch manager: list branch bookings
   @Get('branch/me')
   @UseGuards(RolesGuard)

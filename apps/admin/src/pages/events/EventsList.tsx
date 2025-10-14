@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Space, Table, Tag, Input, Select, Card, Statistic, Row, Col, Avatar, Tooltip } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   GiftOutlined, 
   SearchOutlined, 
@@ -76,11 +76,32 @@ export default function EventsList() {
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [typeFilter, setTypeFilter] = useState<string>('')
+  const [branchFilter, setBranchFilter] = useState<string>('')
+  const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([])
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
+    const q = searchParams.get('q') || ''
+    const st = searchParams.get('status') || ''
+    const tp = searchParams.get('type') || ''
+    const b = searchParams.get('branchId') || ''
+    setSearchText(q)
+    setStatusFilter(st)
+    setTypeFilter(tp)
+    setBranchFilter(b)
     loadEvents()
+    loadBranches()
   }, [])
+
+  useEffect(() => {
+    const params: Record<string, string> = {}
+    if (searchText) params.q = searchText
+    if (statusFilter) params.status = statusFilter
+    if (typeFilter) params.type = typeFilter
+    if (branchFilter) params.branchId = branchFilter
+    setSearchParams(params, { replace: true })
+  }, [searchText, statusFilter, typeFilter, branchFilter])
 
   async function loadEvents() {
     setLoading(true)
@@ -162,6 +183,13 @@ export default function EventsList() {
     }
   }
 
+  async function loadBranches() {
+    try {
+      const resp = await apiGet<Array<{ id: string; name_en?: string; name_ar?: string }>>('/content/branches')
+      setBranches((resp || []).map(b => ({ id: b.id as any, name: (b as any).name_ar || (b as any).name_en || 'Branch' })))
+    } catch {}
+  }
+
   const filteredEvents = events.filter(event => {
     const matchesSearch = !searchText || 
       event.requester.name?.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -172,8 +200,9 @@ export default function EventsList() {
     
     const matchesStatus = !statusFilter || event.status === statusFilter
     const matchesType = !typeFilter || event.type === typeFilter
+    const matchesBranch = !branchFilter || event.branch?.id === branchFilter
     
-    return matchesSearch && matchesStatus && matchesType
+    return matchesSearch && matchesStatus && matchesType && matchesBranch
   })
 
   const getStatusColor = (status: string) => {
@@ -509,6 +538,16 @@ export default function EventsList() {
                   { label: '🏢 شركات', value: 'corporate' },
                   { label: '🎉 أخرى', value: 'other' },
                 ]}
+              />
+
+              <Select
+                placeholder="اختر الفرع"
+                value={branchFilter || undefined}
+                onChange={setBranchFilter}
+                style={{ width: 220 }}
+                size="large"
+                allowClear
+                options={branches.map(b => ({ label: b.name, value: b.id }))}
               />
             </Space>
           </Card>

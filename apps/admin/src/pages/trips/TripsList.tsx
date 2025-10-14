@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Button, Space, Table, Tag, Input, Select, Card, Statistic, Row, Col, Avatar, Tooltip } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { Button, Space, Table, Tag, Input, Select, Card, Statistic, Row, Col, Avatar, Tooltip, DatePicker } from 'antd'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   BookOutlined, 
   SearchOutlined, 
@@ -63,11 +63,39 @@ export default function TripsList() {
   const [loading, setLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [dateRange, setDateRange] = useState<[any, any] | null>(null)
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
+    const q = searchParams.get('q') || ''
+    const st = searchParams.get('status') || ''
+    const from = searchParams.get('from')
+    const to = searchParams.get('to')
+    setSearchText(q)
+    setStatusFilter(st)
+    if (from && to) {
+      setDateRange([{
+        toDate: () => new Date(from)
+      } as any, {
+        toDate: () => new Date(to)
+      } as any])
+    }
     loadTrips()
   }, [])
+
+  useEffect(() => {
+    const params: Record<string, string> = {}
+    if (searchText) params.q = searchText
+    if (statusFilter) params.status = statusFilter
+    if (dateRange?.[0]?.toDate && dateRange?.[1]?.toDate) {
+      const fromISO = new Date(dateRange[0].toDate()).toISOString()
+      const toISO = new Date(dateRange[1].toDate()).toISOString()
+      params.from = fromISO
+      params.to = toISO
+    }
+    setSearchParams(params, { replace: true })
+  }, [searchText, statusFilter, dateRange])
 
   async function loadTrips() {
     setLoading(true)
@@ -154,8 +182,12 @@ export default function TripsList() {
       trip.contactEmail?.toLowerCase().includes(searchText.toLowerCase())
     
     const matchesStatus = !statusFilter || trip.status === statusFilter
+    const matchesDate = !dateRange || (
+      new Date(trip.preferredDate) >= dateRange[0]?.toDate() &&
+      new Date(trip.preferredDate) <= dateRange[1]?.toDate()
+    )
     
-    return matchesSearch && matchesStatus
+    return matchesSearch && matchesStatus && matchesDate
   })
 
   const getStatusColor = (status: string) => {
@@ -413,6 +445,14 @@ export default function TripsList() {
                   { label: 'تم الدفع', value: 'paid' },
                   { label: 'مكتمل', value: 'completed' },
                 ]}
+              />
+
+              <DatePicker.RangePicker
+                placeholder={["من تاريخ", "إلى تاريخ"]}
+                value={dateRange as any}
+                onChange={setDateRange as any}
+                size="large"
+                style={{ width: 260 }}
               />
             </Space>
           </Card>

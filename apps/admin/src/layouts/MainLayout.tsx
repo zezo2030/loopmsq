@@ -30,9 +30,12 @@ export default function MainLayout() {
     if (path.startsWith('/trips')) {
       return ['trips']
     }
-    if (path.startsWith('/events')) {
+  if (path.startsWith('/events')) {
       return ['events']
     }
+  if (path.startsWith('/notifications')) {
+    return ['notifications']
+  }
     return [path === '/' ? 'dashboard' : path.replace('/', '')]
   }
 
@@ -120,6 +123,11 @@ export default function MainLayout() {
       key: 'events',
       icon: <GiftOutlined />,
       label: <Link to="/events">Special Events</Link>,
+    },
+    {
+      key: 'notifications',
+      icon: <BellOutlined />,
+      label: <Link to="/notifications">Notifications</Link>,
     },
   ]
 

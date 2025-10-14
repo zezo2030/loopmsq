@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Space, Table, Tag, Input, Select, DatePicker, Card, Statistic, Row, Col, Avatar, Tooltip } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   CalendarOutlined, 
   SearchOutlined, 
@@ -71,11 +71,62 @@ export default function BookingsList() {
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [dateRange, setDateRange] = useState<[any, any] | null>(null)
+  const [branchFilter, setBranchFilter] = useState<string>('')
+  const [hallFilter, setHallFilter] = useState<string>('')
+  const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([])
+  const [halls, setHalls] = useState<Array<{ id: string; name: string; branchId: string }>>([])
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
+    // Initialize filters from URL
+    const s = searchParams.get('q') || ''
+    const st = searchParams.get('status') || ''
+    const b = searchParams.get('branchId') || ''
+    const h = searchParams.get('hallId') || ''
+    const from = searchParams.get('from')
+    const to = searchParams.get('to')
+    setSearchText(s)
+    setStatusFilter(st)
+    setBranchFilter(b)
+    setHallFilter(h)
+    if (from && to) {
+      // AntD dayjs-compatible strings; we’ll keep raw strings and coerce on compare
+      setDateRange([{
+        toDate: () => new Date(from)
+      } as any, {
+        toDate: () => new Date(to)
+      } as any])
+    }
     loadBookings()
+    loadBranches()
   }, [])
+
+  useEffect(() => {
+    // Load halls when branch changes
+    if (!branchFilter) {
+      setHalls([])
+      setHallFilter('')
+      return
+    }
+    loadHalls(branchFilter)
+  }, [branchFilter])
+
+  useEffect(() => {
+    // Sync filters to URL
+    const params: Record<string, string> = {}
+    if (searchText) params.q = searchText
+    if (statusFilter) params.status = statusFilter
+    if (branchFilter) params.branchId = branchFilter
+    if (hallFilter) params.hallId = hallFilter
+    if (dateRange?.[0]?.toDate && dateRange?.[1]?.toDate) {
+      const fromISO = new Date(dateRange[0].toDate()).toISOString()
+      const toISO = new Date(dateRange[1].toDate()).toISOString()
+      params.from = fromISO
+      params.to = toISO
+    }
+    setSearchParams(params, { replace: true })
+  }, [searchText, statusFilter, branchFilter, hallFilter, dateRange])
 
   async function loadBookings() {
     setLoading(true)
@@ -125,6 +176,20 @@ export default function BookingsList() {
     }
   }
 
+  async function loadBranches() {
+    try {
+      const resp = await apiGet<Array<{ id: string; name_en?: string; name_ar?: string }>>('/content/branches')
+      setBranches((resp || []).map(b => ({ id: b.id as any, name: (b as any).name_ar || (b as any).name_en || 'Branch' })))
+    } catch {}
+  }
+
+  async function loadHalls(branchId: string) {
+    try {
+      const resp = await apiGet<Array<{ id: string; name_en?: string; name_ar?: string; branchId: string }>>(`/content/halls?branchId=${branchId}`)
+      setHalls((resp || []).map(h => ({ id: h.id, name: (h as any).name_ar || (h as any).name_en || 'Hall', branchId: (h as any).branchId })))
+    } catch {}
+  }
+
   const filteredBookings = bookings.filter(booking => {
     const matchesSearch = !searchText || 
       booking.user.name?.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -138,8 +203,11 @@ export default function BookingsList() {
       new Date(booking.startTime) >= dateRange[0]?.toDate() &&
       new Date(booking.startTime) <= dateRange[1]?.toDate()
     )
+
+    const matchesBranch = !branchFilter || booking.branch.id === branchFilter
+    const matchesHall = !hallFilter || booking.hall?.id === hallFilter
     
-    return matchesSearch && matchesStatus && matchesDate
+    return matchesSearch && matchesStatus && matchesDate && matchesBranch && matchesHall
   })
 
   const getStatusColor = (status: string) => {
@@ -375,6 +443,27 @@ export default function BookingsList() {
                   { label: 'ملغي', value: 'cancelled' },
                   { label: 'مكتمل', value: 'completed' },
                 ]}
+              />
+
+              <Select
+                placeholder="اختر الفرع"
+                value={branchFilter || undefined}
+                onChange={setBranchFilter}
+                style={{ width: 220 }}
+                size="large"
+                allowClear
+                options={branches.map(b => ({ label: b.name, value: b.id }))}
+              />
+
+              <Select
+                placeholder="اختر القاعة"
+                value={hallFilter || undefined}
+                onChange={setHallFilter}
+                style={{ width: 220 }}
+                size="large"
+                allowClear
+                disabled={!branchFilter}
+                options={halls.map(h => ({ label: h.name, value: h.id }))}
               />
 
               <RangePicker

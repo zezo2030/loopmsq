@@ -121,8 +121,8 @@ export default function Dashboard() {
             <p className="page-subtitle">Monitor your business performance and key metrics</p>
           </div>
           <Space>
-            <Button type="primary" className="btn-primary" icon={<CalendarOutlined />}>
-              View Reports
+            <Button type="primary" className="btn-primary" icon={<CalendarOutlined />} onClick={() => (window.location.href = '/bookings')}>
+              Go to Bookings
             </Button>
           </Space>
         </div>
@@ -180,7 +180,7 @@ export default function Dashboard() {
               <Card 
                 className="custom-card"
                 title="Bookings Overview" 
-                extra={<Button type="link">View All Bookings</Button>}
+                extra={<Button type="link" onClick={() => (window.location.href = '/bookings')}>View All Bookings</Button>}
               >
                 <Row gutter={[16, 16]}>
                   {bookingStats.map((stat, index) => (

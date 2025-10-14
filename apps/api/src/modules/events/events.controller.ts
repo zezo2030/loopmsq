@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, ParseIntPipe, Post, UseGuards, Query } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { EventsService } from './events.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateEventRequestDto } from './dto/create-event-request.dto';
@@ -19,6 +19,20 @@ export class EventsController {
   @ApiOperation({ summary: 'Create event request' })
   createRequest(@CurrentUser() user: any, @Body() dto: CreateEventRequestDto) {
     return this.eventsService.createRequest(user.id, dto);
+  }
+
+  // Admin: list all event requests with basic stats
+  @Get('admin/all')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List all event requests (Admin only)' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async adminListAll(
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
+  ) {
+    return this.eventsService.findAllRequests(page, limit);
   }
 
   @Get('requests/:id')

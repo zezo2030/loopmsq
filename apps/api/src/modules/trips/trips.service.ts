@@ -215,6 +215,53 @@ export class TripsService {
     });
     return { success: true };
   }
+
+  async findAllRequests(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    requests: SchoolTripRequest[];
+    total: number;
+    page: number;
+    totalPages: number;
+    stats: {
+      total: number;
+      pending: number;
+      approved: number;
+      completed: number;
+      totalRevenue: number;
+    };
+  }> {
+    const [requests, total] = await this.tripRepo.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    } as any);
+
+    // Basic stats (approximate; revenue from quotedPrice of PAID/COMPLETED)
+    const pending = await this.tripRepo.count({ where: { status: 'pending' as any } });
+    const approved = await this.tripRepo.count({ where: { status: 'approved' as any } });
+    const completed = await this.tripRepo.count({ where: { status: 'completed' as any } });
+    const paidList = await this.tripRepo.find({ where: { status: 'paid' as any } });
+    const completedList = await this.tripRepo.find({ where: { status: 'completed' as any } });
+    const totalRevenue = [...paidList, ...completedList]
+      .map((r) => Number(r.quotedPrice || 0))
+      .reduce((a, b) => a + b, 0);
+
+    return {
+      requests,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      stats: {
+        total,
+        pending,
+        approved,
+        completed,
+        totalRevenue,
+      },
+    };
+  }
 }
 
 
