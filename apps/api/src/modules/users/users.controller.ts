@@ -175,4 +175,18 @@ export class UsersController {
     await this.usersService.activate(id);
     return { message: 'User activated successfully' };
   }
+
+  @Patch(':id/delete')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Hard delete user (Admin only)' })
+  @ApiResponse({ status: 200, description: 'User deleted permanently' })
+  @ApiResponse({ status: 400, description: 'User has related records' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async deleteHard(@Param('id', ParseUUIDPipe) id: string) {
+    await this.usersService.deleteHard(id);
+    return { message: 'User deleted permanently' };
+  }
 }

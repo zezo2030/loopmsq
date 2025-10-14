@@ -207,6 +207,31 @@ export default function UsersList() {
               Activate
             </Button>
           )}
+          <Popconfirm
+            title="Delete permanently? This cannot be undone."
+            okText="Delete"
+            okButtonProps={{ danger: true }}
+            cancelText="Cancel"
+            disabled={record.isActive}
+            onConfirm={async () => {
+              try {
+                const token = localStorage.getItem('accessToken')
+                const resp = await fetch(`${getApiBase()}/users/${record.id}/delete`, {
+                  method: 'PATCH',
+                  headers: { Authorization: `Bearer ${token}` },
+                })
+                if (!resp.ok) throw new Error(await resp.text() || 'Failed')
+                message.success('User deleted permanently')
+                setRows(rows => rows.filter(r => r.id !== record.id))
+              } catch (e: any) {
+                message.error(e?.message || 'Failed to delete user')
+              }
+            }}
+          >
+            <Button type="link" size="small" danger disabled={record.isActive}>
+              Delete
+            </Button>
+          </Popconfirm>
         </Space>
       ),
     },
