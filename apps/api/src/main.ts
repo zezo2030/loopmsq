@@ -6,6 +6,11 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import helmet from 'helmet';
 import compression from 'compression';
 import { AppModule } from './app.module';
+import { getQueueToken } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { createBullBoard } from '@bull-board/api';
+import { BullAdapter } from '@bull-board/api/bullAdapter';
+import { ExpressAdapter } from '@bull-board/express';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
@@ -63,12 +68,32 @@ async function bootstrap() {
     SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
   }
 
+  // Bull Board - Queues dashboard
+  try {
+    const smsQueue = app.get<Queue>(getQueueToken('notifications_sms'));
+    const emailQueue = app.get<Queue>(getQueueToken('notifications_email'));
+    const pushQueue = app.get<Queue>(getQueueToken('notifications_push'));
+    const serverAdapter = new ExpressAdapter();
+    serverAdapter.setBasePath(`/${apiPrefix}/queues`);
+    createBullBoard({
+      queues: [new BullAdapter(smsQueue), new BullAdapter(emailQueue), new BullAdapter(pushQueue)],
+      serverAdapter,
+    });
+    const expressInstance: any = app.getHttpAdapter().getInstance();
+    expressInstance.use(`/${apiPrefix}/queues`, serverAdapter.getRouter());
+  } catch (e) {
+    logger.warn('Bull Board initialization skipped: ' + (e as Error).message);
+  }
+
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
 
   logger.log(
     `Application is running on: http://localhost:${port}/${apiPrefix}`,
   );
+  try {
+    logger.log(`Queues dashboard: http://localhost:${port}/${apiPrefix}/queues`);
+  } catch {}
   if (configService.get<string>('NODE_ENV') !== 'production') {
     logger.log(
       `Swagger documentation: http://localhost:${port}/${apiPrefix}/docs`,

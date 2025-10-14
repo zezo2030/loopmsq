@@ -157,11 +157,13 @@ export default function MainLayout() {
           
           <div className="admin-header-actions">
             <Space size="middle">
-              <Button 
-                type="text" 
-                icon={<BellOutlined />} 
-                size="large"
-              />
+              <Link to="/api/v1/queues" target="_blank">
+                <Button 
+                  type="text" 
+                  icon={<BellOutlined />} 
+                  size="large"
+                />
+              </Link>
               
               <Dropdown
                 menu={{ items: userMenuItems }}

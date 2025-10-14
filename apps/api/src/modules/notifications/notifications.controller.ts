@@ -1,9 +1,14 @@
-import { Body, Controller, Delete, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Delete, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { ApiTags } from '@nestjs/swagger';
 import { NotificationsService, NotificationChannel } from './notifications.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DeviceToken } from '../../database/entities/device-token.entity';
+import { Roles, UserRole } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { PromoDto } from './dto/promo.dto';
 
 @ApiTags('notifications')
 @Controller('notifications')
@@ -14,8 +19,11 @@ export class NotificationsController {
   ) {}
 
   @Post('promo')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  async sendPromo(@Body() body: { userId?: string; phone?: string; email?: string; message: string; lang?: 'ar' | 'en'; channels?: NotificationChannel[] }) {
+  async sendPromo(@Body() body: PromoDto) {
     const channels: NotificationChannel[] = body.channels && body.channels.length ? body.channels : (['sms', 'push'] as NotificationChannel[]);
     await this.notifications.enqueue({
       type: 'PROMO',

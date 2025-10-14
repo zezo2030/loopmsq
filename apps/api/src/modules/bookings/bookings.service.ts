@@ -331,24 +331,50 @@ export class BookingsService {
   async findAllBookings(
     page: number = 1,
     limit: number = 10,
+    filters?: { status?: string; branchId?: string; hallId?: string; from?: string; to?: string },
   ): Promise<{
     bookings: Booking[];
     total: number;
     page: number;
     totalPages: number;
+    stats: { total: number; confirmed: number; pending: number; cancelled: number; totalRevenue: number };
   }> {
+    const where: any = {};
+    if (filters?.status) where.status = filters.status as any;
+    if (filters?.branchId) where.branchId = filters.branchId;
+    if (filters?.hallId) where.hallId = filters.hallId;
+    if (filters?.from && filters?.to) {
+      where.startTime = ({} as any);
+      (where.startTime as any).$gte = new Date(filters.from) as any;
+      (where.startTime as any).$lte = new Date(filters.to) as any;
+    }
+
     const [bookings, total] = await this.bookingRepository.findAndCount({
+      where,
       relations: ['user', 'branch', 'hall', 'tickets', 'payments'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     } as any);
 
+    // Stats
+    const [confirmed, pending, cancelled] = await Promise.all([
+      this.bookingRepository.count({ where: { ...where, status: 'confirmed' as any } }),
+      this.bookingRepository.count({ where: { ...where, status: 'pending' as any } }),
+      this.bookingRepository.count({ where: { ...where, status: 'cancelled' as any } }),
+    ]);
+    const revenueRows = await this.bookingRepository.find({
+      where: { ...where, status: 'confirmed' as any },
+      select: ['totalPrice'] as any,
+    } as any);
+    const totalRevenue = revenueRows.map((r: any) => Number(r.totalPrice || 0)).reduce((a: number, b: number) => a + b, 0);
+
     return {
       bookings,
       total,
       page,
       totalPages: Math.ceil(total / limit),
+      stats: { total, confirmed, pending, cancelled, totalRevenue },
     };
   }
 

@@ -77,11 +77,21 @@ export class BookingsController {
   @ApiOperation({ summary: 'List all bookings (Admin only)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'branchId', required: false, type: String })
+  @ApiQuery({ name: 'hallId', required: false, type: String })
+  @ApiQuery({ name: 'from', required: false, type: String, description: 'ISO date - startTime from' })
+  @ApiQuery({ name: 'to', required: false, type: String, description: 'ISO date - startTime to' })
   async adminListAll(
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
+    @Query('status') status?: string,
+    @Query('branchId') branchId?: string,
+    @Query('hallId') hallId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.bookingsService.findAllBookings(page, limit);
+    return this.bookingsService.findAllBookings(page, limit, { status, branchId, hallId, from, to });
   }
 
   // Branch manager: list branch bookings

@@ -76,7 +76,7 @@ export class NotificationsService {
       const tokens = await this.getUserTokens(n.to.userId, resolved.phone);
       if (tokens.length) {
         const title = this.renderSubject(n, lang);
-        const body = this.renderTemplate(n, 'email', lang); // reuse email template as full text
+        const body = this.renderTemplate(n, 'sms', lang); // concise body for push
         jobs.push(
           this.pushQueue.add(
             'send',

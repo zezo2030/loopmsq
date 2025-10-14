@@ -28,11 +28,21 @@ export class EventsController {
   @ApiOperation({ summary: 'List all event requests (Admin only)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'type', required: false, type: String })
+  @ApiQuery({ name: 'branchId', required: false, type: String })
+  @ApiQuery({ name: 'from', required: false, type: String })
+  @ApiQuery({ name: 'to', required: false, type: String })
   async adminListAll(
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('branchId') branchId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.eventsService.findAllRequests(page, limit);
+    return this.eventsService.findAllRequests(page, limit, { status, type, branchId, from, to });
   }
 
   @Get('requests/:id')

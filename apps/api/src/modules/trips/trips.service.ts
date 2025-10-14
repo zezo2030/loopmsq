@@ -219,6 +219,7 @@ export class TripsService {
   async findAllRequests(
     page: number = 1,
     limit: number = 10,
+    filters?: { status?: string; from?: string; to?: string },
   ): Promise<{
     requests: SchoolTripRequest[];
     total: number;
@@ -232,18 +233,27 @@ export class TripsService {
       totalRevenue: number;
     };
   }> {
+    const where: any = {};
+    if (filters?.status) where.status = filters.status as any;
+    if (filters?.from && filters?.to) {
+      where.preferredDate = ({} as any);
+      (where.preferredDate as any).$gte = new Date(filters.from) as any;
+      (where.preferredDate as any).$lte = new Date(filters.to) as any;
+    }
+
     const [requests, total] = await this.tripRepo.findAndCount({
+      where,
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     } as any);
 
-    // Basic stats (approximate; revenue from quotedPrice of PAID/COMPLETED)
-    const pending = await this.tripRepo.count({ where: { status: 'pending' as any } });
-    const approved = await this.tripRepo.count({ where: { status: 'approved' as any } });
-    const completed = await this.tripRepo.count({ where: { status: 'completed' as any } });
-    const paidList = await this.tripRepo.find({ where: { status: 'paid' as any } });
-    const completedList = await this.tripRepo.find({ where: { status: 'completed' as any } });
+    // Stats (respect filters)
+    const pending = await this.tripRepo.count({ where: { ...where, status: 'pending' as any } });
+    const approved = await this.tripRepo.count({ where: { ...where, status: 'approved' as any } });
+    const completed = await this.tripRepo.count({ where: { ...where, status: 'completed' as any } });
+    const paidList = await this.tripRepo.find({ where: { ...where, status: 'paid' as any } });
+    const completedList = await this.tripRepo.find({ where: { ...where, status: 'completed' as any } });
     const totalRevenue = [...paidList, ...completedList]
       .map((r) => Number(r.quotedPrice || 0))
       .reduce((a, b) => a + b, 0);

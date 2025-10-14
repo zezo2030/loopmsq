@@ -89,6 +89,7 @@ export class EventsService {
   async findAllRequests(
     page: number = 1,
     limit: number = 10,
+    filters?: { status?: string; type?: string; branchId?: string; from?: string; to?: string },
   ): Promise<{
     requests: EventRequest[];
     total: number;
@@ -102,17 +103,28 @@ export class EventsService {
       totalRevenue: number;
     };
   }> {
+    const where: any = {};
+    if (filters?.status) where.status = filters.status as any;
+    if (filters?.type) where.type = filters.type;
+    if (filters?.branchId) where.branchId = filters.branchId;
+    if (filters?.from && filters?.to) {
+      where.startTime = ({} as any);
+      (where.startTime as any).$gte = new Date(filters.from) as any;
+      (where.startTime as any).$lte = new Date(filters.to) as any;
+    }
+
     const [requests, total] = await this.eventRepo.findAndCount({
+      where,
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     } as any);
 
-    const pending = await this.eventRepo.count({ where: [{ status: 'submitted' as any }, { status: 'under_review' as any }] as any });
-    const quoted = await this.eventRepo.count({ where: { status: 'quoted' as any } });
-    const confirmed = await this.eventRepo.count({ where: { status: 'confirmed' as any } });
-    const paidList = await this.eventRepo.find({ where: { status: 'paid' as any } });
-    const confirmedList = await this.eventRepo.find({ where: { status: 'confirmed' as any } });
+    const pending = await this.eventRepo.count({ where: [{ ...where, status: 'submitted' as any }, { ...where, status: 'under_review' as any }] as any });
+    const quoted = await this.eventRepo.count({ where: { ...where, status: 'quoted' as any } });
+    const confirmed = await this.eventRepo.count({ where: { ...where, status: 'confirmed' as any } });
+    const paidList = await this.eventRepo.find({ where: { ...where, status: 'paid' as any } });
+    const confirmedList = await this.eventRepo.find({ where: { ...where, status: 'confirmed' as any } });
     const totalRevenue = [...paidList, ...confirmedList]
       .map((r) => Number(r.quotedPrice || 0))
       .reduce((a, b) => a + b, 0);

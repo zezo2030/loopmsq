@@ -50,11 +50,17 @@ export class TripsController {
   @ApiOperation({ summary: 'List all school trip requests (Admin only)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'from', required: false, type: String })
+  @ApiQuery({ name: 'to', required: false, type: String })
   async adminListAll(
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
+    @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.tripsService.findAllRequests(page, limit);
+    return this.tripsService.findAllRequests(page, limit, { status, from, to });
   }
 
   @Get('requests/:id')

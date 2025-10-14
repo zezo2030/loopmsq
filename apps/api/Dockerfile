@@ -2,7 +2,7 @@
 FROM node:20 AS deps
 WORKDIR /app/apps/api
 COPY apps/api/package*.json ./
-RUN npm ci
+RUN npm install --no-audit --no-fund
 
 FROM node:20 AS build
 WORKDIR /app
