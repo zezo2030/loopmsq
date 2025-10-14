@@ -20,6 +20,15 @@ import TripDetail from './pages/trips/TripDetail'
 import EventsList from './pages/events/EventsList'
 import EventDetail from './pages/events/EventDetail'
 import Notifications from './pages/notifications/Notifications'
+import Banners from './pages/cms/Banners'
+import Offers from './pages/cms/Offers'
+import Coupons from './pages/cms/Coupons'
+import Packages from './pages/cms/Packages'
+import PaymentsList from './pages/finance/PaymentsList'
+import PaymentDetail from './pages/finance/PaymentDetail'
+import Loyalty from './pages/marketing/Loyalty'
+import Referrals from './pages/marketing/Referrals'
+import WalletsList from './pages/finance/WalletsList'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -50,6 +59,21 @@ const router = createBrowserRouter([
 
       // Notifications
       { path: 'notifications', element: <Notifications /> },
+
+      // CMS
+      { path: 'cms/banners', element: <Banners /> },
+      { path: 'cms/offers', element: <Offers /> },
+      { path: 'cms/coupons', element: <Coupons /> },
+      { path: 'cms/packages', element: <Packages /> },
+
+      // Finance
+      { path: 'finance/payments', element: <PaymentsList /> },
+      { path: 'finance/payments/:id', element: <PaymentDetail /> },
+      { path: 'finance/wallets', element: <WalletsList /> },
+
+      // Marketing
+      { path: 'marketing/loyalty', element: <Loyalty /> },
+      { path: 'marketing/referrals', element: <Referrals /> },
     ],
   },
 ])

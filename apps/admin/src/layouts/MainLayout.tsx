@@ -12,8 +12,13 @@ import {
   CrownOutlined,
   CalendarOutlined,
   BookOutlined,
-  GiftOutlined
+  GiftOutlined,
+  PictureOutlined,
+  PercentageOutlined,
+  TagsOutlined,
+  AppstoreOutlined
 } from '@ant-design/icons'
+import { DollarOutlined, WalletOutlined, RocketOutlined } from '@ant-design/icons'
 import '../theme.css'
 
 export default function MainLayout() {
@@ -129,6 +134,35 @@ export default function MainLayout() {
       icon: <BellOutlined />,
       label: <Link to="/notifications">Notifications</Link>,
     },
+    {
+      key: 'cms',
+      icon: <AppstoreOutlined />,
+      label: 'CMS',
+      children: [
+        { key: 'cms-banners', icon: <PictureOutlined />, label: <Link to="/cms/banners">Banners</Link> },
+        { key: 'cms-offers', icon: <TagsOutlined />, label: <Link to="/cms/offers">Offers</Link> },
+        { key: 'cms-coupons', icon: <PercentageOutlined />, label: <Link to="/cms/coupons">Coupons</Link> },
+        { key: 'cms-packages', icon: <GiftOutlined />, label: <Link to="/cms/packages">Packages</Link> },
+      ],
+    },
+    {
+      key: 'finance',
+      icon: <DollarOutlined />,
+      label: 'Finance',
+      children: [
+        { key: 'finance-payments', icon: <DollarOutlined />, label: <Link to="/finance/payments">Payments</Link> },
+        { key: 'finance-wallets', icon: <WalletOutlined />, label: <Link to="/finance/wallets">Wallets</Link> },
+      ],
+    },
+    {
+      key: 'marketing',
+      icon: <RocketOutlined />,
+      label: 'Marketing',
+      children: [
+        { key: 'marketing-loyalty', icon: <CrownOutlined />, label: <Link to="/marketing/loyalty">Loyalty</Link> },
+        { key: 'marketing-referrals', icon: <UsergroupAddOutlined />, label: <Link to="/marketing/referrals">Referrals</Link> },
+      ],
+    },
   ]
 
   return (
@@ -216,6 +250,12 @@ function getPageTitle(pathname: string): string {
   // Special Events
   if (pathname === '/events') return 'Special Events'
   if (pathname.startsWith('/events/')) return 'Event Details'
+
+  // CMS
+  if (pathname === '/cms/banners') return 'CMS - Banners'
+  if (pathname === '/cms/offers') return 'CMS - Offers'
+  if (pathname === '/cms/coupons') return 'CMS - Coupons'
+  if (pathname === '/cms/packages') return 'CMS - Packages'
   
   return 'Admin Control Panel'
 }

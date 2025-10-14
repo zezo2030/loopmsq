@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import { LoyaltyRule } from '../../database/entities/loyalty-rule.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { LoyaltyTransaction, TransactionType } from '../../database/entities/loyalty-transaction.entity';
@@ -116,6 +116,57 @@ export class LoyaltyService {
     await this.ruleRepo.update({ isActive: true } as any, { isActive: false } as any);
     rule.isActive = true;
     await this.ruleRepo.save(rule);
+  }
+
+  async listWallets(params: { query?: string; page?: number; pageSize?: number }) {
+    const { query, page = 1, pageSize = 20 } = params;
+    const where = query
+      ? [
+          { user: { name: ILike(`%${query}%`) } } as any,
+          { userId: ILike(`%${query}%`) } as any,
+        ]
+      : undefined;
+
+    const [items, total] = await this.walletRepo.findAndCount({
+      relations: ['user'],
+      where: where as any,
+      order: { updatedAt: 'DESC' } as any,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return { items, total, page, pageSize };
+  }
+
+  async adjustWallet(userId: string, input: { balanceDelta?: number; pointsDelta?: number; reason?: string }) {
+    if (!input || (input.balanceDelta == null && input.pointsDelta == null)) {
+      throw new BadRequestException('No changes provided');
+    }
+    const wallet = await this.walletRepo.findOne({ where: { userId } });
+    if (!wallet) throw new NotFoundException('Wallet not found');
+
+    if (input.balanceDelta) {
+      wallet.balance = Number(wallet.balance) + Number(input.balanceDelta);
+    }
+    if (input.pointsDelta) {
+      wallet.loyaltyPoints = Number(wallet.loyaltyPoints) + Number(input.pointsDelta);
+    }
+    wallet.lastTransactionAt = new Date();
+    await this.walletRepo.save(wallet);
+
+    if (input.pointsDelta && input.pointsDelta !== 0) {
+      const tx = this.txRepo.create({
+        userId,
+        walletId: wallet.id,
+        pointsChange: Number(input.pointsDelta),
+        amountChange: null,
+        type: input.pointsDelta > 0 ? TransactionType.BONUS : TransactionType.PENALTY,
+        reason: input.reason || 'Admin adjustment',
+      } as any);
+      await this.txRepo.save(tx);
+    }
+
+    return { success: true, balance: wallet.balance, points: wallet.loyaltyPoints };
   }
 }
 

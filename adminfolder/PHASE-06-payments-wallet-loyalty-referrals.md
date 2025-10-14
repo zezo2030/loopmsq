@@ -16,13 +16,14 @@ Financial overview and incentives.
 - /marketing/referrals
 
 ### API Mapping
-- Payments: `/payments` endpoints
-- Wallet/Loyalty: `/loyalty` module endpoints
-- Referrals: to be added
+- Payments: `/payments` endpoints (admin list, admin detail)
+- Wallet/Loyalty: `/loyalty` (me, admin user summary, wallets list/adjust, rules CRUD/activate)
+- Referrals: `/referrals` (codes list/create, attribute, earnings list, approve)
 
 ### Acceptance Criteria
-- Points awarded on successful payments visible in UI.
-- Rule activation is exclusive and persisted.
+- Points awarded on successful payments visible in UI (wallet transactions).
+- Rule activation is exclusive and persisted. Verified via admin page.
+- Referrals earnings created on first paid order and approvable to credit wallet.
 
 ### Estimate
 4–6 days.

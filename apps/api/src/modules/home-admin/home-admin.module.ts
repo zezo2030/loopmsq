@@ -5,12 +5,14 @@ import { Offer } from '../../database/entities/offer.entity';
 import { BannerAdminController } from './banner.controller';
 import { OfferAdminController } from './offer.controller';
 import { HomeAdminService } from './home-admin.service';
+import { RedisService } from '../../utils/redis.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Banner, Offer])],
   controllers: [BannerAdminController, OfferAdminController],
   providers: [
     HomeAdminService,
+    RedisService,
   ],
 })
 export class HomeAdminModule {}

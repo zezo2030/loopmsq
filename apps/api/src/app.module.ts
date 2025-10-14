@@ -26,6 +26,9 @@ import { HomeModule } from './modules/home/home.module';
 import { HomeAdminModule } from './modules/home-admin/home-admin.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { CouponsModule } from './modules/coupons/coupons.module';
+import { PackagesModule } from './modules/packages/packages.module';
+import { ReferralsModule } from './modules/referrals/referrals.module';
 
 @Module({
   imports: [
@@ -83,6 +86,9 @@ import { ReportsModule } from './modules/reports/reports.module';
     HomeAdminModule,
     ReviewsModule,
     ReportsModule,
+    CouponsModule,
+    PackagesModule,
+    ReferralsModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],

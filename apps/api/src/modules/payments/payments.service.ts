@@ -21,6 +21,7 @@ import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../../utils/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { ReferralsService } from '../referrals/referrals.service';
 
 @Injectable()
 export class PaymentsService {
@@ -36,6 +37,7 @@ export class PaymentsService {
     private readonly redisService: RedisService,
     private readonly notifications: NotificationsService,
     private readonly loyalty: LoyaltyService,
+    private readonly referrals?: ReferralsService,
   ) {}
 
   async createIntent(userId: string, dto: CreatePaymentIntentDto) {
@@ -157,6 +159,10 @@ export class PaymentsService {
       });
       // Award loyalty points
       await this.loyalty.awardPoints(userId, Number(payment.amount), booking.id);
+      // Create referral earning if eligible (fire-and-forget)
+      if (this.referrals) {
+        try { await this.referrals.createEarningForFirstPayment(userId, payment.id); } catch (_) {}
+      }
       return { success: true, paymentId: payment.id };
     } catch (e) {
       await queryRunner.rollbackTransaction();
@@ -265,6 +271,57 @@ export class PaymentsService {
       throw new NotFoundException('Payment not found');
     }
     return payment;
+  }
+
+  async getPaymentByIdAdmin(id: string) {
+    const payment = await this.paymentRepository.findOne({
+      where: { id },
+      relations: ['booking'],
+    });
+    if (!payment) throw new NotFoundException('Payment not found');
+    return payment;
+  }
+
+  async listPaymentsAdmin(params: {
+    status?: PaymentStatus;
+    method?: PaymentMethod;
+    from?: string;
+    to?: string;
+    userId?: string;
+    bookingId?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const {
+      status,
+      method,
+      from,
+      to,
+      userId,
+      bookingId,
+      page = 1,
+      pageSize = 20,
+    } = params;
+
+    const qb = this.paymentRepository
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.booking', 'b')
+      .orderBy('p.paidAt', 'DESC', 'NULLS LAST')
+      .addOrderBy('p.createdAt', 'DESC');
+
+    if (status) qb.andWhere('p.status = :status', { status });
+    if (method) qb.andWhere('p.method = :method', { method });
+    if (bookingId) qb.andWhere('p.bookingId = :bookingId', { bookingId });
+    if (userId) qb.andWhere('b.userId = :userId', { userId });
+    if (from) qb.andWhere('(p.paidAt IS NOT NULL AND p.paidAt >= :from)', { from });
+    if (to) qb.andWhere('(p.paidAt IS NOT NULL AND p.paidAt <= :to)', { to });
+
+    const [items, total] = await qb
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getManyAndCount();
+
+    return { items, total, page, pageSize };
   }
 }
 

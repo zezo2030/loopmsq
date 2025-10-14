@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { RedisService } from '../../utils/redis.service';
 import { Banner } from '../../database/entities/banner.entity';
 import { Offer } from '../../database/entities/offer.entity';
 
@@ -9,36 +10,49 @@ export class HomeAdminService {
   constructor(
     @InjectRepository(Banner) private readonly bannerRepo: Repository<Banner>,
     @InjectRepository(Offer) private readonly offerRepo: Repository<Offer>,
+    private readonly redis: RedisService,
   ) {}
 
   // Banner
   listBanners() {
     return this.bannerRepo.find({ order: { createdAt: 'DESC' } as any });
   }
-  createBanner(dto: Partial<Banner>) {
+  async createBanner(dto: Partial<Banner>) {
     const entity = this.bannerRepo.create(dto);
-    return this.bannerRepo.save(entity);
+    const saved = await this.bannerRepo.save(entity);
+    await this.redis.del('home:v1');
+    return saved;
   }
-  updateBanner(id: string, dto: Partial<Banner>) {
-    return this.bannerRepo.update(id, dto);
+  async updateBanner(id: string, dto: Partial<Banner>) {
+    const res = await this.bannerRepo.update(id, dto);
+    await this.redis.del('home:v1');
+    return res;
   }
-  deleteBanner(id: string) {
-    return this.bannerRepo.delete(id);
+  async deleteBanner(id: string) {
+    const res = await this.bannerRepo.delete(id);
+    await this.redis.del('home:v1');
+    return res;
   }
 
   // Offer
   listOffers() {
     return this.offerRepo.find({ order: { createdAt: 'DESC' } as any });
   }
-  createOffer(dto: Partial<Offer>) {
+  async createOffer(dto: Partial<Offer>) {
     const entity = this.offerRepo.create(dto);
-    return this.offerRepo.save(entity);
+    const saved = await this.offerRepo.save(entity);
+    await this.redis.del('home:v1');
+    return saved;
   }
-  updateOffer(id: string, dto: Partial<Offer>) {
-    return this.offerRepo.update(id, dto);
+  async updateOffer(id: string, dto: Partial<Offer>) {
+    const res = await this.offerRepo.update(id, dto);
+    await this.redis.del('home:v1');
+    return res;
   }
-  deleteOffer(id: string) {
-    return this.offerRepo.delete(id);
+  async deleteOffer(id: string) {
+    const res = await this.offerRepo.delete(id);
+    await this.redis.del('home:v1');
+    return res;
   }
 }
 
