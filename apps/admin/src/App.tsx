@@ -1,11 +1,11 @@
 import { useAdminAuth } from './auth'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Outlet, Navigate } from 'react-router-dom'
 import { Spin, Result, Button } from 'antd'
+import { Component, type ReactNode } from 'react'
 import './App.css'
 
 function App() {
   const { status } = useAdminAuth()
-  const navigate = useNavigate()
 
   if (status === 'loading') {
     return (
@@ -16,19 +16,36 @@ function App() {
   }
 
   if (status === 'unauthorized') {
-    return (
-      <div className="app-unauthorized">
-        <Result
-          status="403"
-          title="Access Denied"
-          subTitle="Sorry, you are not authorized to access this page. Please log in with an Admin or Branch Manager account."
-          extra={<Button type="primary" onClick={() => navigate('/login')}>Go to Login</Button>}
-        />
-      </div>
-    )
+    return <Navigate to="/login" replace />
   }
 
   return <Outlet />
 }
 
 export default App
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() { return { hasError: true } }
+  componentDidCatch() {}
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="app-unauthorized">
+          <Result
+            status="500"
+            title="Something went wrong"
+            subTitle="An unexpected error occurred. Please try again."
+            extra={<Button type="primary" onClick={() => window.location.reload()}>Reload</Button>}
+          />
+        </div>
+      )
+    }
+    return this.props.children as any
+  }
+}
+
+export { ErrorBoundary }

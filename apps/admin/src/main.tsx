@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './i18n'
 import './index.css'
 import './theme.css'
-import App from './App.tsx'
+import App, { ErrorBoundary } from './App.tsx'
 import MainLayout from './layouts/MainLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -34,60 +34,70 @@ import Halls from './pages/content/Halls'
 import Reviews from './pages/feedback/Reviews'
 import Tickets from './pages/support/Tickets'
 import ReportsOverview from './pages/reports/Overview'
+import Settings from './pages/Settings'
+import Analytics from './Analytics'
+import MetaPixel from './MetaPixel'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   {
     path: '/',
-    element: <MainLayout />,
+    element: <App />, // guard layer
     children: [
-      { index: true, element: <App /> },
-      { path: 'dashboard', element: <Dashboard /> },
+      { index: true, element: <MainLayout /> },
+      {
+        path: '/',
+        element: <MainLayout />,
+        children: [
+          { path: 'dashboard', element: <Dashboard /> },
       
-      // Users Management
-      { path: 'users', element: <UsersList /> },
-      { path: 'users/:id', element: <UserDetail /> },
-      { path: 'staff/new', element: <CreateStaff /> },
-      { path: 'branch-managers/new', element: <CreateBranchManager /> },
+          // Users Management
+          { path: 'users', element: <UsersList /> },
+          { path: 'users/:id', element: <UserDetail /> },
+          { path: 'staff/new', element: <CreateStaff /> },
+          { path: 'branch-managers/new', element: <CreateBranchManager /> },
       
-      // Bookings Management
-      { path: 'bookings', element: <BookingsList /> },
-      { path: 'bookings/:id', element: <BookingDetail /> },
+          // Bookings Management
+          { path: 'bookings', element: <BookingsList /> },
+          { path: 'bookings/:id', element: <BookingDetail /> },
       
-      // School Trips Management
-      { path: 'trips', element: <TripsList /> },
-      { path: 'trips/:id', element: <TripDetail /> },
+          // School Trips Management
+          { path: 'trips', element: <TripsList /> },
+          { path: 'trips/:id', element: <TripDetail /> },
       
-      // Special Events Management
-      { path: 'events', element: <EventsList /> },
-      { path: 'events/:id', element: <EventDetail /> },
+          // Special Events Management
+          { path: 'events', element: <EventsList /> },
+          { path: 'events/:id', element: <EventDetail /> },
 
-      // Notifications
-      { path: 'notifications', element: <Notifications /> },
+          // Notifications
+          { path: 'notifications', element: <Notifications /> },
 
-      // CMS
-      { path: 'cms/banners', element: <Banners /> },
-      { path: 'cms/offers', element: <Offers /> },
-      { path: 'cms/coupons', element: <Coupons /> },
-      { path: 'cms/packages', element: <Packages /> },
+          // CMS
+          { path: 'cms/banners', element: <Banners /> },
+          { path: 'cms/offers', element: <Offers /> },
+          { path: 'cms/coupons', element: <Coupons /> },
+          { path: 'cms/packages', element: <Packages /> },
 
-      // Content
-      { path: 'content/branches', element: <Branches /> },
-      { path: 'content/halls', element: <Halls /> },
+          // Content
+          { path: 'content/branches', element: <Branches /> },
+          { path: 'content/halls', element: <Halls /> },
 
-      // Finance
-      { path: 'finance/payments', element: <PaymentsList /> },
-      { path: 'finance/payments/:id', element: <PaymentDetail /> },
-      { path: 'finance/wallets', element: <WalletsList /> },
+          // Finance
+          { path: 'finance/payments', element: <PaymentsList /> },
+          { path: 'finance/payments/:id', element: <PaymentDetail /> },
+          { path: 'finance/wallets', element: <WalletsList /> },
 
-      // Marketing
-      { path: 'marketing/loyalty', element: <Loyalty /> },
-      { path: 'marketing/referrals', element: <Referrals /> },
+          // Marketing
+          { path: 'marketing/loyalty', element: <Loyalty /> },
+          { path: 'marketing/referrals', element: <Referrals /> },
 
-      // Feedback/Support/Reports
-      { path: 'feedback/reviews', element: <Reviews /> },
-      { path: 'support/tickets', element: <Tickets /> },
-      { path: 'reports/overview', element: <ReportsOverview /> },
+          // Feedback/Support/Reports
+          { path: 'feedback/reviews', element: <Reviews /> },
+          { path: 'support/tickets', element: <Tickets /> },
+          { path: 'reports/overview', element: <ReportsOverview /> },
+          { path: 'settings', element: <Settings /> },
+        ],
+      },
     ],
   },
 ])
@@ -97,7 +107,11 @@ const queryClient = new QueryClient()
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <ErrorBoundary>
+        <Analytics />
+        <MetaPixel />
+        <RouterProvider router={router} />
+      </ErrorBoundary>
     </QueryClientProvider>
   </StrictMode>,
 )

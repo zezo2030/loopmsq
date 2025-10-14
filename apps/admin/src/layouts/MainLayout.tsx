@@ -16,7 +16,9 @@ import {
   PictureOutlined,
   PercentageOutlined,
   TagsOutlined,
-  AppstoreOutlined
+  AppstoreOutlined,
+  StarOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons'
 import { DollarOutlined, WalletOutlined, RocketOutlined } from '@ant-design/icons'
 import '../theme.css'
@@ -47,6 +49,15 @@ export default function MainLayout() {
   if (path.startsWith('/content/halls')) {
     return ['content-halls']
   }
+  if (path.startsWith('/feedback/reviews')) {
+    return ['feedback-reviews']
+  }
+  if (path.startsWith('/support/tickets')) {
+    return ['support-tickets']
+  }
+  if (path.startsWith('/reports/overview')) {
+    return ['reports-overview']
+  }
     return [path === '/' ? 'dashboard' : path.replace('/', '')]
   }
 
@@ -64,7 +75,7 @@ export default function MainLayout() {
     {
       key: 'settings',
       icon: <SettingOutlined />,
-      label: 'Preferences',
+      label: <Link to="/settings">Preferences</Link>,
     },
     { 
       type: 'divider' as const,
@@ -176,6 +187,30 @@ export default function MainLayout() {
       children: [
         { key: 'marketing-loyalty', icon: <CrownOutlined />, label: <Link to="/marketing/loyalty">Loyalty</Link> },
         { key: 'marketing-referrals', icon: <UsergroupAddOutlined />, label: <Link to="/marketing/referrals">Referrals</Link> },
+      ],
+    },
+    {
+      key: 'feedback',
+      icon: <StarOutlined />,
+      label: 'Feedback',
+      children: [
+        { key: 'feedback-reviews', icon: <StarOutlined />, label: <Link to="/feedback/reviews">Reviews</Link> },
+      ],
+    },
+    {
+      key: 'support',
+      icon: <BellOutlined />,
+      label: 'Support',
+      children: [
+        { key: 'support-tickets', icon: <BellOutlined />, label: <Link to="/support/tickets">Tickets</Link> },
+      ],
+    },
+    {
+      key: 'reports',
+      icon: <BarChartOutlined />,
+      label: 'Reports',
+      children: [
+        { key: 'reports-overview', icon: <BarChartOutlined />, label: <Link to="/reports/overview">Overview</Link> },
       ],
     },
   ]
