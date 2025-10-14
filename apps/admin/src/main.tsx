@@ -31,6 +31,9 @@ import Referrals from './pages/marketing/Referrals'
 import WalletsList from './pages/finance/WalletsList'
 import Branches from './pages/content/Branches'
 import Halls from './pages/content/Halls'
+import Reviews from './pages/feedback/Reviews'
+import Tickets from './pages/support/Tickets'
+import ReportsOverview from './pages/reports/Overview'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -80,6 +83,11 @@ const router = createBrowserRouter([
       // Marketing
       { path: 'marketing/loyalty', element: <Loyalty /> },
       { path: 'marketing/referrals', element: <Referrals /> },
+
+      // Feedback/Support/Reports
+      { path: 'feedback/reviews', element: <Reviews /> },
+      { path: 'support/tickets', element: <Tickets /> },
+      { path: 'reports/overview', element: <ReportsOverview /> },
     ],
   },
 ])
