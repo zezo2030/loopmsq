@@ -22,15 +22,6 @@ export class LoyaltyController {
     return this.loyalty.getSummary(user.id);
   }
 
-  @Get(':userId')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get loyalty summary for a user (Admin only)' })
-  async getUserSummary(@Param('userId') userId: string) {
-    return this.loyalty.getSummary(userId);
-  }
-
   @Post('redeem')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
@@ -88,6 +79,15 @@ export class LoyaltyController {
   @ApiOperation({ summary: 'Adjust wallet balance/points (Admin only)' })
   async adjustWallet(@Param('userId') userId: string, @Body() body: AdjustWalletDto) {
     return this.loyalty.adjustWallet(userId, body);
+  }
+
+  @Get(':userId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get loyalty summary for a user (Admin only)' })
+  async getUserSummary(@Param('userId') userId: string) {
+    return this.loyalty.getSummary(userId);
   }
 }
 
