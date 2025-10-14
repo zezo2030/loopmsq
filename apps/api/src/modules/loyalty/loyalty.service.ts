@@ -120,22 +120,36 @@ export class LoyaltyService {
 
   async listWallets(params: { query?: string; page?: number; pageSize?: number }) {
     const { query, page = 1, pageSize = 20 } = params;
-    const where = query
-      ? [
-          { user: { name: ILike(`%${query}%`) } } as any,
-          { userId: ILike(`%${query}%`) } as any,
-        ]
-      : undefined;
+    const qb = this.walletRepo
+      .createQueryBuilder('w')
+      .leftJoinAndSelect('w.user', 'u')
+      .orderBy('w.updatedAt', 'DESC');
 
-    const [items, total] = await this.walletRepo.findAndCount({
-      relations: ['user'],
-      where: where as any,
-      order: { updatedAt: 'DESC' } as any,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
+    if (query && query.trim()) {
+      const q = query.trim();
+      // Strict UUID v4 format: 8-4-4-4-12 hex segments
+      const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(q);
+      if (isUuid) {
+        qb.andWhere('w.userId = :uid', { uid: q });
+      } else {
+        qb.andWhere('u.name ILIKE :q', { q: `%${q}%` });
+      }
+    }
 
-    return { items, total, page, pageSize };
+    try {
+      const [items, total] = await qb
+        .skip((page - 1) * pageSize)
+        .take(pageSize)
+        .getManyAndCount();
+
+      return { items, total, page, pageSize };
+    } catch (e: any) {
+      if (e?.code === '22P02') {
+        // Invalid text representation for UUID; return empty result rather than 500
+        return { items: [], total: 0, page, pageSize };
+      }
+      throw e;
+    }
   }
 
   async adjustWallet(userId: string, input: { balanceDelta?: number; pointsDelta?: number; reason?: string }) {
