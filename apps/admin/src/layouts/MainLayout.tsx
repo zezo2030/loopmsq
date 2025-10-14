@@ -1,5 +1,6 @@
 import { Menu, Button, Avatar, Dropdown, Space } from 'antd'
 import { Link, Outlet, useLocation } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
 import { 
   DashboardOutlined, 
   UserOutlined, 
@@ -25,6 +26,8 @@ import '../theme.css'
 
 export default function MainLayout() {
   const location = useLocation()
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const sidebarRef = useRef<HTMLDivElement | null>(null)
   
   const getSelectedKeys = () => {
     const path = location.pathname
@@ -65,6 +68,25 @@ export default function MainLayout() {
     localStorage.removeItem('accessToken')
     window.location.href = '/login'
   }
+
+  // Scroll selected menu item into view when route changes
+  useEffect(() => {
+    const container = sidebarRef.current || document.querySelector('.admin-menu') as HTMLElement | null
+    if (!container) return
+    const selected = container.querySelector('.ant-menu-item-selected, .ant-menu-submenu-selected') as HTMLElement | null
+    if (selected && typeof selected.scrollIntoView === 'function') {
+      selected.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+  }, [location.pathname])
+
+  // Scroll main content to top on route changes
+  useEffect(() => {
+    if (contentRef.current) {
+      try { contentRef.current.scrollTop = 0 } catch {}
+    } else {
+      try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch {}
+    }
+  }, [location.pathname])
 
   const userMenuItems = [
     {
@@ -218,7 +240,7 @@ export default function MainLayout() {
   return (
     <div className="admin-layout">
       {/* Sidebar */}
-      <div className="admin-sidebar">
+      <div className="admin-sidebar" ref={sidebarRef}>
         <div className="admin-logo">
           🏢 Admin Control
         </div>
@@ -271,7 +293,7 @@ export default function MainLayout() {
         
         {/* Content */}
         <div className="admin-content">
-          <div className="admin-content-wrapper">
+          <div className="admin-content-wrapper" ref={contentRef}>
             <Outlet />
           </div>
         </div>
