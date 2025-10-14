@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Space, Table, Tag, Input, Select, Avatar, Tooltip } from 'antd'
+import { Button, Space, Table, Tag, Input, Select, Avatar, Tooltip, message, Popconfirm } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { 
   UserOutlined, 
@@ -163,6 +163,50 @@ export default function UsersList() {
               onClick={() => navigate(`/users/${record.id}`)}
             />
           </Tooltip>
+          {record.isActive ? (
+            <Popconfirm
+              title="Deactivate user?"
+              okText="Deactivate"
+              cancelText="Cancel"
+              onConfirm={async () => {
+                try {
+                  const token = localStorage.getItem('accessToken')
+                  const resp = await fetch(`${getApiBase()}/users/${record.id}/deactivate`, {
+                    method: 'PATCH',
+                    headers: { Authorization: `Bearer ${token}` },
+                  })
+                  if (!resp.ok) throw new Error(await resp.text() || 'Failed')
+                  message.success('User deactivated')
+                  setRows(rows => rows.map(r => r.id === record.id ? { ...r, isActive: false } : r))
+                } catch (e: any) {
+                  message.error(e?.message || 'Failed to deactivate')
+                }
+              }}
+            >
+              <Button type="link" size="small">Deactivate</Button>
+            </Popconfirm>
+          ) : (
+            <Button
+              type="link"
+              size="small"
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem('accessToken')
+                  const resp = await fetch(`${getApiBase()}/users/${record.id}/activate`, {
+                    method: 'PATCH',
+                    headers: { Authorization: `Bearer ${token}` },
+                  })
+                  if (!resp.ok) throw new Error(await resp.text() || 'Failed')
+                  message.success('User activated')
+                  setRows(rows => rows.map(r => r.id === record.id ? { ...r, isActive: true } : r))
+                } catch (e: any) {
+                  message.error(e?.message || 'Failed to activate')
+                }
+              }}
+            >
+              Activate
+            </Button>
+          )}
         </Space>
       ),
     },
