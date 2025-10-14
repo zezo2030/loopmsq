@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Space, Table, Tag, Input, Select, Avatar, Tooltip, message, Popconfirm } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   UserOutlined, 
   SearchOutlined, 
@@ -32,6 +32,9 @@ export default function UsersList() {
   const [loading, setLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('')
+  const [page, setPage] = useState<number>(1)
+  const [pageSize, setPageSize] = useState<number>(20)
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -57,6 +60,29 @@ export default function UsersList() {
     })()
     return () => { mounted = false }
   }, [])
+
+  // Initialize filters from URL on mount
+  useEffect(() => {
+    const q = searchParams.get('q') || ''
+    const role = searchParams.get('role') || ''
+    const p = Number(searchParams.get('page') || '1')
+    const ps = Number(searchParams.get('pageSize') || '20')
+    setSearchText(q)
+    setRoleFilter(role)
+    if (!Number.isNaN(p)) setPage(p)
+    if (!Number.isNaN(ps)) setPageSize(ps)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Sync filters to URL
+  useEffect(() => {
+    const next = new URLSearchParams()
+    if (searchText) next.set('q', searchText)
+    if (roleFilter) next.set('role', roleFilter)
+    next.set('page', String(page))
+    next.set('pageSize', String(pageSize))
+    setSearchParams(next, { replace: true })
+  }, [searchText, roleFilter, page, pageSize, setSearchParams])
 
   const filteredData = rows.filter(user => {
     const matchesSearch = !searchText || 
@@ -320,11 +346,12 @@ export default function UsersList() {
               loading={loading}
               pagination={{
                 total: filteredData.length,
-                pageSize: 20,
+                current: page,
+                pageSize,
                 showSizeChanger: true,
                 showQuickJumper: true,
-                showTotal: (total, range) => 
-                  `${range[0]}-${range[1]} of ${total} users`,
+                onChange: (p, ps) => { setPage(p); setPageSize(ps) },
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} users`,
               }}
               scroll={{ x: 800 }}
             />

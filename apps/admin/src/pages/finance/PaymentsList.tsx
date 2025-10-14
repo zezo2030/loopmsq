@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Card, Table, Tag, Input, Select, DatePicker, Space, Button } from 'antd'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api'
 import dayjs from 'dayjs'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 interface PaymentItem {
   id: string
@@ -41,6 +41,7 @@ export default function PaymentsList() {
   const [to, setTo] = useState<string | undefined>()
   const [page, setPage] = useState<number>(1)
   const [pageSize, setPageSize] = useState<number>(20)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const queryKey = useMemo(() => ['payments', { status, method, userId, bookingId, from, to, page, pageSize }], [status, method, userId, bookingId, from, to, page, pageSize])
   const { data, isLoading, refetch } = useQuery<PaymentsResponse>({
@@ -58,6 +59,36 @@ export default function PaymentsList() {
       return apiGet<PaymentsResponse>(`/payments?${params.toString()}`)
     },
   })
+
+  // Initialize from URL
+  useEffect(() => {
+    const sp = (k: string) => searchParams.get(k) || undefined
+    setStatus(sp('status'))
+    setMethod(sp('method'))
+    setUserId(searchParams.get('userId') || '')
+    setBookingId(searchParams.get('bookingId') || '')
+    const f = sp('from'); const t = sp('to')
+    setFrom(f); setTo(t)
+    const p = Number(searchParams.get('page') || '1')
+    const ps = Number(searchParams.get('pageSize') || '20')
+    if (!Number.isNaN(p)) setPage(p)
+    if (!Number.isNaN(ps)) setPageSize(ps)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Sync to URL
+  useEffect(() => {
+    const next = new URLSearchParams()
+    if (status) next.set('status', status)
+    if (method) next.set('method', method)
+    if (userId) next.set('userId', userId)
+    if (bookingId) next.set('bookingId', bookingId)
+    if (from) next.set('from', from)
+    if (to) next.set('to', to)
+    next.set('page', String(page))
+    next.set('pageSize', String(pageSize))
+    setSearchParams(next, { replace: true })
+  }, [status, method, userId, bookingId, from, to, page, pageSize, setSearchParams])
 
   const columns = [
     {

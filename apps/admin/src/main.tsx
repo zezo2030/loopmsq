@@ -29,6 +29,8 @@ import PaymentDetail from './pages/finance/PaymentDetail'
 import Loyalty from './pages/marketing/Loyalty'
 import Referrals from './pages/marketing/Referrals'
 import WalletsList from './pages/finance/WalletsList'
+import Branches from './pages/content/Branches'
+import Halls from './pages/content/Halls'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -65,6 +67,10 @@ const router = createBrowserRouter([
       { path: 'cms/offers', element: <Offers /> },
       { path: 'cms/coupons', element: <Coupons /> },
       { path: 'cms/packages', element: <Packages /> },
+
+      // Content
+      { path: 'content/branches', element: <Branches /> },
+      { path: 'content/halls', element: <Halls /> },
 
       // Finance
       { path: 'finance/payments', element: <PaymentsList /> },

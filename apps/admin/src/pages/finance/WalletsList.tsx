@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Card, Table, Input, Space, Button, Modal, Form, InputNumber, message } from 'antd'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../../api'
+import { useSearchParams } from 'react-router-dom'
 
 interface WalletItem {
   id: string
@@ -26,6 +27,7 @@ export default function WalletsList() {
   const [pageSize, setPageSize] = useState<number>(20)
   const [adjustUserId, setAdjustUserId] = useState<string | null>(null)
   const [form] = Form.useForm()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const queryKey = useMemo(() => ['wallets', { query, page, pageSize }], [query, page, pageSize])
   const { data, isLoading, refetch } = useQuery<WalletsResponse>({
@@ -38,6 +40,26 @@ export default function WalletsList() {
       return apiGet<WalletsResponse>(`/loyalty/wallets?${params.toString()}`)
     },
   })
+
+  // Initialize from URL
+  useEffect(() => {
+    const q = searchParams.get('q') || ''
+    const p = Number(searchParams.get('page') || '1')
+    const ps = Number(searchParams.get('pageSize') || '20')
+    setQuery(q)
+    if (!Number.isNaN(p)) setPage(p)
+    if (!Number.isNaN(ps)) setPageSize(ps)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Sync to URL
+  useEffect(() => {
+    const next = new URLSearchParams()
+    if (query) next.set('q', query)
+    next.set('page', String(page))
+    next.set('pageSize', String(pageSize))
+    setSearchParams(next, { replace: true })
+  }, [query, page, pageSize, setSearchParams])
 
   const adjustMutation = useMutation({
     mutationFn: async (payload: { userId: string; balanceDelta?: number; pointsDelta?: number; reason?: string }) => {

@@ -41,6 +41,12 @@ export default function MainLayout() {
   if (path.startsWith('/notifications')) {
     return ['notifications']
   }
+  if (path.startsWith('/content/branches')) {
+    return ['content-branches']
+  }
+  if (path.startsWith('/content/halls')) {
+    return ['content-halls']
+  }
     return [path === '/' ? 'dashboard' : path.replace('/', '')]
   }
 
@@ -143,6 +149,15 @@ export default function MainLayout() {
         { key: 'cms-offers', icon: <TagsOutlined />, label: <Link to="/cms/offers">Offers</Link> },
         { key: 'cms-coupons', icon: <PercentageOutlined />, label: <Link to="/cms/coupons">Coupons</Link> },
         { key: 'cms-packages', icon: <GiftOutlined />, label: <Link to="/cms/packages">Packages</Link> },
+      ],
+    },
+    {
+      key: 'content',
+      icon: <AppstoreOutlined />,
+      label: 'Content',
+      children: [
+        { key: 'content-branches', icon: <AppstoreOutlined />, label: <Link to="/content/branches">Branches</Link> },
+        { key: 'content-halls', icon: <AppstoreOutlined />, label: <Link to="/content/halls">Halls</Link> },
       ],
     },
     {
