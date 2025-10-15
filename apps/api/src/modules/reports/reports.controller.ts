@@ -1,10 +1,12 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Res, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from '../../database/entities/user.entity';
 
 @ApiTags('reports')
 @Controller('reports')
@@ -15,7 +17,19 @@ export class ReportsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  async overview(@Query('from') from?: string, @Query('to') to?: string, @Query('branchId') branchId?: string) {
+  async overview(
+    @CurrentUser() user: User,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    // Enforce branch scoping for branch managers
+    if (user.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!user.branchId) {
+        throw new ForbiddenException('Not allowed');
+      }
+      branchId = user.branchId;
+    }
     return this.reports.overview({ from, to, branchId });
   }
 
@@ -23,7 +37,21 @@ export class ReportsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  async export(@Res() res: Response, @Query('type') type: string, @Query('from') from?: string, @Query('to') to?: string, @Query('branchId') branchId?: string) {
+  async export(
+    @CurrentUser() user: User,
+    @Res() res: Response,
+    @Query('type') type: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    // Enforce branch scoping for branch managers
+    if (user.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!user.branchId) {
+        throw new ForbiddenException('Not allowed');
+      }
+      branchId = user.branchId;
+    }
     const data = await this.reports.overview({ from, to, branchId });
     const csv = this.toCSV(type || 'overview', data);
     res.setHeader('Content-Type', 'text/csv');

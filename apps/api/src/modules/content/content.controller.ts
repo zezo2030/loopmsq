@@ -83,7 +83,7 @@ export class ContentController {
     // Branch manager may only update their own branch
     if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
       if (!requester.branchId || requester.branchId !== id) {
-        throw new ForbiddenException('Not allowed to update this branch');
+        throw new ForbiddenException('Not allowed');
       }
     }
     return this.contentService.updateBranch(id, updateData);
@@ -122,7 +122,7 @@ export class ContentController {
     // Force branchId to requester's branch for branch managers
     if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
       if (!requester.branchId) {
-        throw new ForbiddenException('Branch not assigned');
+        throw new ForbiddenException('Not allowed');
       }
       createHallDto.branchId = requester.branchId as any;
     }
@@ -163,11 +163,11 @@ export class ContentController {
     if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
       const hall = await this.contentService.findHallById(id);
       if (!requester.branchId || hall.branchId !== requester.branchId) {
-        throw new ForbiddenException('Not allowed to update this hall');
+        throw new ForbiddenException('Not allowed');
       }
       // Prevent moving hall to another branch
       if (updateData && (updateData as any).branchId && (updateData as any).branchId !== requester.branchId) {
-        throw new ForbiddenException('Cannot change hall branch');
+        throw new ForbiddenException('Not allowed');
       }
     }
     return this.contentService.updateHall(id, updateData);

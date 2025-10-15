@@ -427,7 +427,7 @@ export default function EventsList() {
   ]
 
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-content">

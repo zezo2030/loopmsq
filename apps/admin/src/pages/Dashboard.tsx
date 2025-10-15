@@ -118,7 +118,7 @@ export default function Dashboard() {
               change: 0,
               trend: 'stable'
             }].map((stat, index) => (
-              <Col xs={24} sm={12} lg={6} key={index}>
+              <Col xs={24} sm={12} md={8} lg={6} key={index}>
                 <Card className="custom-card">
                   <Statistic
                     title={stat.title}
@@ -163,7 +163,7 @@ export default function Dashboard() {
           {revenueEntries.length > 0 && (
             <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
               {revenueEntries.map(([k, v]) => (
-                <Col xs={24} sm={12} lg={6} key={k}>
+                <Col xs={24} sm={12} md={8} lg={6} key={k}>
                   <Card className="custom-card">
                     <Statistic title={`${t('reports.revenue_by_method') || 'Revenue'}: ${k}`} value={Number(v)} suffix="SAR" />
                   </Card>
@@ -174,7 +174,7 @@ export default function Dashboard() {
 
           <Row gutter={[24, 24]}>
             {/* Recent Activity */}
-            <Col xs={24} lg={16}>
+            <Col xs={24} md={16} lg={16}>
               <Card 
                 className="custom-card"
                 title={t('dashboard.recent_activity') || 'Recent Activity'} 
@@ -223,7 +223,7 @@ export default function Dashboard() {
             </Col>
 
             {/* Quick Actions & Status Summary */}
-            <Col xs={24} lg={8}>
+            <Col xs={24} md={8} lg={8}>
               <Card 
                 className="custom-card"
                 title={

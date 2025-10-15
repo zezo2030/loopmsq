@@ -130,7 +130,8 @@ export default function PaymentsList() {
   ]
 
   return (
-    <Card title={t('payments.title') || 'Payments'} extra={<Button onClick={() => refetch()}>{t('common.refresh') || 'Refresh'}</Button>}>
+    <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+      <Card title={t('payments.title') || 'Payments'} extra={<Button onClick={() => refetch()}>{t('common.refresh') || 'Refresh'}</Button>}>
       <Space style={{ marginBottom: 16 }} wrap>
         <Select
           allowClear
@@ -180,6 +181,7 @@ export default function PaymentsList() {
           onChange: (p, ps) => { setPage(p); setPageSize(ps); },
         }}
       />
-    </Card>
+      </Card>
+    </div>
   )
 }

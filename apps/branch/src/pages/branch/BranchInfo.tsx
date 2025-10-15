@@ -5,6 +5,7 @@ import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiGet, apiPut } from '../../api'
 import { useBranchAuth } from '../../auth'
+import WorkingHoursEditor from '../../components/WorkingHoursEditor'
 
 const { TextArea } = Input
 const { Option } = Select
@@ -197,14 +198,10 @@ export default function BranchInfo() {
                   </Form.Item>
 
                   <Form.Item
-                    label={t('branch.working_hours') || 'Working Hours (JSON)'}
+                    label={t('branch.working_hours') || 'Working Hours'}
                     name="workingHours"
-                    help={t('branch.working_hours_help') || 'Enter working hours in JSON format'}
                   >
-                    <TextArea 
-                      rows={4} 
-                      placeholder={t('branch.working_hours_ph') || '{"monday": {"open": "09:00", "close": "18:00"}}'}
-                    />
+                    <WorkingHoursEditor />
                   </Form.Item>
 
                   <Row gutter={[16, 16]}>

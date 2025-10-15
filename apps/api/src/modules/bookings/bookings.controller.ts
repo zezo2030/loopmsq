@@ -122,7 +122,8 @@ export class BookingsController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.bookingsService.findBookingById(id, user.id);
+    const isManager = user.roles?.includes(UserRole.BRANCH_MANAGER) || false;
+    return this.bookingsService.findBookingById(id, user.id, user.branchId, isManager);
   }
 
   @Get(':id/tickets')
@@ -134,7 +135,8 @@ export class BookingsController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.bookingsService.getBookingTickets(id, user.id);
+    const isManager = user.roles?.includes(UserRole.BRANCH_MANAGER) || false;
+    return this.bookingsService.getBookingTickets(id, user.id, user.branchId, isManager);
   }
 
   @Post(':id/cancel')
@@ -148,7 +150,8 @@ export class BookingsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body('reason') reason?: string,
   ) {
-    return this.bookingsService.cancelBooking(id, user.id, reason);
+    const isManager = user.roles?.includes(UserRole.BRANCH_MANAGER) || false;
+    return this.bookingsService.cancelBooking(id, user.id, reason, user.branchId, isManager);
   }
 
   // Staff endpoints

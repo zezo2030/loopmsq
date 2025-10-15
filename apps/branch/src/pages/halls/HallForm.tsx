@@ -33,6 +33,8 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
         features: hall.features,
         images: hall.images,
         decorated: hall.decorated,
+        descriptionAr: hall.descriptionAr,
+        descriptionEn: hall.descriptionEn,
       })
     }
   }, [hall, form])
@@ -52,6 +54,8 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
           holiday: values.pricing?.holiday || 1,
           decoration: values.pricing?.decoration || 0,
         },
+        description_ar: values.descriptionAr,
+        description_en: values.descriptionEn,
       }
 
       if (isEditMode) {
@@ -231,6 +235,31 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
           placeholder={t('halls.images_ph') || 'Enter image URLs (one per line)'}
         />
       </Form.Item>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            label={t('halls.description_ar') || 'Description (Arabic)'}
+            name="descriptionAr"
+          >
+            <TextArea 
+              rows={3} 
+              placeholder={t('halls.description_ar') || 'Enter Arabic description'}
+            />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            label={t('halls.description_en') || 'Description (English)'}
+            name="descriptionEn"
+          >
+            <TextArea 
+              rows={3} 
+              placeholder={t('halls.description_en') || 'Enter English description'}
+            />
+          </Form.Item>
+        </Col>
+      </Row>
 
       {/* Form Actions */}
       <div style={{ textAlign: 'right', marginTop: '24px' }}>

@@ -378,13 +378,23 @@ export class BookingsService {
     };
   }
 
-  async findBookingById(id: string, userId?: string): Promise<Booking> {
+  async findBookingById(id: string, userIdOrRequesterId?: string, requesterBranchId?: string, isRequesterBranchManager?: boolean): Promise<Booking> {
+    const where: any = { id };
+    if (userIdOrRequesterId && !isRequesterBranchManager) {
+      // End-user scope by userId
+      where.userId = userIdOrRequesterId;
+    }
     const booking = await this.bookingRepository.findOne({
-      where: { id, ...(userId && { userId }) },
+      where,
       relations: ['user', 'branch', 'hall', 'tickets', 'payments'],
     });
 
     if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (isRequesterBranchManager && requesterBranchId && booking.branchId !== requesterBranchId) {
+      // Hide existence outside branch
       throw new NotFoundException('Booking not found');
     }
 
@@ -393,9 +403,11 @@ export class BookingsService {
 
   async getBookingTickets(
     bookingId: string,
-    userId?: string,
+    userIdOrRequesterId?: string,
+    requesterBranchId?: string,
+    isRequesterBranchManager?: boolean,
   ): Promise<Ticket[]> {
-    const booking = await this.findBookingById(bookingId, userId);
+    const booking = await this.findBookingById(bookingId, userIdOrRequesterId, requesterBranchId, isRequesterBranchManager);
 
     return this.ticketRepository.find({
       where: { bookingId: booking.id },
@@ -436,7 +448,7 @@ export class BookingsService {
         success: false,
         ticket,
         booking: ticket.booking,
-        message: 'Forbidden: ticket belongs to a different branch',
+        message: 'Not allowed',
       };
     }
 
@@ -531,10 +543,12 @@ export class BookingsService {
 
   async cancelBooking(
     bookingId: string,
-    userId: string,
+    userIdOrRequesterId: string,
     reason?: string,
+    requesterBranchId?: string,
+    isRequesterBranchManager?: boolean,
   ): Promise<Booking> {
-    const booking = await this.findBookingById(bookingId, userId);
+    const booking = await this.findBookingById(bookingId, userIdOrRequesterId, requesterBranchId, isRequesterBranchManager);
 
     if (booking.status === BookingStatus.CANCELLED) {
       throw new BadRequestException('Booking is already cancelled');
@@ -580,15 +594,15 @@ export class BookingsService {
 
       await queryRunner.commitTransaction();
 
-      this.logger.log(`Booking cancelled: ${bookingId} by user ${userId}`);
+      this.logger.log(`Booking cancelled: ${bookingId} by user ${userIdOrRequesterId}`);
 
       // Clear cache
-      await this.redisService.del(`user:${userId}:bookings`);
+      await this.redisService.del(`user:${userIdOrRequesterId}:bookings`);
 
       // Notify cancellation
       await this.notifications.enqueue({
         type: 'BOOKING_CANCELLED',
-        to: { userId },
+        to: { userId: userIdOrRequesterId },
         data: { bookingId: booking.id, reason },
         channels: ['sms', 'push'],
       });

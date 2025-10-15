@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space } from 'antd'
 import { apiGet, apiPost, apiPut, apiPatch } from '../../api'
 import { useTranslation } from 'react-i18next'
+import WorkingHoursEditor from '../../components/WorkingHoursEditor'
 
 type Branch = {
   id: string
@@ -72,7 +73,7 @@ export default function Branches() {
             contactPhone: r.contactPhone,
             amenities: r.amenities,
             status: r.status,
-            workingHours: r.workingHours ? JSON.stringify(r.workingHours, null, 2) : ''
+            workingHours: r.workingHours || {}
           }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
           <Select
             value={r.status}
@@ -91,7 +92,8 @@ export default function Branches() {
   ]
 
   return (
-    <Card title={t('branches.title') || 'الفروع'} extra={<Button type="primary" disabled={!canEdit} onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('branches.new') || 'فرع جديد'}</Button>}>
+    <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+      <Card title={t('branches.title') || 'الفروع'} extra={<Button type="primary" disabled={!canEdit} onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('branches.new') || 'فرع جديد'}</Button>}>
       <Table
         rowKey="id"
         loading={isLoading}
@@ -123,7 +125,7 @@ export default function Branches() {
               status: values.status || 'active',
             }
             if (values.workingHours) {
-              try { payload.workingHours = JSON.parse(values.workingHours) } catch { message.error(t('branches.working_hours_invalid') || 'Invalid working hours JSON'); return }
+              payload.workingHours = values.workingHours
             }
             if (!canEdit) { message.error(t('errors.forbidden') || 'Forbidden'); return }
             if (editing) updateBranch.mutate({ id: editing.id, body: payload })
@@ -148,8 +150,8 @@ export default function Branches() {
           <Form.Item name="amenities" label={t('branches.amenities') || 'الخدمات'}>
             <Select mode="tags" placeholder={t('branches.amenities_ph') || 'أدخل الخدمات'} />
           </Form.Item>
-          <Form.Item name="workingHours" label={t('branches.working_hours') || 'أوقات العمل (JSON)'}>
-            <Input.TextArea rows={6} placeholder='{"sunday":{"open":"09:00","close":"22:00"}}' />
+          <Form.Item name="workingHours" label={t('branches.working_hours') || 'أوقات العمل'}>
+            <WorkingHoursEditor />
           </Form.Item>
           <Form.Item name="description_ar" label={t('branches.description_ar') || 'الوصف (AR)'}>
             <Input.TextArea rows={3} />
@@ -159,7 +161,8 @@ export default function Branches() {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+      </Card>
+    </div>
   )
 }
 

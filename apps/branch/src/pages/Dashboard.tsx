@@ -12,9 +12,11 @@ import '../theme.css'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
 import { apiGet } from '../api'
+import { useBranchAuth } from '../auth'
 
 export default function Dashboard() {
   const { t } = useTranslation()
+  const { me } = useBranchAuth()
   const [overview, setOverview] = useState<{ 
     bookings: { total: number; confirmed: number; cancelled: number; pending?: number }; 
     scans: number; 
@@ -31,7 +33,8 @@ export default function Dashboard() {
   useEffect(() => {
     ;(async () => {
       try {
-        const ov = await apiGet<any>('/reports/overview')
+        const branchIdParam = me?.branchId ? `?branchId=${me.branchId}` : ''
+        const ov = await apiGet<any>(`/reports/overview${branchIdParam}`)
         setOverview(ov)
       } catch {}
       try {
@@ -40,12 +43,12 @@ export default function Dashboard() {
         setRecent(items)
       } catch {}
     })()
-  }, [])
+  }, [me?.branchId])
 
   const revenueEntries = Object.entries(overview?.revenueByMethod || {})
 
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-content">
@@ -94,7 +97,7 @@ export default function Dashboard() {
               change: 0,
               trend: 'stable'
             }].map((stat, index) => (
-              <Col xs={24} sm={12} lg={6} key={index}>
+              <Col xs={24} sm={12} md={8} lg={6} key={index}>
                 <Card className="custom-card">
                   <Statistic
                     title={stat.title}
@@ -139,7 +142,7 @@ export default function Dashboard() {
           {revenueEntries.length > 0 && (
             <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
               {revenueEntries.map(([k, v]) => (
-                <Col xs={24} sm={12} lg={6} key={k}>
+                <Col xs={24} sm={12} md={8} lg={6} key={k}>
                   <Card className="custom-card">
                     <Statistic title={`${t('reports.revenue_by_method') || 'Revenue'}: ${k}`} value={Number(v)} suffix="SAR" />
                   </Card>
@@ -150,13 +153,14 @@ export default function Dashboard() {
 
           <Row gutter={[24, 24]}>
             {/* Recent Activity */}
-            <Col xs={24} lg={16}>
+            <Col xs={24} md={16} lg={16}>
               <Card 
                 className="custom-card"
                 title={t('dashboard.recent_activity') || 'Recent Activity'} 
                 extra={<Button type="link">{t('common.view_all') || 'View All'}</Button>}
               >
                 <List
+                  style={{ maxHeight: '400px', overflowY: 'auto' }}
                   itemLayout="horizontal"
                   dataSource={recent}
                   renderItem={(item: any) => (
@@ -199,7 +203,7 @@ export default function Dashboard() {
             </Col>
 
             {/* Quick Actions & Status Summary */}
-            <Col xs={24} lg={8}>
+            <Col xs={24} md={8} lg={8}>
               <Card 
                 className="custom-card"
                 title={

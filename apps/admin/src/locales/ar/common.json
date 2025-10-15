@@ -135,9 +135,20 @@
   "branches.contact_phone": "هاتف التواصل",
   "branches.amenities": "الخدمات",
   "branches.amenities_ph": "أدخل الخدمات",
-  "branches.working_hours": "أوقات العمل (JSON)",
+  "branches.working_hours": "أوقات العمل",
   "branches.description_ar": "الوصف (AR)",
   "branches.description_en": "الوصف (EN)",
+  "working_hours.days": "الأيام",
+  "working_hours.open": "فتح",
+  "working_hours.close": "إغلاق",
+  "working_hours.closed": "مغلق",
+  "working_hours.sunday": "الأحد",
+  "working_hours.monday": "الاثنين",
+  "working_hours.tuesday": "الثلاثاء",
+  "working_hours.wednesday": "الأربعاء",
+  "working_hours.thursday": "الخميس",
+  "working_hours.friday": "الجمعة",
+  "working_hours.saturday": "السبت",
   "branches.edit_title": "تعديل فرع",
   "branches.create_title": "إنشاء فرع",
   "branches.working_hours_invalid": "صيغة أوقات العمل غير صحيحة (JSON)"
@@ -177,7 +188,9 @@
   "halls.features": "المزايا",
   "halls.features_ph": "أدخل المزايا",
   "halls.images": "صور (روابط)",
-  "halls.images_ph": "أدخل روابط الصور"
+  "halls.images_ph": "أدخل روابط الصور",
+  "halls.description_ar": "الوصف (عربي)",
+  "halls.description_en": "الوصف (إنجليزي)"
   ,
   "reports.overview": "نظرة عامة على التقارير",
   "reports.branch": "الفرع",
@@ -190,7 +203,8 @@
   "reports.load_failed": "فشل تحميل التقرير",
   "common.apply": "تطبيق",
   "common.yes": "نعم",
-  "common.no": "لا"
+  "common.no": "لا",
+  "common.year": "سنة"
   ,
   "settings.title": "الإعدادات",
   "settings.saved": "تم الحفظ",

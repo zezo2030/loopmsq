@@ -57,7 +57,8 @@ export default function Tickets() {
   ]
 
   return (
-    <Card title="Support Tickets">
+    <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+      <Card title="Support Tickets">
       <Space style={{ marginBottom: 16 }} wrap>
         <Input placeholder="Search by subject/user" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 320 }} />
         <Select placeholder="Status" value={status} onChange={setStatus} allowClear style={{ width: 160 }} options={[
@@ -120,7 +121,8 @@ export default function Tickets() {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+      </Card>
+    </div>
   )
 }
 
