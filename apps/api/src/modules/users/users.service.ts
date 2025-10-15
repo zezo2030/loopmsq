@@ -253,10 +253,17 @@ export class UsersService {
     };
   }
 
-  async deactivate(id: string): Promise<void> {
+  async deactivate(id: string, requester?: User): Promise<void> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    // Branch manager can only deactivate users in their branch
+    if (requester?.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId || user.branchId !== requester.branchId) {
+        throw new ConflictException('Not allowed to deactivate this user');
+      }
     }
 
     user.isActive = false;
@@ -265,10 +272,17 @@ export class UsersService {
     this.logger.log(`User deactivated: ${id}`);
   }
 
-  async activate(id: string): Promise<void> {
+  async activate(id: string, requester?: User): Promise<void> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    // Branch manager can only activate users in their branch
+    if (requester?.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId || user.branchId !== requester.branchId) {
+        throw new ConflictException('Not allowed to activate this user');
+      }
     }
 
     user.isActive = true;

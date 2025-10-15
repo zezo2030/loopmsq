@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api'
 import dayjs from 'dayjs'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 interface PaymentItem {
   id: string
@@ -33,6 +34,7 @@ const statusColors: Record<string, string> = {
 }
 
 export default function PaymentsList() {
+  const { t } = useTranslation()
   const [status, setStatus] = useState<string | undefined>()
   const [method, setMethod] = useState<string | undefined>()
   const [userId, setUserId] = useState<string>('')
@@ -92,35 +94,35 @@ export default function PaymentsList() {
 
   const columns = [
     {
-      title: 'Payment ID',
+      title: t('payments.id') || 'Payment ID',
       dataIndex: 'id',
       key: 'id',
       render: (id: string) => <Link to={`/finance/payments/${id}`}>{id.slice(0, 8)}...</Link>,
     },
     {
-      title: 'Booking',
+      title: t('payments.booking') || 'Booking',
       dataIndex: 'bookingId',
       key: 'bookingId',
       render: (bid: string) => <span>{bid.slice(0, 8)}...</span>,
     },
     {
-      title: 'Amount',
+      title: t('payments.amount') || 'Amount',
       key: 'amount',
       render: (_: any, r: PaymentItem) => `${r.amount} ${r.currency}`,
     },
     {
-      title: 'Status',
+      title: t('payments.status') || 'Status',
       dataIndex: 'status',
       key: 'status',
       render: (s: string) => <Tag color={statusColors[s] || 'default'}>{s}</Tag>,
     },
     {
-      title: 'Method',
+      title: t('payments.method') || 'Method',
       dataIndex: 'method',
       key: 'method',
     },
     {
-      title: 'Paid At',
+      title: t('payments.paid_at') || 'Paid At',
       dataIndex: 'paidAt',
       key: 'paidAt',
       render: (d?: string) => (d ? dayjs(d).format('YYYY-MM-DD HH:mm') : '-'),
@@ -128,41 +130,41 @@ export default function PaymentsList() {
   ]
 
   return (
-    <Card title="Payments" extra={<Button onClick={() => refetch()}>Refresh</Button>}>
+    <Card title={t('payments.title') || 'Payments'} extra={<Button onClick={() => refetch()}>{t('common.refresh') || 'Refresh'}</Button>}>
       <Space style={{ marginBottom: 16 }} wrap>
         <Select
           allowClear
-          placeholder="Status"
+          placeholder={t('payments.status') || 'Status'}
           style={{ width: 160 }}
           value={status}
           onChange={(v) => { setPage(1); setStatus(v) }}
           options={[
-            { label: 'Pending', value: 'pending' },
-            { label: 'Processing', value: 'processing' },
-            { label: 'Completed', value: 'completed' },
-            { label: 'Failed', value: 'failed' },
-            { label: 'Refunded', value: 'refunded' },
-            { label: 'Partially Refunded', value: 'partially_refunded' },
+            { label: t('payments.status_pending') || 'Pending', value: 'pending' },
+            { label: t('payments.status_processing') || 'Processing', value: 'processing' },
+            { label: t('payments.status_completed') || 'Completed', value: 'completed' },
+            { label: t('payments.status_failed') || 'Failed', value: 'failed' },
+            { label: t('payments.status_refunded') || 'Refunded', value: 'refunded' },
+            { label: t('payments.status_partially_refunded') || 'Partially Refunded', value: 'partially_refunded' },
           ]}
         />
         <Select
           allowClear
-          placeholder="Method"
+          placeholder={t('payments.method') || 'Method'}
           style={{ width: 180 }}
           value={method}
           onChange={(v) => { setPage(1); setMethod(v) }}
           options={[
-            { label: 'Credit Card', value: 'credit_card' },
-            { label: 'Debit Card', value: 'debit_card' },
-            { label: 'Wallet', value: 'wallet' },
-            { label: 'Bank Transfer', value: 'bank_transfer' },
-            { label: 'Cash', value: 'cash' },
+            { label: t('payments.method_credit_card') || 'Credit Card', value: 'credit_card' },
+            { label: t('payments.method_debit_card') || 'Debit Card', value: 'debit_card' },
+            { label: t('payments.method_wallet') || 'Wallet', value: 'wallet' },
+            { label: t('payments.method_bank_transfer') || 'Bank Transfer', value: 'bank_transfer' },
+            { label: t('payments.method_cash') || 'Cash', value: 'cash' },
           ]}
         />
-        <Input placeholder="User ID" style={{ width: 260 }} value={userId} onChange={(e) => setUserId(e.target.value)} />
-        <Input placeholder="Booking ID" style={{ width: 260 }} value={bookingId} onChange={(e) => setBookingId(e.target.value)} />
-        <DatePicker placeholder="From" onChange={(v) => setFrom(v ? v.toISOString() : undefined)} />
-        <DatePicker placeholder="To" onChange={(v) => setTo(v ? v.toISOString() : undefined)} />
+        <Input placeholder={t('payments.user_id') || 'User ID'} style={{ width: 260 }} value={userId} onChange={(e) => setUserId(e.target.value)} />
+        <Input placeholder={t('payments.booking_id') || 'Booking ID'} style={{ width: 260 }} value={bookingId} onChange={(e) => setBookingId(e.target.value)} />
+        <DatePicker placeholder={t('common.from') || 'From'} onChange={(v) => setFrom(v ? v.toISOString() : undefined)} />
+        <DatePicker placeholder={t('common.to') || 'To'} onChange={(v) => setTo(v ? v.toISOString() : undefined)} />
       </Space>
 
       <Table

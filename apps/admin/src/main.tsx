@@ -37,6 +37,7 @@ import ReportsOverview from './pages/reports/Overview'
 import Settings from './pages/Settings'
 import Analytics from './Analytics'
 import MetaPixel from './MetaPixel'
+import SearchPage from './pages/Search'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -44,11 +45,11 @@ const router = createBrowserRouter([
     path: '/',
     element: <App />, // guard layer
     children: [
-      { index: true, element: <MainLayout /> },
       {
         path: '/',
         element: <MainLayout />,
         children: [
+          { index: true, element: <Dashboard /> },
           { path: 'dashboard', element: <Dashboard /> },
       
           // Users Management
@@ -95,6 +96,7 @@ const router = createBrowserRouter([
           { path: 'feedback/reviews', element: <Reviews /> },
           { path: 'support/tickets', element: <Tickets /> },
           { path: 'reports/overview', element: <ReportsOverview /> },
+          { path: 'search', element: <SearchPage /> },
           { path: 'settings', element: <Settings /> },
         ],
       },

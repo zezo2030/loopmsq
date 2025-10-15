@@ -31,10 +31,10 @@ export class SupportService {
 
   async get(user: any, id: string) {
     const ticket = await this.ticketRepo.findOne({ where: { id } });
-    if (!ticket) throw new NotFoundException('Ticket not found');
+    if (!ticket) throw new NotFoundException('support.ticket_not_found');
     const roles: string[] = user.roles || [];
     const isStaff = roles.includes('staff') || roles.includes('admin');
-    if (!isStaff && ticket.userId !== user.id) throw new ForbiddenException('Not allowed');
+    if (!isStaff && ticket.userId !== user.id) throw new ForbiddenException('errors.not_allowed');
     return ticket;
   }
 

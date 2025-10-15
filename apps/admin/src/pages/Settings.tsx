@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Card, Form, Switch, Input, Button, message, Divider } from 'antd'
+import { useTranslation } from 'react-i18next'
 
 export default function Settings() {
+  const { t } = useTranslation()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
 
@@ -16,7 +18,7 @@ export default function Settings() {
   }, [form])
 
   return (
-    <Card title="Settings">
+    <Card title={t('settings.title') || 'Settings'}>
       <Form form={form} layout="vertical" onFinish={(values) => {
         setLoading(true)
         try {
@@ -25,30 +27,30 @@ export default function Settings() {
 
           localStorage.setItem('settings.pixelEnabled', values.pixelEnabled ? 'true' : 'false')
           if (values.pixelId !== undefined) localStorage.setItem('settings.pixelId', values.pixelId)
-          message.success('Saved')
+          message.success(t('settings.saved') || 'Saved')
           setTimeout(() => window.location.reload(), 500)
         } catch (e: any) {
-          message.error(e?.message || 'Failed to save')
+          message.error(e?.message || (t('settings.save_failed') || 'Failed to save'))
         } finally {
           setLoading(false)
         }
       }}>
-        <Form.Item name="analyticsEnabled" label="Enable Analytics" valuePropName="checked">
+        <Form.Item name="analyticsEnabled" label={t('settings.enable_analytics') || 'Enable Analytics'} valuePropName="checked">
           <Switch />
         </Form.Item>
-        <Form.Item name="gtmId" label="GTM ID (e.g., GTM-XXXXXXX)">
-          <Input placeholder="GTM-XXXXXXX" />
+        <Form.Item name="gtmId" label={t('settings.gtm_id') || 'GTM ID (e.g., GTM-XXXXXXX)'}>
+          <Input placeholder={t('settings.gtm_ph') || 'GTM-XXXXXXX'} />
         </Form.Item>
 
         <Divider />
 
-        <Form.Item name="pixelEnabled" label="Enable Meta Pixel" valuePropName="checked">
+        <Form.Item name="pixelEnabled" label={t('settings.enable_pixel') || 'Enable Meta Pixel'} valuePropName="checked">
           <Switch />
         </Form.Item>
-        <Form.Item name="pixelId" label="Meta Pixel ID">
-          <Input placeholder="1234567890" />
+        <Form.Item name="pixelId" label={t('settings.pixel_id') || 'Meta Pixel ID'}>
+          <Input placeholder={t('settings.pixel_ph') || '1234567890'} />
         </Form.Item>
-        <Button type="primary" htmlType="submit" loading={loading}>Save</Button>
+        <Button type="primary" htmlType="submit" loading={loading}>{t('common.save') || 'Save'}</Button>
       </Form>
     </Card>
   )

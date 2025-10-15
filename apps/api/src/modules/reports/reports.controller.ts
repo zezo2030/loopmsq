@@ -1,7 +1,10 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import type { Response } from 'express';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 
 @ApiTags('reports')
 @Controller('reports')
@@ -9,11 +12,17 @@ export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
 
   @Get('overview')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
   async overview(@Query('from') from?: string, @Query('to') to?: string, @Query('branchId') branchId?: string) {
     return this.reports.overview({ from, to, branchId });
   }
 
   @Get('export')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
   async export(@Res() res: Response, @Query('type') type: string, @Query('from') from?: string, @Query('to') to?: string, @Query('branchId') branchId?: string) {
     const data = await this.reports.overview({ from, to, branchId });
     const csv = this.toCSV(type || 'overview', data);

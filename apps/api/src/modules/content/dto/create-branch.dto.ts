@@ -4,7 +4,7 @@ import {
   IsOptional,
   IsObject,
   IsArray,
-  IsPhoneNumber,
+  IsEnum,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -61,7 +61,7 @@ export class CreateBranchDto {
     required: false,
   })
   @IsOptional()
-  @IsPhoneNumber()
+  @IsString()
   contactPhone?: string;
 
   @ApiProperty({
@@ -87,4 +87,14 @@ export class CreateBranchDto {
   @IsOptional()
   @IsArray()
   amenities?: string[];
+
+  @ApiProperty({
+    description: 'Branch status',
+    enum: ['active', 'inactive', 'maintenance'],
+    default: 'active',
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(['active', 'inactive', 'maintenance'])
+  status?: 'active' | 'inactive' | 'maintenance';
 }

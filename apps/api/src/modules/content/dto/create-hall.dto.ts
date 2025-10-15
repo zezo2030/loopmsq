@@ -6,8 +6,34 @@ import {
   IsObject,
   IsArray,
   IsUUID,
+  IsNumber,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+
+class PriceConfigDto {
+  @ApiProperty({ description: 'Base price for the hall', example: 500 })
+  @IsNumber()
+  basePrice: number;
+
+  @ApiProperty({ description: 'Hourly rate', example: 100 })
+  @IsNumber()
+  hourlyRate: number;
+
+  @ApiProperty({ description: 'Weekend multiplier', example: 1.5 })
+  @IsNumber()
+  weekendMultiplier: number;
+
+  @ApiProperty({ description: 'Holiday multiplier', example: 2.0 })
+  @IsNumber()
+  holidayMultiplier: number;
+
+  @ApiProperty({ description: 'Decoration price', example: 200, required: false })
+  @IsOptional()
+  @IsNumber()
+  decorationPrice?: number;
+}
 
 export class CreateHallDto {
   @ApiProperty({
@@ -33,22 +59,11 @@ export class CreateHallDto {
 
   @ApiProperty({
     description: 'Hall pricing configuration',
-    example: {
-      basePrice: 500,
-      hourlyRate: 100,
-      weekendMultiplier: 1.5,
-      holidayMultiplier: 2.0,
-      decorationPrice: 200,
-    },
+    type: PriceConfigDto,
   })
-  @IsObject()
-  priceConfig: {
-    basePrice: number;
-    hourlyRate: number;
-    weekendMultiplier: number;
-    holidayMultiplier: number;
-    decorationPrice?: number;
-  };
+  @ValidateNested()
+  @Type(() => PriceConfigDto)
+  priceConfig: PriceConfigDto;
 
   @ApiProperty({
     description: 'Whether the hall comes with decoration',

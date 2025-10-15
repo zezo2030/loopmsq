@@ -390,7 +390,7 @@ export class AuthService {
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('auth.invalid_credentials');
     }
 
     // Allow only ADMIN or BRANCH_MANAGER to access the web dashboard
@@ -398,7 +398,7 @@ export class AuthService {
       !user.roles.includes(UserRole.ADMIN) &&
       !user.roles.includes(UserRole.BRANCH_MANAGER)
     ) {
-      throw new UnauthorizedException('Access denied');
+      throw new UnauthorizedException('auth.access_denied');
     }
 
     // Update last login
@@ -416,6 +416,7 @@ export class AuthService {
         name: user.name,
         roles: user.roles,
         language: user.language,
+        branchId: user.branchId,
       },
     };
   }
@@ -440,6 +441,7 @@ export class AuthService {
       roles: user.roles,
       language: user.language,
       isActive: user.isActive,
+      branchId: user.branchId,
       createdAt: user.createdAt,
     };
   }

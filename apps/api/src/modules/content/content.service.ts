@@ -154,11 +154,10 @@ export class ContentService {
     const queryBuilder = this.hallRepository
       .createQueryBuilder('hall')
       .leftJoinAndSelect('hall.branch', 'branch')
-      .where('hall.status = :status', { status: 'available' })
       .orderBy('hall.createdAt', 'DESC');
 
     if (branchId) {
-      queryBuilder.andWhere('hall.branchId = :branchId', { branchId });
+      queryBuilder.where('hall.branchId = :branchId', { branchId });
     }
 
     const halls = await queryBuilder.getMany();

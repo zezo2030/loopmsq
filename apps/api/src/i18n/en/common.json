@@ -1,0 +1,12 @@
+{
+  "auth.invalid_credentials": "Invalid credentials",
+  "auth.access_denied": "Access denied",
+  "errors.not_allowed": "Not allowed",
+  "support.ticket_not_found": "Ticket not found",
+  "reviews.rating_range": "Rating must be 1-5",
+  "reviews.before_end": "Cannot review before booking end",
+  "reviews.already_submitted": "Review already submitted",
+  "bookings.not_found": "Booking not found"
+}
+
+

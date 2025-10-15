@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   ParseIntPipe,
   ParseBoolPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -25,6 +26,8 @@ import { CreateBranchDto } from './dto/create-branch.dto';
 import { CreateHallDto } from './dto/create-hall.dto';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from '../../database/entities/user.entity';
 
 @ApiTags('content')
 @Controller('content')
@@ -46,13 +49,13 @@ export class ContentController {
 
   @Get('branches')
   @ApiOperation({ summary: 'Get all branches' })
-  @ApiQuery({ name: 'includeInactive', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeInactive', required: false, type: String, description: 'true|false|1|0' })
   @ApiResponse({ status: 200, description: 'Branches retrieved successfully' })
   async findAllBranches(
-    @Query('includeInactive', new ParseBoolPipe({ optional: true }))
-    includeInactive: boolean = false,
+    @Query('includeInactive') includeInactive?: string,
   ) {
-    return this.contentService.findAllBranches(includeInactive);
+    const includeInactiveBool = includeInactive === 'true' || includeInactive === '1' || includeInactive === 'yes';
+    return this.contentService.findAllBranches(includeInactiveBool);
   }
 
   @Get('branches/:id')
@@ -65,7 +68,7 @@ export class ContentController {
 
   @Put('branches/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update branch (Admin only)' })
   @ApiResponse({ status: 200, description: 'Branch updated successfully' })
@@ -75,7 +78,14 @@ export class ContentController {
   async updateBranch(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateData: Partial<CreateBranchDto>,
+    @CurrentUser() requester: User,
   ) {
+    // Branch manager may only update their own branch
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId || requester.branchId !== id) {
+        throw new ForbiddenException('Not allowed to update this branch');
+      }
+    }
     return this.contentService.updateBranch(id, updateData);
   }
 
@@ -101,14 +111,21 @@ export class ContentController {
   // Hall endpoints
   @Post('halls')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create new hall (Admin only)' })
   @ApiResponse({ status: 201, description: 'Hall created successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Branch not found' })
-  async createHall(@Body() createHallDto: CreateHallDto) {
+  async createHall(@Body() createHallDto: CreateHallDto, @CurrentUser() requester: User) {
+    // Force branchId to requester's branch for branch managers
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId) {
+        throw new ForbiddenException('Branch not assigned');
+      }
+      createHallDto.branchId = requester.branchId as any;
+    }
     return this.contentService.createHall(createHallDto);
   }
 
@@ -130,7 +147,7 @@ export class ContentController {
 
   @Put('halls/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update hall (Admin only)' })
   @ApiResponse({ status: 200, description: 'Hall updated successfully' })
@@ -140,7 +157,19 @@ export class ContentController {
   async updateHall(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateData: Partial<CreateHallDto>,
+    @CurrentUser() requester: User,
   ) {
+    // Branch manager can only update halls in their own branch
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      const hall = await this.contentService.findHallById(id);
+      if (!requester.branchId || hall.branchId !== requester.branchId) {
+        throw new ForbiddenException('Not allowed to update this hall');
+      }
+      // Prevent moving hall to another branch
+      if (updateData && (updateData as any).branchId && (updateData as any).branchId !== requester.branchId) {
+        throw new ForbiddenException('Cannot change hall branch');
+      }
+    }
     return this.contentService.updateHall(id, updateData);
   }
 

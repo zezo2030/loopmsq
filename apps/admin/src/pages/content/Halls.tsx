@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Row, Col } from 'antd'
 import { apiGet, apiPost, apiPut, apiPatch } from '../../api'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useAdminAuth } from '../../auth'
 
@@ -27,6 +28,7 @@ type Hall = {
 }
 
 export default function Halls() {
+  const { t } = useTranslation()
   const { me } = useAdminAuth()
   const canEdit = (me?.roles || []).includes('admin')
   const canUpdateStatus = canEdit || (me?.roles || []).includes('branch_manager')
@@ -76,30 +78,30 @@ export default function Halls() {
 
   const createHall = useMutation({
     mutationFn: async (payload: Partial<Hall>) => apiPost('/content/halls', payload),
-    onSuccess: () => { message.success('تم إنشاء القاعة'); qc.invalidateQueries({ queryKey: ['halls'] }); setOpen(false) },
+    onSuccess: () => { message.success(t('halls.created') || 'Hall created'); qc.invalidateQueries({ queryKey: ['halls'] }); setOpen(false) },
   })
   const updateHall = useMutation({
     mutationFn: async ({ id, body }: { id: string; body: Partial<Hall> }) => apiPut(`/content/halls/${id}`, body),
-    onSuccess: () => { message.success('تم تحديث القاعة'); qc.invalidateQueries({ queryKey: ['halls'] }); setOpen(false); setEditing(null) },
+    onSuccess: () => { message.success(t('halls.updated') || 'Hall updated'); qc.invalidateQueries({ queryKey: ['halls'] }); setOpen(false); setEditing(null) },
   })
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: NonNullable<Hall['status']> }) => apiPatch(`/content/halls/${id}/status`, { status }),
-    onSuccess: () => { message.success('تم تحديث الحالة'); qc.invalidateQueries({ queryKey: ['halls'] }) },
+    onSuccess: () => { message.success(t('halls.status_updated') || 'Status updated'); qc.invalidateQueries({ queryKey: ['halls'] }) },
   })
 
   const columns = [
-    { title: 'الفرع', dataIndex: 'branchId', key: 'branchId' },
-    { title: 'الاسم (AR)', dataIndex: 'name_ar', key: 'name_ar' },
-    { title: 'الاسم (EN)', dataIndex: 'name_en', key: 'name_en' },
-    { title: 'السعة', dataIndex: 'capacity', key: 'capacity' },
-    { title: 'الحالة', dataIndex: 'status', key: 'status' },
+    { title: t('halls.branch') || 'الفرع', dataIndex: 'branchId', key: 'branchId' },
+    { title: t('halls.name_ar') || 'الاسم (AR)', dataIndex: 'name_ar', key: 'name_ar' },
+    { title: t('halls.name_en') || 'الاسم (EN)', dataIndex: 'name_en', key: 'name_en' },
+    { title: t('halls.capacity') || 'السعة', dataIndex: 'capacity', key: 'capacity' },
+    { title: t('halls.status') || 'الحالة', dataIndex: 'status', key: 'status' },
     {
-      title: 'التسعير',
+      title: t('halls.pricing') || 'التسعير',
       key: 'pricing',
       render: (_: any, r: Hall) => `${r.priceConfig.basePrice} + ${r.priceConfig.hourlyRate}/h`,
     },
     {
-      title: 'إجراءات',
+      title: t('common.actions') || 'إجراءات',
       key: 'actions',
       render: (_: any, r: Hall) => (
         <Space>
@@ -118,30 +120,30 @@ export default function Halls() {
             description_en: r.description_en,
             features: r.features,
             images: r.images,
-          }); setOpen(true) }}>تعديل</Button>
+          }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
           <Select
             value={r.status}
             style={{ width: 170 }}
             disabled={!canUpdateStatus}
             onChange={(v) => updateStatus.mutate({ id: r.id, status: v as any })}
             options={[
-              { label: 'Available', value: 'available' },
-              { label: 'Maintenance', value: 'maintenance' },
-              { label: 'Reserved', value: 'reserved' },
+              { label: t('halls.available') || 'Available', value: 'available' },
+              { label: t('halls.maintenance') || 'Maintenance', value: 'maintenance' },
+              { label: t('halls.reserved') || 'Reserved', value: 'reserved' },
             ]}
           />
-          <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ hallId: r.id }) }}>معاينة السعر/التوفر</Button>
+          <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ hallId: r.id }) }}>{t('halls.preview') || 'معاينة السعر/التوفر'}</Button>
         </Space>
       ),
     },
   ]
 
   return (
-    <Card title="القاعات" extra={
+    <Card title={t('halls.title') || 'القاعات'} extra={
       <Space>
-        <Input placeholder="تصفية بالفرع (UUID)" value={branchFilter} onChange={(e) => setBranchFilter(e.target.value || undefined)} style={{ width: 260 }} />
-        <Button onClick={() => refetch()}>تحديث</Button>
-        <Button type="primary" disabled={!canEdit} onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>قاعة جديدة</Button>
+        <Input placeholder={t('halls.filter_branch') || 'تصفية بالفرع (UUID)'} value={branchFilter} onChange={(e) => setBranchFilter(e.target.value || undefined)} style={{ width: 260 }} />
+        <Button onClick={() => refetch()}>{t('common.refresh') || 'تحديث'}</Button>
+        <Button type="primary" disabled={!canEdit} onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('halls.new') || 'قاعة جديدة'}</Button>
       </Space>
     }>
       <Table
@@ -153,11 +155,11 @@ export default function Halls() {
       />
 
       <Modal
-        title={editing ? 'تعديل قاعة' : 'إنشاء قاعة'}
+        title={editing ? (t('halls.edit_title') || 'تعديل قاعة') : (t('halls.create_title') || 'إنشاء قاعة')}
         open={open}
         onCancel={() => { setOpen(false); setEditing(null) }}
         onOk={() => form.submit()}
-        okText={editing ? 'تحديث' : 'إنشاء'}
+        okText={editing ? (t('common.update') || 'تحديث') : (t('common.create') || 'إنشاء')}
         width={820}
       >
         <Form
@@ -182,88 +184,88 @@ export default function Halls() {
               features: values.features?.length ? values.features : undefined,
               images: values.images?.length ? values.images : undefined,
             }
-            if (!canEdit) { message.error('غير مصرح'); return }
+            if (!canEdit) { message.error(t('errors.forbidden') || 'Forbidden'); return }
             if (editing) updateHall.mutate({ id: editing.id, body })
             else createHall.mutate(body)
           }}
         >
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="branchId" label="معرف الفرع" rules={[{ required: true }]}>
+              <Form.Item name="branchId" label={t('halls.branch_id') || 'معرف الفرع'} rules={[{ required: true }]}>
                 <Input />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="capacity" label="السعة" rules={[{ required: true }]}>
+              <Form.Item name="capacity" label={t('halls.capacity') || 'السعة'} rules={[{ required: true }]}>
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="name_ar" label="الاسم (AR)" rules={[{ required: true }]}>
+              <Form.Item name="name_ar" label={t('halls.name_ar') || 'الاسم (AR)'} rules={[{ required: true }]}>
                 <Input />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="name_en" label="الاسم (EN)" rules={[{ required: true }]}>
+              <Form.Item name="name_en" label={t('halls.name_en') || 'الاسم (EN)'} rules={[{ required: true }]}>
                 <Input />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
             <Col span={6}>
-              <Form.Item name="price_basePrice" label="Base">
+              <Form.Item name="price_basePrice" label={t('halls.price_base') || 'Base'}>
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="price_hourlyRate" label="Hourly">
+              <Form.Item name="price_hourlyRate" label={t('halls.price_hourly') || 'Hourly'}>
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="price_weekendMultiplier" label="Weekend x">
+              <Form.Item name="price_weekendMultiplier" label={t('halls.price_weekend') || 'Weekend x'}>
                 <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="price_holidayMultiplier" label="Holiday x">
+              <Form.Item name="price_holidayMultiplier" label={t('halls.price_holiday') || 'Holiday x'}>
                 <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="price_decorationPrice" label="Decoration">
+              <Form.Item name="price_decorationPrice" label={t('halls.price_decoration') || 'Decoration'}>
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="isDecorated" label="مزينة" valuePropName="checked">
+              <Form.Item name="isDecorated" label={t('halls.decorated') || 'مزينة'} valuePropName="checked">
                 <Select
-                  options={[{ label: 'Yes', value: true }, { label: 'No', value: false }]}
+                  options={[{ label: t('common.yes') || 'Yes', value: true }, { label: t('common.no') || 'No', value: false }]}
                 />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="features" label="المزايا">
-            <Select mode="tags" placeholder="أدخل المزايا" />
+          <Form.Item name="features" label={t('halls.features') || 'المزايا'}>
+            <Select mode="tags" placeholder={t('halls.features_ph') || 'أدخل المزايا'} />
           </Form.Item>
-          <Form.Item name="images" label="صور (روابط)">
-            <Select mode="tags" placeholder="أدخل روابط الصور" />
+          <Form.Item name="images" label={t('halls.images') || 'صور (روابط)'}>
+            <Select mode="tags" placeholder={t('halls.images_ph') || 'أدخل روابط الصور'} />
           </Form.Item>
-          <Form.Item name="description_ar" label="الوصف (AR)">
+          <Form.Item name="description_ar" label={t('halls.description_ar') || 'الوصف (AR)'}>
             <Input.TextArea rows={3} />
           </Form.Item>
-          <Form.Item name="description_en" label="الوصف (EN)">
+          <Form.Item name="description_en" label={t('halls.description_en') || 'الوصف (EN)'}>
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
-        title="معاينة السعر والتوفر"
+        title={t('halls.preview_title') || 'معاينة السعر والتوفر'}
         open={previewOpen}
         onCancel={() => setPreviewOpen(false)}
         onOk={() => previewForm.submit()}
@@ -279,25 +281,25 @@ export default function Halls() {
             availParams.set('startTime', values.startTime)
             availParams.set('durationHours', String(values.durationHours))
             const availability = await apiGet<any>(`/content/halls/${values.hallId}/availability?${availParams.toString()}`)
-            message.success(`Total: ${pricing.total ?? JSON.stringify(pricing)} | Available: ${availability.available}`)
+            message.success(`${t('halls.total') || 'Total'}: ${pricing.total ?? JSON.stringify(pricing)} | ${t('halls.available_q') || 'Available'}: ${availability.available}`)
           } catch (e: any) {
-            message.error(e?.message || 'فشل المعاينة')
+            message.error(e?.message || (t('halls.preview_failed') || 'Preview failed'))
           }
         }}>
-          <Form.Item name="hallId" label="Hall" rules={[{ required: true }]}>
+          <Form.Item name="hallId" label={t('halls.hall') || 'Hall'} rules={[{ required: true }]}>
             <Select
               showSearch
               options={(data || []).map(h => ({ value: h.id, label: `${h.name_en} (${h.id.slice(0,8)}...)` }))}
               filterOption={(input, option) => (option?.label as string).toLowerCase().includes(input.toLowerCase())}
             />
           </Form.Item>
-          <Form.Item name="startTime" label="Start Time (ISO)" rules={[{ required: true }]}>
+          <Form.Item name="startTime" label={t('halls.start_time') || 'Start Time (ISO)'} rules={[{ required: true }]}>
             <Input placeholder="2025-10-14T18:00:00.000Z" />
           </Form.Item>
-          <Form.Item name="durationHours" label="Duration (hours)" rules={[{ required: true }]}>
+          <Form.Item name="durationHours" label={t('halls.duration') || 'Duration (hours)'} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="persons" label="Persons" rules={[{ required: true }]}>
+          <Form.Item name="persons" label={t('halls.persons') || 'Persons'} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
         </Form>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button, Card, Form, Input, Typography, message, Space } from 'antd'
 import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons'
 import '../theme.css'
+import { useTranslation } from 'react-i18next'
 
 function getApiBase(): string {
   const base = (import.meta as any).env?.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE
@@ -10,6 +11,7 @@ function getApiBase(): string {
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
+  const { t } = useTranslation()
 
   async function onFinish(values: { email: string; password: string }) {
     setLoading(true)
@@ -19,13 +21,13 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       })
-      if (!resp.ok) throw new Error('Invalid credentials')
+      if (!resp.ok) throw new Error(t('auth.invalid') || 'Invalid credentials')
       const data = await resp.json()
       localStorage.setItem('accessToken', data.accessToken)
-      message.success('تم تسجيل الدخول بنجاح')
+      message.success(t('login.success') || 'Logged in successfully')
       window.location.href = '/'
     } catch (e: any) {
-      message.error(e?.message || 'فشل تسجيل الدخول')
+      message.error(e?.message || t('login.failed') || 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -39,10 +41,10 @@ export default function Login() {
           <Space direction="vertical" align="center" style={{ width: '100%' }}>
             <div style={{ fontSize: '32px', marginBottom: '8px' }}>🏢</div>
             <Typography.Title level={3} style={{ margin: 0, color: '#262626' }}>
-              Admin Dashboard
+              {t('app.title')}
             </Typography.Title>
             <Typography.Text type="secondary">
-              Welcome back! Please sign in to continue
+              {t('login.subtitle') || 'Welcome back! Please sign in to continue'}
             </Typography.Text>
           </Space>
         }
@@ -55,11 +57,11 @@ export default function Login() {
           style={{ padding: '20px 0' }}
         >
           <Form.Item 
-            label="Email Address" 
+            label={t('login.email') || 'Email Address'} 
             name="email" 
             rules={[
-              { required: true, message: 'Please enter your email' },
-              { type: 'email', message: 'Please enter a valid email' }
+              { required: true, message: t('login.email_required') || 'Please enter your email' },
+              { type: 'email', message: t('login.email_valid') || 'Please enter a valid email' }
             ]}
           >
             <Input 
@@ -71,13 +73,13 @@ export default function Login() {
           </Form.Item>
           
           <Form.Item 
-            label="Password" 
+            label={t('login.password') || 'Password'} 
             name="password" 
-            rules={[{ required: true, message: 'Please enter your password' }]}
+            rules={[{ required: true, message: t('login.password_required') || 'Please enter your password' }]}
           >
             <Input.Password 
               prefix={<LockOutlined />}
-              placeholder="Enter your password"
+              placeholder={t('login.password_placeholder') || 'Enter your password'}
               size="large"
             />
           </Form.Item>
@@ -92,7 +94,7 @@ export default function Login() {
               className="btn-primary"
               block
             >
-              Sign In
+              {t('login.signin') || 'Sign In'}
             </Button>
           </Form.Item>
         </Form>
@@ -102,7 +104,7 @@ export default function Login() {
             type="secondary" 
             style={{ margin: 0, fontSize: '12px' }}
           >
-            🔒 Secure access for Admin and Branch Manager accounts only
+            {t('login.footer') || '🔒 Secure access for Admin and Branch Manager accounts only'}
           </Typography.Paragraph>
         </div>
       </Card>

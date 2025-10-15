@@ -11,6 +11,7 @@ import {
   TeamOutlined
 } from '@ant-design/icons'
 import '../../theme.css'
+import { useTranslation } from 'react-i18next'
 
 type UserRow = {
   id: string
@@ -28,6 +29,7 @@ function getApiBase(): string {
 }
 
 export default function UsersList() {
+  const { t } = useTranslation()
   const [rows, setRows] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
@@ -46,7 +48,7 @@ export default function UsersList() {
         const resp = await fetch(`${getApiBase()}/users?page=1&limit=50`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-        if (!resp.ok) throw new Error('Failed to load users')
+        if (!resp.ok) throw new Error(t('users.load_failed') || 'Failed to load users')
         const data = await resp.json()
         if (!mounted) return
         setRows(data.users || [])
@@ -107,7 +109,7 @@ export default function UsersList() {
 
   const columns = [
     {
-      title: 'User',
+      title: t('users.user') || 'User',
       key: 'user',
       render: (_: any, record: UserRow) => (
         <Space size="middle">
@@ -118,7 +120,7 @@ export default function UsersList() {
           />
           <div>
             <div style={{ fontWeight: '600', fontSize: '14px' }}>
-              {record.name || 'Unnamed User'}
+              {record.name || (t('users.unnamed') || 'Unnamed User')}
             </div>
             <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
               {record.email}
@@ -128,13 +130,13 @@ export default function UsersList() {
       ),
     },
     {
-      title: 'Phone',
+      title: t('users.phone') || 'Phone',
       dataIndex: 'phone',
       key: 'phone',
       render: (phone?: string) => phone || <span style={{ color: '#8c8c8c' }}>—</span>
     },
     {
-      title: 'Roles',
+      title: t('users.roles') || 'Roles',
       dataIndex: 'roles',
       key: 'roles',
       render: (roles?: string[]) => (
@@ -148,7 +150,7 @@ export default function UsersList() {
       ),
     },
     {
-      title: 'Status',
+      title: t('users.status') || 'Status',
       dataIndex: 'isActive',
       key: 'isActive',
       render: (isActive?: boolean) => (
@@ -156,24 +158,24 @@ export default function UsersList() {
           color={isActive ? 'success' : 'default'} 
           className="custom-tag"
         >
-          {isActive ? '✓ Active' : '✗ Inactive'}
+          {isActive ? (t('users.active') || '✓ Active') : (t('users.inactive') || '✗ Inactive')}
         </Tag>
       ),
     },
     {
-      title: 'Joined',
+      title: t('users.joined') || 'Joined',
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: (date?: string) => 
         date ? new Date(date).toLocaleDateString() : '—'
     },
     {
-      title: 'Actions',
+      title: t('common.actions') || 'Actions',
       key: 'actions',
       width: 120,
       render: (_: any, record: UserRow) => (
         <Space size="small">
-          <Tooltip title="View Details">
+          <Tooltip title={t('common.view_details') || 'View Details'}>
             <Button 
               type="text"
               size="small"
@@ -181,7 +183,7 @@ export default function UsersList() {
               onClick={() => navigate(`/users/${record.id}`)}
             />
           </Tooltip>
-          <Tooltip title="Edit User">
+          <Tooltip title={t('users.edit_user') || 'Edit User'}>
             <Button 
               type="text"
               size="small"
@@ -191,9 +193,9 @@ export default function UsersList() {
           </Tooltip>
           {record.isActive ? (
             <Popconfirm
-              title="Deactivate user?"
-              okText="Deactivate"
-              cancelText="Cancel"
+              title={t('users.deactivate_q') || 'Deactivate user?'}
+              okText={t('users.deactivate') || 'Deactivate'}
+              cancelText={t('common.cancel') || 'Cancel'}
               onConfirm={async () => {
                 try {
                   const token = localStorage.getItem('accessToken')
@@ -201,15 +203,15 @@ export default function UsersList() {
                     method: 'PATCH',
                     headers: { Authorization: `Bearer ${token}` },
                   })
-                  if (!resp.ok) throw new Error(await resp.text() || 'Failed')
-                  message.success('User deactivated')
+                  if (!resp.ok) throw new Error(await resp.text() || (t('users.failed') || 'Failed'))
+                  message.success(t('users.deactivated') || 'User deactivated')
                   setRows(rows => rows.map(r => r.id === record.id ? { ...r, isActive: false } : r))
                 } catch (e: any) {
-                  message.error(e?.message || 'Failed to deactivate')
+                  message.error(e?.message || (t('users.deactivate_failed') || 'Failed to deactivate'))
                 }
               }}
             >
-              <Button type="link" size="small">Deactivate</Button>
+              <Button type="link" size="small">{t('users.deactivate') || 'Deactivate'}</Button>
             </Popconfirm>
           ) : (
             <Button
@@ -222,22 +224,22 @@ export default function UsersList() {
                     method: 'PATCH',
                     headers: { Authorization: `Bearer ${token}` },
                   })
-                  if (!resp.ok) throw new Error(await resp.text() || 'Failed')
-                  message.success('User activated')
+                  if (!resp.ok) throw new Error(await resp.text() || (t('users.failed') || 'Failed'))
+                  message.success(t('users.activated') || 'User activated')
                   setRows(rows => rows.map(r => r.id === record.id ? { ...r, isActive: true } : r))
                 } catch (e: any) {
-                  message.error(e?.message || 'Failed to activate')
+                  message.error(e?.message || (t('users.activate_failed') || 'Failed to activate'))
                 }
               }}
             >
-              Activate
+              {t('users.activate') || 'Activate'}
             </Button>
           )}
           <Popconfirm
-            title="Delete permanently? This cannot be undone."
-            okText="Delete"
+            title={t('users.delete_q') || 'Delete permanently? This cannot be undone.'}
+            okText={t('common.delete') || 'Delete'}
             okButtonProps={{ danger: true }}
-            cancelText="Cancel"
+            cancelText={t('common.cancel') || 'Cancel'}
             disabled={record.isActive}
             onConfirm={async () => {
               try {
@@ -246,16 +248,16 @@ export default function UsersList() {
                   method: 'PATCH',
                   headers: { Authorization: `Bearer ${token}` },
                 })
-                if (!resp.ok) throw new Error(await resp.text() || 'Failed')
-                message.success('User deleted permanently')
+                if (!resp.ok) throw new Error(await resp.text() || (t('users.failed') || 'Failed'))
+                message.success(t('users.deleted') || 'User deleted permanently')
                 setRows(rows => rows.filter(r => r.id !== record.id))
               } catch (e: any) {
-                message.error(e?.message || 'Failed to delete user')
+                message.error(e?.message || (t('users.delete_failed') || 'Failed to delete user'))
               }
             }}
           >
             <Button type="link" size="small" danger disabled={record.isActive}>
-              Delete
+              {t('common.delete') || 'Delete'}
             </Button>
           </Popconfirm>
         </Space>
@@ -271,10 +273,10 @@ export default function UsersList() {
           <div>
             <h1 className="page-title">
               <TeamOutlined style={{ marginRight: '12px' }} />
-              User Management
+              {t('users.title') || 'User Management'}
             </h1>
             <p className="page-subtitle">
-              Manage users, staff, and branch managers across your platform
+              {t('users.subtitle') || 'Manage users, staff, and branch managers across your platform'}
             </p>
           </div>
           <Space>
@@ -284,14 +286,14 @@ export default function UsersList() {
               icon={<PlusOutlined />}
               onClick={() => navigate('/staff/new')}
             >
-              Add Staff
+              {t('users.add_staff') || 'Add Staff'}
             </Button>
             <Button 
               type="default"
               icon={<PlusOutlined />}
               onClick={() => navigate('/branch-managers/new')}
             >
-              Add Manager
+              {t('users.add_manager') || 'Add Manager'}
             </Button>
           </Space>
         </div>
@@ -310,7 +312,7 @@ export default function UsersList() {
           }}>
             <Space size="middle" wrap>
               <Input
-                placeholder="Search by name, email, or phone..."
+                placeholder={t('users.search_placeholder') || 'Search by name, email, or phone...'}
                 prefix={<SearchOutlined />}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
@@ -320,7 +322,7 @@ export default function UsersList() {
               />
               
               <Select
-                placeholder="Filter by role"
+                placeholder={t('users.filter_by_role') || 'Filter by role'}
                 value={roleFilter}
                 onChange={setRoleFilter}
                 style={{ width: 180 }}
@@ -328,10 +330,10 @@ export default function UsersList() {
                 allowClear
                 suffixIcon={<FilterOutlined />}
                 options={[
-                  { label: 'Admin', value: 'admin' },
-                  { label: 'Branch Manager', value: 'branch_manager' },
-                  { label: 'Staff', value: 'staff' },
-                  { label: 'User', value: 'user' },
+                  { label: t('roles.admin') || 'Admin', value: 'admin' },
+                  { label: t('roles.branch_manager') || 'Branch Manager', value: 'branch_manager' },
+                  { label: t('roles.staff') || 'Staff', value: 'staff' },
+                  { label: t('roles.user') || 'User', value: 'user' },
                 ]}
               />
             </Space>
@@ -351,7 +353,7 @@ export default function UsersList() {
                 showSizeChanger: true,
                 showQuickJumper: true,
                 onChange: (p, ps) => { setPage(p); setPageSize(ps) },
-                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} users`,
+                showTotal: (total, range) => `${range[0]}-${range[1]} ${t('common.of') || 'of'} ${total} ${t('users.users') || 'users'}`,
               }}
               scroll={{ x: 800 }}
             />

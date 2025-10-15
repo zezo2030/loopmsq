@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CouponsService } from './coupons.service';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { CreateCouponDto } from './dto/create-coupon.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../../common/guards/roles.guard';
 
 @ApiTags('admin/coupons')
 @Controller()
@@ -12,13 +14,17 @@ export class CouponsController {
 
   // Admin CRUD
   @Get('admin/coupons')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @ApiBearerAuth()
   list() {
     return this.coupons.list();
   }
 
   @Post('admin/coupons')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
   create(@Body() body: CreateCouponDto) {
     return this.coupons.create({
       ...body,
@@ -28,7 +34,9 @@ export class CouponsController {
   }
 
   @Patch('admin/coupons/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
   update(@Param('id') id: string, @Body() body: UpdateCouponDto) {
     return this.coupons.update(id, {
       ...body,
@@ -38,7 +46,9 @@ export class CouponsController {
   }
 
   @Delete('admin/coupons/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
   remove(@Param('id') id: string) {
     return this.coupons.remove(id);
   }

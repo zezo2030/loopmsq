@@ -1,115 +1,72 @@
 import { Row, Col, Card, Statistic, List, Avatar, Button, Space, Tag, Divider } from 'antd'
 import { 
-  UserOutlined, 
-  TeamOutlined, 
   CalendarOutlined,
   RiseOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
-  BookOutlined,
-  GiftOutlined,
   DollarOutlined,
   CheckCircleOutlined,
   FileTextOutlined
 } from '@ant-design/icons'
 import '../theme.css'
+import { useTranslation } from 'react-i18next'
+import { useEffect, useState } from 'react'
+import { apiGet } from '../api'
 
 export default function Dashboard() {
-  const statsData = [
-    {
-      title: 'Total Users',
-      value: 2847,
-      prefix: <UserOutlined />,
-      suffix: 'users',
-      change: 12.5,
-      trend: 'up'
-    },
-    {
-      title: 'Active Staff',
-      value: 24,
-      prefix: <TeamOutlined />,
-      suffix: 'staff',
-      change: -2.3,
-      trend: 'down'
-    },
-    {
-      title: 'Total Bookings',
-      value: 156,
-      prefix: <CalendarOutlined />,
-      suffix: 'bookings',
-      change: 18.2,
-      trend: 'up'
-    },
-    {
-      title: 'Monthly Revenue',
-      value: 285000,
-      prefix: <DollarOutlined />,
-      suffix: 'SAR',
-      change: 15.3,
-      trend: 'up'
-    }
-  ]
+  const { t } = useTranslation()
+  const [overviewAll, setOverviewAll] = useState<{ bookings: { total: number; confirmed: number; cancelled: number }; scans: number; revenueByMethod: Record<string, number> } | null>(null)
+  const [todaysEventsCount, setTodaysEventsCount] = useState<number>(0)
+  const [weekRevenue, setWeekRevenue] = useState<number>(0)
+  const [pendingApprovals, setPendingApprovals] = useState<number>(0)
 
-  const bookingStats = [
-    {
-      title: 'Hall Bookings',
-      value: 98,
-      prefix: <CalendarOutlined />,
-      color: '#1890ff'
-    },
-    {
-      title: 'School Trips',
-      value: 24,
-      prefix: <BookOutlined />,
-      color: '#52c41a'
-    },
-    {
-      title: 'Special Events',
-      value: 18,
-      prefix: <GiftOutlined />,
-      color: '#722ed1'
-    }
-  ]
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const ovAll = await apiGet<any>('/reports/overview')
+        setOverviewAll(ovAll)
+      } catch {}
+      try {
+        const now = new Date()
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString()
+        const res = await apiGet<any>(`/bookings/admin/all?from=${encodeURIComponent(startOfDay)}&to=${encodeURIComponent(endOfDay)}&limit=200`)
+        const items = Array.isArray(res?.bookings) ? res.bookings : (res?.items || [])
+        setTodaysEventsCount(items.length || 0)
+      } catch {}
+      try {
+        const end = new Date()
+        const start = new Date(end)
+        start.setDate(end.getDate() - 7)
+        const ovWeek = await apiGet<any>(`/reports/overview?from=${encodeURIComponent(start.toISOString())}&to=${encodeURIComponent(end.toISOString())}`)
+        const revTotal = Object.values(ovWeek?.revenueByMethod || {}).reduce((a: number, b: any) => a + Number(b || 0), 0)
+        setWeekRevenue(revTotal)
+      } catch {}
+      try {
+        const resPending = await apiGet<any>('/bookings/admin/all?status=pending&limit=200')
+        const itemsPending = Array.isArray(resPending?.bookings) ? resPending.bookings : (resPending?.items || [])
+        setPendingApprovals(itemsPending.length || 0)
+      } catch {}
+    })()
+  }, [])
+  const [overview, setOverview] = useState<{ bookings: { total: number; confirmed: number; cancelled: number; pending?: number }; scans: number; revenueByMethod: Record<string, number> } | null>(null)
+  const [recent, setRecent] = useState<Array<{ id: string; branch?: any; hall?: any; startTime?: string; status?: string }>>([])
 
-  const recentActivities = [
-    {
-      title: 'حجز جديد مؤكد',
-      description: 'قاعة الماسة - حفل عيد ميلاد لـ 30 شخص',
-      avatar: '📅',
-      time: 'منذ 5 دقائق',
-      type: 'booking'
-    },
-    {
-      title: 'طلب رحلة مدرسية',
-      description: 'مدرسة النور - 45 طالب للرحلة التعليمية',
-      avatar: '📚',
-      time: 'منذ 15 دقيقة',
-      type: 'trip'
-    },
-    {
-      title: 'عرض سعر مرسل',
-      description: 'حدث خاص - حفل تخرج جامعي',
-      avatar: '🎉',
-      time: 'منذ 30 دقيقة',
-      type: 'event'
-    },
-    {
-      title: 'دفعة مستلمة',
-      description: 'تم استلام 3,500 ر.س لحجز القاعة',
-      avatar: '💰',
-      time: 'منذ ساعة',
-      type: 'payment'
-    },
-    {
-      title: 'مستخدم جديد',
-      description: 'أحمد محمد انضم للمنصة',
-      avatar: '👤',
-      time: 'منذ ساعتين',
-      type: 'user'
-    }
-  ]
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const ov = await apiGet<any>('/reports/overview')
+        setOverview(ov)
+      } catch {}
+      try {
+        const res = await apiGet<any>('/bookings/admin/all?page=1&limit=8')
+        const items = Array.isArray(res?.bookings) ? res.bookings : (res?.items || [])
+        setRecent(items)
+      } catch {}
+    })()
+  }, [])
 
-  
+  const revenueEntries = Object.entries(overview?.revenueByMethod || {})
 
   return (
     <div className="page-container">
@@ -117,12 +74,12 @@ export default function Dashboard() {
       <div className="page-header">
         <div className="page-header-content">
           <div>
-            <h1 className="page-title">Dashboard Overview</h1>
-            <p className="page-subtitle">Monitor your business performance and key metrics</p>
+            <h1 className="page-title">{t('dashboard.title') || 'Dashboard Overview'}</h1>
+            <p className="page-subtitle">{t('dashboard.subtitle') || 'Monitor your business performance and key metrics'}</p>
           </div>
           <Space>
             <Button type="primary" className="btn-primary" icon={<CalendarOutlined />} onClick={() => (window.location.href = '/bookings')}>
-              Go to Bookings
+              {t('dashboard.go_bookings') || 'Go to Bookings'}
             </Button>
           </Space>
         </div>
@@ -132,7 +89,35 @@ export default function Dashboard() {
         <div className="page-content-inner">
           {/* Main Stats Cards */}
           <Row gutter={[24, 24]} style={{ marginBottom: '32px' }}>
-            {statsData.map((stat, index) => (
+            {[{
+              title: t('reports.bookings_total') || 'Bookings (Total)',
+              value: overviewAll?.bookings?.total ?? 0,
+              prefix: <CalendarOutlined />,
+              suffix: t('dashboard.kpi_bookings') || 'bookings',
+              change: 0,
+              trend: 'stable'
+            }, {
+              title: t('reports.bookings_confirmed') || 'Bookings (Confirmed)',
+              value: overviewAll?.bookings?.confirmed ?? 0,
+              prefix: <CheckCircleOutlined />,
+              suffix: '',
+              change: 0,
+              trend: 'stable'
+            }, {
+              title: t('reports.bookings_cancelled') || 'Bookings (Cancelled)',
+              value: overviewAll?.bookings?.cancelled ?? 0,
+              prefix: <ArrowDownOutlined />,
+              suffix: '',
+              change: 0,
+              trend: 'stable'
+            }, {
+              title: t('dashboard.kpi_revenue') || 'Revenue',
+              value: Object.values(overviewAll?.revenueByMethod || {}).reduce((a: number, b: any) => a + Number(b || 0), 0),
+              prefix: <DollarOutlined />,
+              suffix: 'SAR',
+              change: 0,
+              trend: 'stable'
+            }].map((stat, index) => (
               <Col xs={24} sm={12} lg={6} key={index}>
                 <Card className="custom-card">
                   <Statistic
@@ -174,65 +159,30 @@ export default function Dashboard() {
             ))}
           </Row>
 
-          {/* Bookings Breakdown */}
-          <Row gutter={[24, 24]} style={{ marginBottom: '32px' }}>
-            <Col xs={24}>
-              <Card 
-                className="custom-card"
-                title="Bookings Overview" 
-                extra={<Button type="link" onClick={() => (window.location.href = '/bookings')}>View All Bookings</Button>}
-              >
-                <Row gutter={[16, 16]}>
-                  {bookingStats.map((stat, index) => (
-                    <Col xs={24} sm={8} key={index}>
-                      <div style={{ 
-                        textAlign: 'center',
-                        padding: '20px',
-                        backgroundColor: '#fafafa',
-                        borderRadius: '8px',
-                        border: `2px solid ${stat.color}20`
-                      }}>
-                        <div style={{ 
-                          fontSize: '32px', 
-                          color: stat.color,
-                          marginBottom: '8px'
-                        }}>
-                          {stat.prefix}
-                        </div>
-                        <div style={{ 
-                          fontSize: '24px', 
-                          fontWeight: 'bold',
-                          color: stat.color,
-                          marginBottom: '4px'
-                        }}>
-                          {stat.value}
-                        </div>
-                        <div style={{ 
-                          fontSize: '14px', 
-                          color: '#8c8c8c',
-                          fontWeight: '500'
-                        }}>
-                          {stat.title}
-                        </div>
-                      </div>
-                    </Col>
-                  ))}
-                </Row>
-              </Card>
-            </Col>
-          </Row>
+          {/* Revenue by Method */}
+          {revenueEntries.length > 0 && (
+            <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
+              {revenueEntries.map(([k, v]) => (
+                <Col xs={24} sm={12} lg={6} key={k}>
+                  <Card className="custom-card">
+                    <Statistic title={`${t('reports.revenue_by_method') || 'Revenue'}: ${k}`} value={Number(v)} suffix="SAR" />
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          )}
 
           <Row gutter={[24, 24]}>
             {/* Recent Activity */}
             <Col xs={24} lg={16}>
               <Card 
                 className="custom-card"
-                title="Recent Activity" 
-                extra={<Button type="link">View All</Button>}
+                title={t('dashboard.recent_activity') || 'Recent Activity'} 
+                extra={<Button type="link">{t('common.view_all') || 'View All'}</Button>}
               >
                 <List
                   itemLayout="horizontal"
-                  dataSource={recentActivities}
+                  dataSource={recent}
                   renderItem={(item: any) => (
                     <List.Item>
                       <List.Item.Meta
@@ -240,43 +190,28 @@ export default function Dashboard() {
                           <Avatar 
                             size={40}
                             style={{ 
-                              backgroundColor: 
-                                item.type === 'booking' ? '#dbeafe' :
-                                item.type === 'trip' ? '#dcfce7' :
-                                item.type === 'event' ? '#faf5ff' :
-                                item.type === 'payment' ? '#fefce8' :
-                                '#f1f5f9',
+                              backgroundColor: '#dbeafe',
                               fontSize: '18px' 
                             }}
                           >
-                            {item.avatar}
+                            📅
                           </Avatar>
                         }
                         title={
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: '600' }}>{item.title}</span>
+                            <span style={{ fontWeight: '600' }}>{`${t('dashboard.booking') || 'Booking'} #${String(item.id).slice(0,8)}...`}</span>
                             <Tag 
-                              color={
-                                item.type === 'booking' ? 'blue' :
-                                item.type === 'trip' ? 'green' :
-                                item.type === 'event' ? 'purple' :
-                                item.type === 'payment' ? 'gold' :
-                                'default'
-                              }
+                              color={'blue'}
                             >
-                              {item.type === 'booking' && 'حجز'}
-                              {item.type === 'trip' && 'رحلة'}
-                              {item.type === 'event' && 'حدث'}
-                              {item.type === 'payment' && 'دفع'}
-                              {item.type === 'user' && 'مستخدم'}
+                              {item.status || ''}
                             </Tag>
                           </div>
                         }
                         description={
                           <div>
-                            <div style={{ marginBottom: '4px' }}>{item.description}</div>
+                            <div style={{ marginBottom: '4px' }}>{`${item.branch?.name || ''}${item.hall?.name ? ' - ' + item.hall.name : ''}`}</div>
                             <span style={{ color: '#64748b', fontSize: '12px' }}>
-                              {item.time}
+                              {item.startTime ? new Date(item.startTime).toLocaleString() : ''}
                             </span>
                           </div>
                         }
@@ -294,7 +229,7 @@ export default function Dashboard() {
                 title={
                   <Space>
                     <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                    Status Summary
+                    {t('dashboard.status_summary') || 'Status Summary'}
                   </Space>
                 }
               >
@@ -308,15 +243,15 @@ export default function Dashboard() {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontWeight: '600', color: '#d46b08' }}>Pending Approvals</div>
-                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>School trips & events</div>
+                        <div style={{ fontWeight: '600', color: '#d46b08' }}>{t('dashboard.pending_approvals') || 'Pending Approvals'}</div>
+                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>{t('dashboard.school_trips_events') || 'School trips & events'}</div>
                       </div>
                       <div style={{ 
                         fontSize: '24px', 
                         fontWeight: 'bold',
                         color: '#d46b08'
                       }}>
-                        8
+                        {pendingApprovals}
                       </div>
                     </div>
                   </div>
@@ -330,15 +265,15 @@ export default function Dashboard() {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontWeight: '600', color: '#389e0d' }}>Today's Events</div>
-                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>Active bookings</div>
+                        <div style={{ fontWeight: '600', color: '#389e0d' }}>{t('dashboard.todays_events') || "Today's Events"}</div>
+                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>{t('dashboard.active_bookings') || 'Active bookings'}</div>
                       </div>
                       <div style={{ 
                         fontSize: '24px', 
                         fontWeight: 'bold',
                         color: '#389e0d'
                       }}>
-                        12
+                        {todaysEventsCount}
                       </div>
                     </div>
                   </div>
@@ -352,15 +287,15 @@ export default function Dashboard() {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontWeight: '600', color: '#0958d9' }}>This Week</div>
-                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>Revenue</div>
+                        <div style={{ fontWeight: '600', color: '#0958d9' }}>{t('dashboard.this_week') || 'This Week'}</div>
+                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>{t('dashboard.revenue') || 'Revenue'}</div>
                       </div>
                       <div style={{ 
                         fontSize: '20px', 
                         fontWeight: 'bold',
                         color: '#0958d9'
                       }}>
-                        67,500 SAR
+                        {weekRevenue} SAR
                       </div>
                     </div>
                   </div>
@@ -370,10 +305,10 @@ export default function Dashboard() {
                 
                 <Space style={{ width: '100%', justifyContent: 'center' }}>
                   <Button type="primary" ghost icon={<FileTextOutlined />} size="small">
-                    View Reports
+                    {t('dashboard.view_reports') || 'View Reports'}
                   </Button>
                   <Button type="default" icon={<RiseOutlined />} size="small">
-                    Analytics
+                    {t('dashboard.analytics') || 'Analytics'}
                   </Button>
                 </Space>
               </Card>

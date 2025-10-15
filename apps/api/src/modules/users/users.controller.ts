@@ -152,27 +152,27 @@ export class UsersController {
 
   @Patch(':id/deactivate')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiOperation({ summary: 'Deactivate user (Admin only)' })
   @ApiResponse({ status: 200, description: 'User deactivated successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    await this.usersService.deactivate(id);
+  async deactivate(@CurrentUser() requester: User, @Param('id', ParseUUIDPipe) id: string) {
+    await this.usersService.deactivate(id, requester);
     return { message: 'User deactivated successfully' };
   }
 
   @Patch(':id/activate')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiOperation({ summary: 'Activate user (Admin only)' })
   @ApiResponse({ status: 200, description: 'User activated successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async activate(@Param('id', ParseUUIDPipe) id: string) {
-    await this.usersService.activate(id);
+  async activate(@CurrentUser() requester: User, @Param('id', ParseUUIDPipe) id: string) {
+    await this.usersService.activate(id, requester);
     return { message: 'User activated successfully' };
   }
 

@@ -1,12 +1,26 @@
 import { useState } from 'react'
 import { Button, Form, Input, Select, message, Space, Row, Col, Alert } from 'antd'
+import { useQuery } from '@tanstack/react-query'
 import { ShopOutlined, SaveOutlined } from '@ant-design/icons'
-import { apiPost } from '../../api'
+import { apiGet, apiPost } from '../../api'
 import '../../theme.css'
 
 export default function CreateBranchManager() {
   const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
+
+  // Load branches for dropdown
+  const { data: branches, isLoading: branchesLoading } = useQuery<any[]>({
+    queryKey: ['branches', 'for-select'],
+    queryFn: async () => {
+      const res = await apiGet<any>('/content/branches?includeInactive=true')
+      return Array.isArray(res) ? res : (res.items || res.branches || [])
+    },
+  })
+  const branchOptions = (branches || []).map((b: any) => ({
+    label: `${b?.name_ar || b?.name_en} — ${b?.location || ''}`.trim(),
+    value: b.id,
+  }))
 
   async function onFinish(values: any) {
     setLoading(true)
@@ -112,18 +126,21 @@ export default function CreateBranchManager() {
               <Row gutter={24}>
                 <Col xs={24} md={12}>
                   <Form.Item 
-                    label="Branch ID" 
+                    label="Branch" 
                     name="branchId" 
-                    rules={[{ required: true, message: 'Please enter the branch ID' }]}
+                    rules={[{ required: true, message: 'Please select a branch' }]}
                   >
-                    <Input 
-                      placeholder="Enter branch ID (e.g., BR001)" 
+                    <Select
+                      showSearch
                       size="large"
-                      style={{ fontFamily: 'monospace' }}
+                      placeholder="Select branch"
+                      loading={branchesLoading}
+                      options={branchOptions}
+                      filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
                     />
                   </Form.Item>
                 </Col>
-                
+
                 <Col xs={24} md={12}>
                   <Form.Item label="Language" name="language">
                     <Select 

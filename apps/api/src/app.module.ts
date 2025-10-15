@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { I18nModule, AcceptLanguageResolver, QueryResolver } from 'nestjs-i18n';
+import { join } from 'path';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -29,9 +31,23 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { PackagesModule } from './modules/packages/packages.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
+import { SearchModule } from './modules/search/search.module';
 
 @Module({
   imports: [
+    // i18n
+    I18nModule.forRoot({
+      fallbackLanguage: 'en',
+      loaderOptions: {
+        path: join(__dirname, 'i18n'),
+        watch: false,
+      } as any,
+      resolvers: [
+        { use: QueryResolver, options: ['lang'] },
+        AcceptLanguageResolver,
+      ],
+    }),
+
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
@@ -89,6 +105,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
     CouponsModule,
     PackagesModule,
     ReferralsModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],

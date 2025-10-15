@@ -221,10 +221,11 @@ body {
 
 .admin-content-wrapper {
   flex: 1;
-  overflow-y: visible;
-  overflow-x: visible;
+  overflow-y: auto; /* تمكين التمرير العمودي */
+  overflow-x: hidden;
   width: 100%;
   background: var(--background-main);
+  padding-bottom: 40px; /* مسافة أسفل */
 }
 
 /* Page Container */
@@ -272,6 +273,8 @@ body {
   flex: 1;
   padding: 32px;
   width: 100%;
+  padding-left: 40px;  /* مسافات جانبية */
+  padding-right: 40px; /* مسافات جانبية */
 }
 
 .page-content-inner {
