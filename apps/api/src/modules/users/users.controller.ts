@@ -36,14 +36,27 @@ export class UsersController {
 
   @Post('staff')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Create staff user (Admin only)' })
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Create staff user (Admin/Branch Manager)' })
   @ApiResponse({ status: 201, description: 'Staff user created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 409, description: 'Email or phone already exists' })
-  async createStaff(@Body() createStaffDto: CreateStaffDto) {
+  async createStaff(@Body() createStaffDto: CreateStaffDto, @CurrentUser() requester: User) {
+    // Branch managers can only create staff/users in their own branch and cannot assign elevated roles
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId) {
+        throw new Error('Branch not assigned to requester');
+      }
+      createStaffDto.branchId = requester.branchId as any;
+      // Limit roles to staff or user only
+      const allowed = new Set([UserRole.STAFF, UserRole.USER]);
+      createStaffDto.roles = (createStaffDto.roles || []).filter((r) => allowed.has(r));
+      if (!createStaffDto.roles.length) {
+        createStaffDto.roles = [UserRole.STAFF];
+      }
+    }
     return this.usersService.createStaff(createStaffDto);
   }
 

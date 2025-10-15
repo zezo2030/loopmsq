@@ -22,18 +22,24 @@ export default function CreateStaff({ onSuccess, onCancel }: CreateStaffProps) {
     
     setLoading(true)
     try {
+      // أرسل الحقول المسموحة فقط لتفادي 400 من ValidationPipe
       const staffData = {
-        ...values,
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        password: values.password,
         roles: ['staff'],
         branchId: me.branchId,
-        isActive: true,
-      }
+      } as const
 
       await apiPost('/users/staff', staffData)
       message.success(t('staff.created') || 'Staff member created successfully')
       onSuccess()
-    } catch (error) {
-      message.error(t('staff.create_failed') || 'Failed to create staff member')
+    } catch (error: any) {
+      const msg = (await (async () => {
+        try { return error?.message || '' } catch { return '' }
+      })()) || ''
+      message.error(msg || (t('staff.create_failed') || 'Failed to create staff member'))
     } finally {
       setLoading(false)
     }

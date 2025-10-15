@@ -6,7 +6,7 @@ export class AdminGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
     const roles: UserRole[] = req.user?.roles || [];
-    return roles.includes(UserRole.ADMIN) || roles.includes(UserRole.BRANCH_MANAGER);
+    return roles.includes(UserRole.ADMIN);
   }
 }
 
