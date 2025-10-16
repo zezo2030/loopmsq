@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Card, Table, Button, Space, Tag, message, Modal, Row, Col, Statistic, Switch } from 'antd'
-import { PlusOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
+import { Card, Table, Button, Space, Tag, message, Modal, Row, Col, Statistic, Switch, Popconfirm } from 'antd'
+import { PlusOutlined, EditOutlined, CheckOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiGet, apiPatch } from '../../shared/api'
@@ -17,6 +17,27 @@ export default function StaffList() {
   useEffect(() => {
     loadStaff()
   }, [])
+
+  // Reload staff when branchId changes (when returning to tab)
+  useEffect(() => {
+    if (me?.branchId) {
+      loadStaff()
+    }
+  }, [me?.branchId])
+
+  // Reload staff when page becomes visible (when returning to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && me?.branchId) {
+        loadStaff()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [me?.branchId])
 
   const loadStaff = async () => {
     if (!me?.branchId) return
@@ -35,7 +56,8 @@ export default function StaffList() {
   const handleStatusToggle = async (staffId: string, currentStatus: boolean) => {
     try {
       const endpoint = currentStatus ? 'deactivate' : 'activate'
-      await apiPatch(`/users/${staffId}/${endpoint}`, {})
+      // Include branchId in the request for proper authorization
+      await apiPatch(`/users/${staffId}/${endpoint}`, { branchId: me?.branchId })
       message.success(
         endpoint === 'activate' 
           ? (t('staff.activated') || 'Staff activated successfully')
@@ -51,6 +73,16 @@ export default function StaffList() {
     }
   }
 
+  const handleDeleteStaff = async (staffId: string) => {
+    try {
+      await apiPatch(`/users/${staffId}/delete-staff`, {})
+      message.success(t('staff.deleted') || 'Staff deleted successfully')
+      loadStaff()
+    } catch (error) {
+      message.error(t('staff.delete_failed') || 'Failed to delete staff')
+    }
+  }
+
   const handleCreate = () => {
     setIsCreateVisible(true)
   }
@@ -61,7 +93,10 @@ export default function StaffList() {
 
   const handleCreateSuccess = () => {
     handleCreateClose()
-    loadStaff()
+    // Add a small delay to ensure the server has processed the creation
+    setTimeout(() => {
+      loadStaff()
+    }, 500)
   }
 
   const columns = [
@@ -112,7 +147,7 @@ export default function StaffList() {
     {
       title: t('common.actions') || 'Actions',
       key: 'actions',
-      render: () => (
+      render: (_: any, record: any) => (
         <Space>
           <Button 
             size="small" 
@@ -123,6 +158,22 @@ export default function StaffList() {
           >
             {t('common.edit') || 'Edit'}
           </Button>
+          <Popconfirm
+            title={t('staff.delete_confirm') || 'Are you sure you want to delete this staff member?'}
+            description={t('staff.delete_warning') || 'This action cannot be undone.'}
+            onConfirm={() => handleDeleteStaff(record.id)}
+            okText={t('common.yes') || 'Yes'}
+            cancelText={t('common.no') || 'No'}
+            okButtonProps={{ danger: true }}
+          >
+            <Button 
+              size="small" 
+              danger
+              icon={<DeleteOutlined />}
+            >
+              {t('common.delete') || 'Delete'}
+            </Button>
+          </Popconfirm>
         </Space>
       ),
     },

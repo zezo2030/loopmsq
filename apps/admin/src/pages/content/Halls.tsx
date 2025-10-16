@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Row, Col, Tag } from 'antd'
-import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../api'
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Row, Col, Tag, Dropdown } from 'antd'
+import { DownOutlined } from '@ant-design/icons'
+import { apiGet, apiPost, apiPut, apiPatch } from '../../api'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useAdminAuth } from '../../auth'
@@ -33,16 +34,13 @@ export default function Halls() {
   const { me, status } = useAdminAuth()
   const isAuthLoading = status === 'loading'
   const canEditRaw = (me?.roles || []).includes('admin')
-  const canDeleteRaw = canEditRaw || (me?.roles || []).includes('branch_manager')
-  const canUpdateStatusRaw = canDeleteRaw
+  const canUpdateStatusRaw = canEditRaw || (me?.roles || []).includes('branch_manager')
   const canEdit = !isAuthLoading && canEditRaw
-  const canDelete = !isAuthLoading && canDeleteRaw
   const canUpdateStatus = !isAuthLoading && canUpdateStatusRaw
   
   // Debug logging
   console.log('Halls component render - me:', me)
   console.log('Halls component render - canEdit:', canEdit)
-  console.log('Halls component render - canDelete:', canDelete)
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Hall | null>(null)
@@ -103,26 +101,6 @@ export default function Halls() {
     onSuccess: () => { message.success(t('halls.status_updated') || 'Status updated'); qc.invalidateQueries({ queryKey: ['halls'] }) },
   })
 
-  const deleteHall = useMutation({
-    mutationFn: async (id: string) => {
-      console.log('Deleting hall:', id)
-      const result = await apiDelete(`/content/halls/${id}`)
-      console.log('Delete result:', result)
-      return result
-    },
-    onSuccess: () => {
-      console.log('Delete success')
-      message.success(t('halls.deleted') || 'Hall deleted')
-      // Invalidate any halls queries and immediately refetch the current one
-      qc.invalidateQueries({ queryKey: ['halls'] })
-      refetch()
-    },
-    onError: (error: any) => {
-      console.error('Delete error:', error)
-      message.error(error?.message || 'Failed to delete hall')
-    },
-  })
-
   const columns = [
     {
       title: t('halls.branch') || 'الفرع',
@@ -146,19 +124,63 @@ export default function Halls() {
       title: t('halls.pricing') || 'التسعير',
       key: 'pricing',
       render: (_: any, r: Hall) => {
-        const base = r.priceConfig.basePrice
-        const hourly = r.priceConfig.hourlyRate
-        const wkd = r.priceConfig.weekendMultiplier
-        const hol = r.priceConfig.holidayMultiplier
-        const deco = r.priceConfig.decorationPrice
-        const parts = [
-          `${base} SAR`,
-          `${hourly} SAR/h`,
-          `Wkd x${wkd}`,
-          `Hol x${hol}`,
+        const price = r.priceConfig || {}
+        const formatCurrency = (value?: number | null, suffix: string = 'SAR') =>
+          value == null ? '-' : `${Number(value).toLocaleString()} ${suffix}`
+
+        const items = [
+          {
+            key: 'base',
+            label: (
+              <div>
+                <strong>{t('halls.price_base') || 'Base'}:</strong> {formatCurrency(price.basePrice)}
+              </div>
+            ),
+          },
+          {
+            key: 'hourly',
+            label: (
+              <div>
+                <strong>{t('halls.price_hourly') || 'Hourly'}:</strong> {formatCurrency(price.hourlyRate)}
+              </div>
+            ),
+          },
+          {
+            key: 'weekend',
+            label: (
+              <div>
+                <strong>{t('halls.price_weekend') || 'Weekend Multiplier'}:</strong> x{price.weekendMultiplier ?? 1}
+              </div>
+            ),
+          },
+          {
+            key: 'holiday',
+            label: (
+              <div>
+                <strong>{t('halls.price_holiday') || 'Holiday Multiplier'}:</strong> x{price.holidayMultiplier ?? 1}
+              </div>
+            ),
+          },
         ]
-        if (deco != null) parts.push(`Dec ${deco}`)
-        return parts.join(' | ')
+
+        if (price.decorationPrice != null) {
+          items.push({
+            key: 'decoration',
+            label: (
+              <div>
+                <strong>{t('halls.price_decoration') || 'Decoration'}:</strong> {formatCurrency(price.decorationPrice)}
+              </div>
+            ),
+          })
+        }
+
+        return (
+          <Dropdown menu={{ items }} trigger={['click']}>
+            <Button type="link">
+              {t('halls.pricing_details') || t('halls.pricing') || 'Pricing'} <DownOutlined />
+            </Button>
+          </Dropdown>
+        )
       },
     },
     {
@@ -196,23 +218,6 @@ export default function Halls() {
               ]}
             />
             <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ hallId: r.id }) }}>{t('halls.preview') || 'معاينة السعر/التوفر'}</Button>
-            <Button
-              size="small"
-              danger
-              loading={deleteHall.isPending}
-              onClick={() => {
-                Modal.confirm({
-                  title: t('halls.delete_confirm_title') || 'Delete Hall',
-                  content: t('halls.delete_confirm_message', { name: r.name_ar || r.name_en }) || `Are you sure you want to delete "${r.name_ar || r.name_en}"? This action cannot be undone.`,
-                  okText: t('common.delete') || 'Delete',
-                  okType: 'danger',
-                  cancelText: t('common.cancel') || 'Cancel',
-                  onOk: () => deleteHall.mutate(r.id),
-                })
-              }}
-            >
-              {t('common.delete') || 'Delete'}
-            </Button>
           </Space>
         )
       },

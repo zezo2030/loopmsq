@@ -6,7 +6,6 @@ import {
   DashboardOutlined, 
   UserOutlined, 
   LogoutOutlined,
-  SettingOutlined,
   AppstoreOutlined,
   CalendarOutlined,
   TeamOutlined,
@@ -73,19 +72,6 @@ export default function BranchLayout() {
   }, [location.pathname])
 
   const userMenuItems = [
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: t('profile.settings'),
-    },
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: t('profile.preferences'),
-    },
-    { 
-      type: 'divider' as const,
-    },
     {
       key: 'logout',
       icon: <LogoutOutlined />,

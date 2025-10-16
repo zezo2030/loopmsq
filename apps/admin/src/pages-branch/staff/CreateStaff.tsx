@@ -4,6 +4,7 @@ import { SaveOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiPost } from '../../shared/api'
+import { useAuth } from '../../shared/auth'
 
 interface Props {
   onSuccess: () => void
@@ -12,13 +13,19 @@ interface Props {
 
 export default function CreateStaff({ onSuccess, onCancel }: Props) {
   const { t } = useTranslation()
+  const { me } = useAuth()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (values: any) => {
     setLoading(true)
     try {
-      await apiPost('/users/staff', { ...values, roles: ['staff'] })
+      // Include branchId in the request for proper authorization
+      await apiPost('/users/staff', { 
+        ...values, 
+        roles: ['staff'],
+        branchId: me?.branchId 
+      })
       message.success(t('staff.created') || 'Staff created successfully')
       onSuccess()
     } catch (e) {

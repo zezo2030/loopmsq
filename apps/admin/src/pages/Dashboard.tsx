@@ -1,20 +1,20 @@
 import { Row, Col, Card, Statistic, List, Avatar, Button, Space, Tag, Divider } from 'antd'
 import { 
   CalendarOutlined,
-  RiseOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
   DollarOutlined,
-  CheckCircleOutlined,
-  FileTextOutlined
+  CheckCircleOutlined
 } from '@ant-design/icons'
 import '../theme.css'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { apiGet } from '../api'
 
 export default function Dashboard() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [overviewAll, setOverviewAll] = useState<{ bookings: { total: number; confirmed: number; cancelled: number }; scans: number; revenueByMethod: Record<string, number> } | null>(null)
   const [todaysEventsCount, setTodaysEventsCount] = useState<number>(0)
   const [weekRevenue, setWeekRevenue] = useState<number>(0)
@@ -78,7 +78,7 @@ export default function Dashboard() {
             <p className="page-subtitle">{t('dashboard.subtitle') || 'Monitor your business performance and key metrics'}</p>
           </div>
           <Space>
-            <Button type="primary" className="btn-primary" icon={<CalendarOutlined />} onClick={() => (window.location.href = '/bookings')}>
+            <Button type="primary" className="btn-primary" icon={<CalendarOutlined />} onClick={() => navigate('/admin/bookings')}>
               {t('dashboard.go_bookings') || 'Go to Bookings'}
             </Button>
           </Space>
@@ -304,12 +304,7 @@ export default function Dashboard() {
                 <Divider />
                 
                 <Space style={{ width: '100%', justifyContent: 'center' }}>
-                  <Button type="primary" ghost icon={<FileTextOutlined />} size="small">
-                    {t('dashboard.view_reports') || 'View Reports'}
-                  </Button>
-                  <Button type="default" icon={<RiseOutlined />} size="small">
-                    {t('dashboard.analytics') || 'Analytics'}
-                  </Button>
+                  <Tag color="blue">{t('dashboard.keep_tracking') || 'Keep tracking your metrics'}</Tag>
                 </Space>
               </Card>
             </Col>

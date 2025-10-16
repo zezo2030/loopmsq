@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -358,5 +359,44 @@ export class UsersService {
 
     await this.userRepository.delete(id);
     this.logger.log(`User hard-deleted: ${id}`);
+  }
+
+  async deleteStaff(id: string, requester: User): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['bookings', 'supportTickets'],
+    });
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Branch managers can only delete staff from their own branch
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId || user.branchId !== requester.branchId) {
+        throw new ForbiddenException('You can only delete staff from your own branch');
+      }
+      
+      // Branch managers can only delete staff users, not other roles
+      if (!user.roles?.includes(UserRole.STAFF)) {
+        throw new ForbiddenException('You can only delete staff members');
+      }
+    }
+
+    if ((user.bookings && user.bookings.length > 0) || (user.supportTickets && user.supportTickets.length > 0)) {
+      throw new BadRequestException('User has related records; deactivate instead');
+    }
+
+    const wallet = await this.walletRepository.findOne({ where: { userId: id }, relations: ['transactions'] as any });
+    if (wallet && (wallet as any).transactions && (wallet as any).transactions.length > 0) {
+      throw new BadRequestException('User wallet has transactions; deactivate instead');
+    }
+
+    if (wallet) {
+      await this.walletRepository.delete(wallet.id);
+    }
+
+    await this.userRepository.delete(id);
+    this.logger.log(`Staff deleted by ${requester.id}: ${id}`);
   }
 }

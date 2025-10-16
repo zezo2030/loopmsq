@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Tag, message, DatePicker, Select, Row, Col, Statistic, Modal } from 'antd'
-import { EyeOutlined, CloseOutlined, CalendarOutlined, FilterOutlined } from '@ant-design/icons'
+import { EyeOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiGet, apiPost } from '../../shared/api'
@@ -212,11 +212,6 @@ export default function BookingsList() {
             <h1 className="page-title">{t('bookings.title') || 'Bookings Management'}</h1>
             <p className="page-subtitle">{t('bookings.subtitle') || 'Manage your branch bookings and reservations'}</p>
           </div>
-          <Space>
-            <Button icon={<CalendarOutlined />}>
-              {t('bookings.calendar_view') || 'Calendar View'}
-            </Button>
-          </Space>
         </div>
       </div>
 

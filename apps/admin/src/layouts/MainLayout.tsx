@@ -7,7 +7,6 @@ import {
   UserOutlined, 
   TeamOutlined,
   LogoutOutlined,
-  SettingOutlined,
   BellOutlined,
   UsergroupAddOutlined,
   UserAddOutlined,
@@ -98,14 +97,6 @@ export default function MainLayout() {
   }, [location.pathname])
 
   const userMenuItems = [
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: <Link to="/settings">{t('profile.preferences')}</Link>,
-    },
-    { 
-      type: 'divider' as const,
-    },
     {
       key: 'logout',
       icon: <LogoutOutlined />,

@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Card, Table, Button, Space, Tag, message, Modal, Row, Col, Statistic } from 'antd'
-import { PlusOutlined, EditOutlined, EyeOutlined, SettingOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Card, Table, Button, Space, Tag, message, Modal, Row, Col, Statistic, Dropdown } from 'antd'
+import { PlusOutlined, EditOutlined, EyeOutlined, SettingOutlined, ReloadOutlined, DownOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
-import { apiGet, apiPatch, apiDelete } from '../../shared/api'
+import { apiGet, apiPatch } from '../../shared/api'
 import { useAuth } from '../../shared/auth'
 import HallForm from './HallForm'
+
+const formatCurrency = (value: number | undefined | null, suffix: string = 'SAR') => {
+  if (value === undefined || value === null) return '-'
+  return `${Number(value).toLocaleString()} ${suffix}`
+}
 
 export default function HallsList() {
   const { t } = useTranslation()
@@ -57,28 +62,6 @@ export default function HallsList() {
     } catch (error) {
       message.error(t('halls.status_update_failed') || 'Failed to update status')
     }
-  }
-
-  const handleDelete = async (hallId: string, hallName: string) => {
-    Modal.confirm({
-      title: t('halls.delete_confirm_title') || 'Delete Hall',
-      content: t('halls.delete_confirm_message', { name: hallName }) || `Are you sure you want to delete "${hallName}"? This action cannot be undone.`,
-      okText: t('common.delete') || 'Delete',
-      okType: 'danger',
-      cancelText: t('common.cancel') || 'Cancel',
-      onOk: async () => {
-        try {
-          await apiDelete(`/content/halls/${hallId}`)
-          message.success(t('halls.deleted') || 'Hall deleted successfully')
-          // Force reload halls data
-          setTimeout(() => {
-            loadHalls()
-          }, 100)
-        } catch (error) {
-          message.error(t('halls.delete_failed') || 'Failed to delete hall')
-        }
-      },
-    })
   }
 
   const handleEdit = (hall: any) => {
@@ -138,8 +121,60 @@ export default function HallsList() {
       title: t('halls.pricing') || 'Pricing',
       key: 'pricing',
       render: (record: any) => {
-        const basePrice = record.priceConfig?.basePrice || 0
-        return `${basePrice} SAR`
+        const price = record.priceConfig || {}
+        const items = [
+          {
+            key: 'base',
+            label: (
+              <div>
+                <strong>{t('halls.price_base') || 'Base'}:</strong> {formatCurrency(price.basePrice)}
+              </div>
+            ),
+          },
+          {
+            key: 'hourly',
+            label: (
+              <div>
+                <strong>{t('halls.price_hourly') || 'Hourly'}:</strong> {formatCurrency(price.hourlyRate)}
+              </div>
+            ),
+          },
+          {
+            key: 'weekend',
+            label: (
+              <div>
+                <strong>{t('halls.price_weekend') || 'Weekend Multiplier'}:</strong> x{price.weekendMultiplier ?? 1}
+              </div>
+            ),
+          },
+          {
+            key: 'holiday',
+            label: (
+              <div>
+                <strong>{t('halls.price_holiday') || 'Holiday Multiplier'}:</strong> x{price.holidayMultiplier ?? 1}
+              </div>
+            ),
+          },
+        ]
+
+        if (price.decorationPrice != null) {
+          items.push({
+            key: 'decoration',
+            label: (
+              <div>
+                <strong>{t('halls.price_decoration') || 'Decoration'}:</strong> {formatCurrency(price.decorationPrice)}
+              </div>
+            ),
+          })
+        }
+
+        return (
+          <Dropdown menu={{ items }} trigger={['click']}>
+            <Button type="link">
+              {t('halls.pricing_details') || t('halls.pricing') || 'Pricing'} <DownOutlined />
+            </Button>
+          </Dropdown>
+        )
       },
     },
     {
@@ -173,14 +208,6 @@ export default function HallsList() {
             }}
           >
             {record.status === 'available' ? t('halls.set_maintenance') || 'Set Maintenance' : t('halls.set_available') || 'Set Available'}
-          </Button>
-          <Button 
-            size="small" 
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.id, record.name_ar || record.name_en)}
-          >
-            {t('common.delete') || 'Delete'}
           </Button>
         </Space>
       ),

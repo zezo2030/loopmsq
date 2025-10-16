@@ -202,4 +202,18 @@ export class UsersController {
     await this.usersService.deleteHard(id);
     return { message: 'User deleted permanently' };
   }
+
+  @Patch(':id/delete-staff')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Delete staff user (Admin/Branch Manager)' })
+  @ApiResponse({ status: 200, description: 'Staff deleted successfully' })
+  @ApiResponse({ status: 400, description: 'User has related records' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async deleteStaff(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() requester: User) {
+    await this.usersService.deleteStaff(id, requester);
+    return { message: 'Staff deleted successfully' };
+  }
 }
