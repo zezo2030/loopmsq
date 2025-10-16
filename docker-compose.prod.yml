@@ -59,28 +59,15 @@ services:
       - ./uploads:/app/uploads
     restart: unless-stopped
 
-  admin:
+  console:
     build:
       context: .
       dockerfile: apps/admin/Dockerfile
-    container_name: booking-admin
+    container_name: booking-console
     environment:
       NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
     ports:
       - "3001:80"
-    depends_on:
-      - api
-    restart: unless-stopped
-
-  branch:
-    build:
-      context: .
-      dockerfile: apps/branch/Dockerfile
-    container_name: booking-branch
-    environment:
-      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
-    ports:
-      - "3002:80"
     depends_on:
       - api
     restart: unless-stopped

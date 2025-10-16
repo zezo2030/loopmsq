@@ -12,7 +12,8 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: (typeof localStorage !== 'undefined' && localStorage.getItem('admin_lang')) || 'ar',
+    // Use the same key used across the app for language persistence
+    lng: (typeof localStorage !== 'undefined' && (localStorage.getItem('console_lang') || localStorage.getItem('admin_lang'))) || 'ar',
     fallbackLng: 'en',
     interpolation: { escapeValue: false },
   })

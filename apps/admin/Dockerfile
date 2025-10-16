@@ -17,6 +17,6 @@ RUN apk add --no-cache nginx
 COPY --from=build /app/apps/admin/dist .
 COPY apps/admin/nginx.conf /etc/nginx/http.d/default.conf
 COPY apps/admin/runtime-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && mkdir -p /run/nginx
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh && mkdir -p /run/nginx
 EXPOSE 80
 ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]

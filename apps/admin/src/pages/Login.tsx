@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Card, Form, Input, Typography, message, Space } from 'antd'
+import { Button, Card, Form, Input, Typography, message, Space, Radio } from 'antd'
 import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons'
 import '../theme.css'
 import { useTranslation } from 'react-i18next'
@@ -11,6 +11,7 @@ function getApiBase(): string {
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
+  const [roleChoice, setRoleChoice] = useState<'admin' | 'branch'>('admin')
   const { t } = useTranslation()
 
   async function onFinish(values: { email: string; password: string }) {
@@ -25,7 +26,21 @@ export default function Login() {
       const data = await resp.json()
       localStorage.setItem('accessToken', data.accessToken)
       message.success(t('login.success') || 'Logged in successfully')
-      window.location.href = '/'
+
+      // Fetch user roles to ensure selected role is allowed
+      const meResp = await fetch(`${getApiBase()}/auth/me`, {
+        headers: { Authorization: `Bearer ${data.accessToken}` },
+      })
+      const me = meResp.ok ? await meResp.json() : null
+      const roles: string[] = Array.isArray(me?.roles) ? me.roles : []
+
+      const wanted = roleChoice === 'admin' ? 'admin' : 'branch_manager'
+      if (!roles.includes(wanted)) {
+        message.error(t('auth.not_authorized') || 'Selected role is not authorized for this account')
+        return
+      }
+      try { localStorage.setItem('ui_mode', roleChoice) } catch {}
+      window.location.href = roleChoice === 'admin' ? '/admin' : '/branch'
     } catch (e: any) {
       message.error(e?.message || t('login.failed') || 'Login failed')
     } finally {
@@ -70,6 +85,16 @@ export default function Login() {
               placeholder="admin@example.com"
               size="large"
             />
+          </Form.Item>
+
+          <Form.Item label={t('login.role') || 'Role'} style={{ marginBottom: 12 }}>
+            <Radio.Group
+              onChange={(e) => setRoleChoice(e.target.value)}
+              value={roleChoice}
+            >
+              <Radio.Button value="admin">{t('roles.admin') || 'Admin'}</Radio.Button>
+              <Radio.Button value="branch">{t('roles.branch_manager') || 'Branch Manager'}</Radio.Button>
+            </Radio.Group>
           </Form.Item>
           
           <Form.Item 

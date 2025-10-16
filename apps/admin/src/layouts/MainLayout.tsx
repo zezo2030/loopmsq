@@ -33,13 +33,13 @@ export default function MainLayout() {
   const sidebarRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     try {
-      const lang = (localStorage.getItem('admin_lang')) || 'ar'
+      const lang = (localStorage.getItem('console_lang')) || 'ar'
       document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
     } catch {}
   }, [])
   
   const getSelectedKeys = () => {
-    const path = location.pathname
+    const path = location.pathname.replace(/^\/admin/, '') || '/'
     if (path.startsWith('/users') || path.startsWith('/staff') || path.startsWith('/branch-managers')) {
       return ['users']
     }
@@ -118,12 +118,12 @@ export default function MainLayout() {
     {
       key: 'dashboard',
       icon: <DashboardOutlined />,
-      label: <Link to="/">{t('menu.dashboard')}</Link>,
+      label: <Link to="/admin">{t('menu.dashboard')}</Link>,
     },
     {
       key: 'search',
       icon: <AppstoreOutlined />,
-      label: <Link to="/search">{t('menu.search') || 'Search'}</Link>,
+      label: <Link to="/admin/search">{t('menu.search') || 'Search'}</Link>,
     },
     {
       key: 'users',
@@ -133,7 +133,7 @@ export default function MainLayout() {
         {
           key: 'users-list',
           icon: <UsergroupAddOutlined />,
-          label: <Link to="/users" className="user-dropdown-link">
+          label: <Link to="/admin/users" className="user-dropdown-link">
             <div className="user-dropdown-item">
               <span className="dropdown-item-text">{t('users.all') || 'All Users'}</span>
               <span className="dropdown-item-desc">Manage system users</span>
@@ -143,7 +143,7 @@ export default function MainLayout() {
         {
           key: 'create-staff',
           icon: <UserAddOutlined />,
-          label: <Link to="/staff/new" className="user-dropdown-link">
+          label: <Link to="/admin/staff/new" className="user-dropdown-link">
             <div className="user-dropdown-item">
               <span className="dropdown-item-text">{t('users.add_staff') || 'Add Staff'}</span>
               <span className="dropdown-item-desc">Add new staff member</span>
@@ -153,7 +153,7 @@ export default function MainLayout() {
         {
           key: 'create-manager',
           icon: <CrownOutlined />,
-          label: <Link to="/branch-managers/new" className="user-dropdown-link">
+          label: <Link to="/admin/branch-managers/new" className="user-dropdown-link">
             <div className="user-dropdown-item">
               <span className="dropdown-item-text">{t('users.add_manager') || 'Add Manager'}</span>
               <span className="dropdown-item-desc">Add branch manager</span>
@@ -165,32 +165,32 @@ export default function MainLayout() {
     {
       key: 'bookings',
       icon: <CalendarOutlined />,
-      label: <Link to="/bookings">{t('menu.bookings')}</Link>,
+      label: <Link to="/admin/bookings">{t('menu.bookings')}</Link>,
     },
     {
       key: 'trips',
       icon: <BookOutlined />,
-      label: <Link to="/trips">{t('menu.trips')}</Link>,
+      label: <Link to="/admin/trips">{t('menu.trips')}</Link>,
     },
     {
       key: 'events',
       icon: <GiftOutlined />,
-      label: <Link to="/events">{t('menu.events')}</Link>,
+      label: <Link to="/admin/events">{t('menu.events')}</Link>,
     },
     {
       key: 'notifications',
       icon: <BellOutlined />,
-      label: <Link to="/notifications">{t('menu.notifications') || 'Notifications'}</Link>,
+      label: <Link to="/admin/notifications">{t('menu.notifications') || 'Notifications'}</Link>,
     },
     {
       key: 'cms',
       icon: <AppstoreOutlined />,
       label: t('menu.cms'),
       children: [
-        { key: 'cms-banners', icon: <PictureOutlined />, label: <Link to="/cms/banners">{t('cms.banners') || 'Banners'}</Link> },
-        { key: 'cms-offers', icon: <TagsOutlined />, label: <Link to="/cms/offers">{t('cms.offers') || 'Offers'}</Link> },
-        { key: 'cms-coupons', icon: <PercentageOutlined />, label: <Link to="/cms/coupons">{t('cms.coupons') || 'Coupons'}</Link> },
-        { key: 'cms-packages', icon: <GiftOutlined />, label: <Link to="/cms/packages">{t('cms.packages') || 'Packages'}</Link> },
+        { key: 'cms-banners', icon: <PictureOutlined />, label: <Link to="/admin/cms/banners">{t('cms.banners') || 'Banners'}</Link> },
+        { key: 'cms-offers', icon: <TagsOutlined />, label: <Link to="/admin/cms/offers">{t('cms.offers') || 'Offers'}</Link> },
+        { key: 'cms-coupons', icon: <PercentageOutlined />, label: <Link to="/admin/cms/coupons">{t('cms.coupons') || 'Coupons'}</Link> },
+        { key: 'cms-packages', icon: <GiftOutlined />, label: <Link to="/admin/cms/packages">{t('cms.packages') || 'Packages'}</Link> },
       ],
     },
     {
@@ -198,8 +198,8 @@ export default function MainLayout() {
       icon: <AppstoreOutlined />,
       label: t('menu.content'),
       children: [
-        { key: 'content-branches', icon: <AppstoreOutlined />, label: <Link to="/content/branches">{t('menu.content.branches')}</Link> },
-        { key: 'content-halls', icon: <AppstoreOutlined />, label: <Link to="/content/halls">{t('menu.content.halls')}</Link> },
+        { key: 'content-branches', icon: <AppstoreOutlined />, label: <Link to="/admin/content/branches">{t('menu.content.branches')}</Link> },
+        { key: 'content-halls', icon: <AppstoreOutlined />, label: <Link to="/admin/content/halls">{t('menu.content.halls')}</Link> },
       ],
     },
     {
@@ -207,8 +207,8 @@ export default function MainLayout() {
       icon: <DollarOutlined />,
       label: t('menu.finance'),
       children: [
-        { key: 'finance-payments', icon: <DollarOutlined />, label: <Link to="/finance/payments">{t('finance.payments') || 'Payments'}</Link> },
-        { key: 'finance-wallets', icon: <WalletOutlined />, label: <Link to="/finance/wallets">{t('finance.wallets') || 'Wallets'}</Link> },
+        { key: 'finance-payments', icon: <DollarOutlined />, label: <Link to="/admin/finance/payments">{t('finance.payments') || 'Payments'}</Link> },
+        { key: 'finance-wallets', icon: <WalletOutlined />, label: <Link to="/admin/finance/wallets">{t('finance.wallets') || 'Wallets'}</Link> },
       ],
     },
     {
@@ -216,8 +216,8 @@ export default function MainLayout() {
       icon: <RocketOutlined />,
       label: t('menu.marketing'),
       children: [
-        { key: 'marketing-loyalty', icon: <CrownOutlined />, label: <Link to="/marketing/loyalty">{t('marketing.loyalty') || 'Loyalty'}</Link> },
-        { key: 'marketing-referrals', icon: <UsergroupAddOutlined />, label: <Link to="/marketing/referrals">{t('marketing.referrals') || 'Referrals'}</Link> },
+        { key: 'marketing-loyalty', icon: <CrownOutlined />, label: <Link to="/admin/marketing/loyalty">{t('marketing.loyalty') || 'Loyalty'}</Link> },
+        { key: 'marketing-referrals', icon: <UsergroupAddOutlined />, label: <Link to="/admin/marketing/referrals">{t('marketing.referrals') || 'Referrals'}</Link> },
       ],
     },
     {
@@ -225,7 +225,7 @@ export default function MainLayout() {
       icon: <StarOutlined />,
       label: t('menu.feedback'),
       children: [
-        { key: 'feedback-reviews', icon: <StarOutlined />, label: <Link to="/feedback/reviews">{t('menu.feedback.reviews')}</Link> },
+        { key: 'feedback-reviews', icon: <StarOutlined />, label: <Link to="/admin/feedback/reviews">{t('menu.feedback.reviews')}</Link> },
       ],
     },
     {
@@ -233,7 +233,7 @@ export default function MainLayout() {
       icon: <BellOutlined />,
       label: t('menu.support'),
       children: [
-        { key: 'support-tickets', icon: <BellOutlined />, label: <Link to="/support/tickets">{t('menu.support.tickets')}</Link> },
+        { key: 'support-tickets', icon: <BellOutlined />, label: <Link to="/admin/support/tickets">{t('menu.support.tickets')}</Link> },
       ],
     },
     {
@@ -241,7 +241,7 @@ export default function MainLayout() {
       icon: <BarChartOutlined />,
       label: t('menu.reports'),
       children: [
-        { key: 'reports-overview', icon: <BarChartOutlined />, label: <Link to="/reports/overview">{t('menu.reports.overview')}</Link> },
+        { key: 'reports-overview', icon: <BarChartOutlined />, label: <Link to="/admin/reports/overview">{t('menu.reports.overview')}</Link> },
       ],
     },
   ]
@@ -280,7 +280,7 @@ export default function MainLayout() {
                     const next = i18n.language === 'ar' ? 'en' : 'ar'
                     i18n.changeLanguage(next)
                     try {
-                      localStorage.setItem('admin_lang', next)
+                      localStorage.setItem('console_lang', next)
                       document.documentElement.dir = next === 'ar' ? 'rtl' : 'ltr'
                     } catch {}
                   }}
@@ -330,31 +330,32 @@ export default function MainLayout() {
 function getPageTitle(pathname: string): string {
   const { t } = useTranslation()
   
-  if (pathname === '/') return t('page.dashboard_overview')
+  const path = pathname.replace(/^\/admin/, '') || '/'
+  if (path === '/') return t('page.dashboard_overview')
   
   // Users Management
-  if (pathname === '/users') return t('page.user_management')
-  if (pathname.startsWith('/users/')) return t('page.user_details')
-  if (pathname === '/staff/new') return t('page.create_staff')
-  if (pathname === '/branch-managers/new') return t('page.create_branch_manager')
+  if (path === '/users') return t('page.user_management')
+  if (path.startsWith('/users/')) return t('page.user_details')
+  if (path === '/staff/new') return t('page.create_staff')
+  if (path === '/branch-managers/new') return t('page.create_branch_manager')
   
   // Bookings Management
-  if (pathname === '/bookings') return t('page.bookings_management')
-  if (pathname.startsWith('/bookings/')) return t('page.booking_details')
+  if (path === '/bookings') return t('page.bookings_management')
+  if (path.startsWith('/bookings/')) return t('page.booking_details')
   
   // School Trips
-  if (pathname === '/trips') return t('page.school_trips')
-  if (pathname.startsWith('/trips/')) return t('page.trip_details')
+  if (path === '/trips') return t('page.school_trips')
+  if (path.startsWith('/trips/')) return t('page.trip_details')
   
   // Special Events
-  if (pathname === '/events') return t('page.special_events')
-  if (pathname.startsWith('/events/')) return t('page.event_details')
+  if (path === '/events') return t('page.special_events')
+  if (path.startsWith('/events/')) return t('page.event_details')
 
   // CMS
-  if (pathname === '/cms/banners') return t('page.cms_banners')
-  if (pathname === '/cms/offers') return t('page.cms_offers')
-  if (pathname === '/cms/coupons') return t('page.cms_coupons')
-  if (pathname === '/cms/packages') return t('page.cms_packages')
+  if (path === '/cms/banners') return t('page.cms_banners')
+  if (path === '/cms/offers') return t('page.cms_offers')
+  if (path === '/cms/coupons') return t('page.cms_coupons')
+  if (path === '/cms/packages') return t('page.cms_packages')
   
   return t('page.admin_control')
 }

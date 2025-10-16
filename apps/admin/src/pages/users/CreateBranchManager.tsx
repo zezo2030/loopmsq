@@ -3,9 +3,11 @@ import { Button, Form, Input, Select, message, Space, Row, Col, Alert } from 'an
 import { useQuery } from '@tanstack/react-query'
 import { ShopOutlined, SaveOutlined } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
+import { useTranslation } from 'react-i18next'
 import '../../theme.css'
 
 export default function CreateBranchManager() {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
 
@@ -61,8 +63,8 @@ export default function CreateBranchManager() {
         <div className="page-content-inner">
           <div className="custom-form">
             <Alert
-              message="Important Notice"
-              description="Branch managers have access to manage their assigned branch only. Make sure to provide the correct Branch ID."
+              message={t('users.important_notice') || 'Important Notice'}
+              description={t('users.branch_manager_notice') || 'Branch managers have access to manage their assigned branch only. Make sure to provide the correct Branch ID.'}
               type="info"
               showIcon
               style={{ marginBottom: '32px' }}
@@ -77,21 +79,21 @@ export default function CreateBranchManager() {
               <Row gutter={24}>
                 <Col xs={24} md={12}>
                   <Form.Item 
-                    label="Full Name" 
+                    label={t('users.full_name') || 'Full Name'} 
                     name="name" 
-                    rules={[{ required: true, message: 'Please enter full name' }]}
+                    rules={[{ required: true, message: t('users.enter_full_name') || 'Please enter full name' }]}
                   >
-                    <Input placeholder="Enter manager's full name" size="large" />
+                    <Input placeholder={t('users.enter_manager_name') || 'Enter manager\'s full name'} size="large" />
                   </Form.Item>
                 </Col>
                 
                 <Col xs={24} md={12}>
                   <Form.Item 
-                    label="Email Address" 
+                    label={t('users.email_address') || 'Email Address'} 
                     name="email" 
                     rules={[
-                      { required: true, message: 'Please enter email' },
-                      { type: 'email', message: 'Please enter a valid email' }
+                      { required: true, message: t('users.enter_email') || 'Please enter email' },
+                      { type: 'email', message: t('users.enter_valid_email') || 'Please enter a valid email' }
                     ]}
                   >
                     <Input type="email" placeholder="manager@company.com" size="large" />
@@ -102,23 +104,23 @@ export default function CreateBranchManager() {
               <Row gutter={24}>
                 <Col xs={24} md={12}>
                   <Form.Item 
-                    label="Password" 
+                    label={t('users.password') || 'Password'} 
                     name="password" 
                     rules={[
-                      { required: true, message: 'Please enter password' },
-                      { min: 6, message: 'Password must be at least 6 characters' }
+                      { required: true, message: t('users.enter_password') || 'Please enter password' },
+                      { min: 6, message: t('users.password_min_length') || 'Password must be at least 6 characters' }
                     ]}
                   >
-                    <Input.Password placeholder="Create a secure password" size="large" />
+                    <Input.Password placeholder={t('users.create_password') || 'Create a secure password'} size="large" />
                   </Form.Item>
                 </Col>
                 
                 <Col xs={24} md={12}>
                   <Form.Item 
-                    label="Phone Number" 
+                    label={t('users.phone_number') || 'Phone Number'} 
                     name="phone"
                   >
-                    <Input placeholder="+966 50 123 4567" size="large" />
+                    <Input placeholder={t('users.enter_phone') || '+966 50 123 4567'} size="large" />
                   </Form.Item>
                 </Col>
               </Row>
@@ -126,14 +128,14 @@ export default function CreateBranchManager() {
               <Row gutter={24}>
                 <Col xs={24} md={12}>
                   <Form.Item 
-                    label="Branch" 
+                    label={t('users.branch') || 'Branch'} 
                     name="branchId" 
-                    rules={[{ required: true, message: 'Please select a branch' }]}
+                    rules={[{ required: true, message: t('users.select_branch') || 'Please select a branch' }]}
                   >
                     <Select
                       showSearch
                       size="large"
-                      placeholder="Select branch"
+                      placeholder={t('users.select_branch') || 'Select branch'}
                       loading={branchesLoading}
                       options={branchOptions}
                       filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
@@ -142,9 +144,9 @@ export default function CreateBranchManager() {
                 </Col>
 
                 <Col xs={24} md={12}>
-                  <Form.Item label="Language" name="language">
+                  <Form.Item label={t('users.language') || 'Language'} name="language">
                     <Select 
-                      placeholder="Select language"
+                      placeholder={t('users.select_language') || 'Select language'}
                       size="large"
                       options={[
                         { label: 'Arabic', value: 'ar' },

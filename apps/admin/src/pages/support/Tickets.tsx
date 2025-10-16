@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card, Table, Tag, Space, Input, Select, Button, Modal, Form, message } from 'antd'
 import { apiGet, apiPost } from '../../api'
+import { useTranslation } from 'react-i18next'
 
 type Ticket = {
   id: string
@@ -13,6 +14,7 @@ type Ticket = {
 }
 
 export default function Tickets() {
+  const { t } = useTranslation()
   const [rows, setRows] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
@@ -58,27 +60,27 @@ export default function Tickets() {
 
   return (
     <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
-      <Card title="Support Tickets">
+      <Card title={t('support.tickets') || 'Support Tickets'}>
       <Space style={{ marginBottom: 16 }} wrap>
-        <Input placeholder="Search by subject/user" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 320 }} />
-        <Select placeholder="Status" value={status} onChange={setStatus} allowClear style={{ width: 160 }} options={[
-          { value: 'open', label: 'Open' },
-          { value: 'in_progress', label: 'In Progress' },
-          { value: 'resolved', label: 'Resolved' },
-          { value: 'closed', label: 'Closed' },
+        <Input placeholder={t('support.search_placeholder') || 'Search by subject/user'} value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 320 }} />
+        <Select placeholder={t('support.status') || 'Status'} value={status} onChange={setStatus} allowClear style={{ width: 160 }} options={[
+          { value: 'open', label: t('support.open') || 'Open' },
+          { value: 'in_progress', label: t('support.in_progress') || 'In Progress' },
+          { value: 'resolved', label: t('support.resolved') || 'Resolved' },
+          { value: 'closed', label: t('support.closed') || 'Closed' },
         ]} />
-        <Select placeholder="Priority" value={priority} onChange={setPriority} allowClear style={{ width: 160 }} options={[
-          { value: 'low', label: 'Low' },
-          { value: 'medium', label: 'Medium' },
-          { value: 'high', label: 'High' },
-          { value: 'urgent', label: 'Urgent' },
+        <Select placeholder={t('support.priority') || 'Priority'} value={priority} onChange={setPriority} allowClear style={{ width: 160 }} options={[
+          { value: 'low', label: t('support.low') || 'Low' },
+          { value: 'medium', label: t('support.medium') || 'Medium' },
+          { value: 'high', label: t('support.high') || 'High' },
+          { value: 'urgent', label: t('support.urgent') || 'Urgent' },
         ]} />
-        <Button onClick={load}>Refresh</Button>
+        <Button onClick={load}>{t('common.refresh') || 'Refresh'}</Button>
       </Space>
       <Table rowKey="id" loading={loading} dataSource={filtered} columns={columns as any} pagination={{ pageSize: 20 }} />
 
       <Modal
-        title="Assign / Update Status"
+        title={t('support.assign_update') || 'Assign / Update Status'}
         open={assignModal.open}
         onCancel={() => setAssignModal({ open: false })}
         onOk={() => form.submit()}
@@ -97,26 +99,26 @@ export default function Tickets() {
             message.error(e?.message || 'Failed')
           }
         }}>
-          <Form.Item name="message" label="Reply Message">
+          <Form.Item name="message" label={t('support.reply_message') || 'Reply Message'}>
             <Input.TextArea rows={4} />
           </Form.Item>
-          <Form.Item name="assignTo" label="Assign To (User ID)">
+          <Form.Item name="assignTo" label={t('support.assign_to_user') || 'Assign To (User ID)'}>
             <Input />
           </Form.Item>
-          <Form.Item name="status" label="Status">
+          <Form.Item name="status" label={t('support.status') || 'Status'}>
             <Select allowClear options={[
-              { value: 'open', label: 'Open' },
-              { value: 'in_progress', label: 'In Progress' },
-              { value: 'resolved', label: 'Resolved' },
-              { value: 'closed', label: 'Closed' },
+              { value: 'open', label: t('support.open') || 'Open' },
+              { value: 'in_progress', label: t('support.in_progress') || 'In Progress' },
+              { value: 'resolved', label: t('support.resolved') || 'Resolved' },
+              { value: 'closed', label: t('support.closed') || 'Closed' },
             ]} />
           </Form.Item>
-          <Form.Item name="priority" label="Priority">
+          <Form.Item name="priority" label={t('support.priority') || 'Priority'}>
             <Select allowClear options={[
-              { value: 'low', label: 'Low' },
-              { value: 'medium', label: 'Medium' },
-              { value: 'high', label: 'High' },
-              { value: 'urgent', label: 'Urgent' },
+              { value: 'low', label: t('support.low') || 'Low' },
+              { value: 'medium', label: t('support.medium') || 'Medium' },
+              { value: 'high', label: t('support.high') || 'High' },
+              { value: 'urgent', label: t('support.urgent') || 'Urgent' },
             ]} />
           </Form.Item>
         </Form>

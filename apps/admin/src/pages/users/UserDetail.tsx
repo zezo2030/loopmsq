@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button, Card, Form, Input, Switch, message } from 'antd'
 import { apiGet, apiPut } from '../../api'
+import { useTranslation } from 'react-i18next'
 
 type User = {
   id: string
@@ -14,6 +15,7 @@ type User = {
 }
 
 export default function UserDetail() {
+  const { t } = useTranslation()
   const { id } = useParams()
   const [form] = Form.useForm<User>()
   const [loading, setLoading] = useState(true)
@@ -59,12 +61,12 @@ export default function UserDetail() {
   }
 
   return (
-    <Card title="User Details" loading={loading}>
+    <Card title={t('users.user_details') || 'User Details'} loading={loading}>
       <Form form={form} layout="vertical" onFinish={onSave}>
-        <Form.Item label="Name" name="name">
+        <Form.Item label={t('users.full_name') || 'Name'} name="name">
           <Input />
         </Form.Item>
-        <Form.Item label="Email" name="email">
+        <Form.Item label={t('users.email_address') || 'Email'} name="email">
           <Input type="email" />
         </Form.Item>
         <Form.Item label="Language" name="language">

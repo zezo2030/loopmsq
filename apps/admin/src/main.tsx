@@ -1,12 +1,13 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './i18n'
 import './index.css'
 import './theme.css'
 import App, { ErrorBoundary } from './App.tsx'
 import MainLayout from './layouts/MainLayout'
+import BranchLayout from './layouts/BranchLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import UsersList from './pages/users/UsersList'
@@ -38,16 +39,35 @@ import Settings from './pages/Settings'
 import Analytics from './Analytics'
 import MetaPixel from './MetaPixel'
 import SearchPage from './pages/Search'
+import BranchDashboard from './pages-branch/Dashboard'
+import BranchInfo from './pages-branch/branch/BranchInfo'
+import BranchHalls from './pages-branch/halls/HallsList'
+import BranchBookings from './pages-branch/bookings/BookingsList'
+import BranchStaff from './pages-branch/staff/StaffList'
+import BranchReports from './pages-branch/reports/Overview'
+import { useAuth } from './shared/auth'
+
+function RequireRoles(props: { roles: string[]; element: any }) {
+  const { roles, element } = props
+  const Guarded = () => {
+    const { me, status } = useAuth()
+    if (status === 'loading') return null
+    const allowed = me?.roles?.some(r => roles.includes(r))
+    return allowed ? element : <Navigate to="/login" replace />
+  }
+  return <Guarded />
+}
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   {
     path: '/',
-    element: <App />, // guard layer
+    element: <App />, // neutral guard layer
     children: [
+      { index: true, element: <RootRedirect /> },
       {
-        path: '/',
-        element: <MainLayout />,
+        path: '/admin',
+        element: <RequireRoles roles={['admin']} element={<MainLayout />} />,
         children: [
           { index: true, element: <Dashboard /> },
           { path: 'dashboard', element: <Dashboard /> },
@@ -100,6 +120,18 @@ const router = createBrowserRouter([
           { path: 'settings', element: <Settings /> },
         ],
       },
+      {
+        path: '/branch',
+        element: <RequireRoles roles={['branch_manager']} element={<BranchLayout />} />,
+        children: [
+          { index: true, element: <BranchDashboard /> },
+          { path: 'branch', element: <BranchInfo /> },
+          { path: 'halls', element: <BranchHalls /> },
+          { path: 'bookings', element: <BranchBookings /> },
+          { path: 'staff', element: <BranchStaff /> },
+          { path: 'reports', element: <BranchReports /> },
+        ],
+      },
     ],
   },
 ])
@@ -117,3 +149,11 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 )
+
+function RootRedirect() {
+  try {
+    const mode = localStorage.getItem('ui_mode')
+    if (mode === 'branch') return <Navigate to="/branch" replace />
+  } catch {}
+  return <Navigate to="/admin" replace />
+}

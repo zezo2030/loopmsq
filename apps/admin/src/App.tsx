@@ -1,11 +1,11 @@
-import { useAdminAuth } from './auth'
+import { useAuth } from './shared/auth'
 import { Outlet, Navigate } from 'react-router-dom'
 import { Spin, Result, Button } from 'antd'
 import { Component, type ReactNode } from 'react'
 import './App.css'
 
 function App() {
-  const { status } = useAdminAuth()
+  const { status } = useAuth()
 
   if (status === 'loading') {
     return (

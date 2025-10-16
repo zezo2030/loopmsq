@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { Button, Form, Input, Select, message, Space, Row, Col } from 'antd'
 import { UserAddOutlined, SaveOutlined } from '@ant-design/icons'
 import { apiPost } from '../../api'
+import { useTranslation } from 'react-i18next'
 import '../../theme.css'
 
 export default function CreateStaff() {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
 
@@ -55,21 +57,21 @@ export default function CreateStaff() {
               <Row gutter={24}>
                 <Col xs={24} md={12}>
                   <Form.Item 
-                    label="Full Name" 
+                    label={t('users.full_name') || 'Full Name'} 
                     name="name" 
-                    rules={[{ required: true, message: 'Please enter full name' }]}
+                    rules={[{ required: true, message: t('users.enter_full_name') || 'Please enter full name' }]}
                   >
-                    <Input placeholder="Enter staff member's full name" size="large" />
+                    <Input placeholder={t('users.enter_full_name') || 'Enter staff member\'s full name'} size="large" />
                   </Form.Item>
                 </Col>
                 
                 <Col xs={24} md={12}>
                   <Form.Item 
-                    label="Email Address" 
+                    label={t('users.email_address') || 'Email Address'} 
                     name="email" 
                     rules={[
-                      { required: true, message: 'Please enter email' },
-                      { type: 'email', message: 'Please enter a valid email' }
+                      { required: true, message: t('users.enter_email') || 'Please enter email' },
+                      { type: 'email', message: t('users.enter_valid_email') || 'Please enter a valid email' }
                     ]}
                   >
                     <Input type="email" placeholder="staff@company.com" size="large" />
@@ -93,10 +95,10 @@ export default function CreateStaff() {
                 
                 <Col xs={24} md={12}>
                   <Form.Item 
-                    label="Phone Number" 
+                    label={t('users.phone_number') || 'Phone Number'} 
                     name="phone"
                   >
-                    <Input placeholder="+966 50 123 4567" size="large" />
+                    <Input placeholder={t('users.enter_phone') || '+966 50 123 4567'} size="large" />
                   </Form.Item>
                 </Col>
               </Row>

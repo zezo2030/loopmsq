@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Card, Tabs, Form, InputNumber, Switch, Button, Table, Space, Input, message } from 'antd'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../../api'
+import { useTranslation } from 'react-i18next'
 
 export default function Loyalty() {
+  const { t } = useTranslation()
   const [form] = Form.useForm()
   const [userId, setUserId] = useState<string>('')
 
@@ -24,45 +26,45 @@ export default function Loyalty() {
   })
 
   const columns = [
-    { title: 'Earn Rate', dataIndex: 'earnRate', key: 'earnRate' },
-    { title: 'Redeem Rate', dataIndex: 'redeemRate', key: 'redeemRate' },
-    { title: 'Min Redeem', dataIndex: 'minRedeemPoints', key: 'minRedeemPoints' },
-    { title: 'Active', dataIndex: 'isActive', key: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
-    { title: 'Actions', key: 'actions', render: (_: any, r: any) => !r.isActive ? <Button onClick={() => activateRule.mutate(r.id)}>Activate</Button> : null },
+    { title: t('marketing.earn_rate') || 'Earn Rate', dataIndex: 'earnRate', key: 'earnRate' },
+    { title: t('marketing.redeem_rate') || 'Redeem Rate', dataIndex: 'redeemRate', key: 'redeemRate' },
+    { title: t('marketing.min_redeem') || 'Min Redeem', dataIndex: 'minRedeemPoints', key: 'minRedeemPoints' },
+    { title: t('marketing.active') || 'Active', dataIndex: 'isActive', key: 'isActive', render: (v: boolean) => (v ? t('marketing.yes') || 'Yes' : t('marketing.no') || 'No') },
+    { title: t('marketing.actions') || 'Actions', key: 'actions', render: (_: any, r: any) => !r.isActive ? <Button onClick={() => activateRule.mutate(r.id)}>{t('marketing.activate') || 'Activate'}</Button> : null },
   ]
 
   return (
-    <Card title="Loyalty">
+    <Card title={t('marketing.loyalty') || 'Loyalty'}>
       <Tabs
         items={[
           {
             key: 'active',
-            label: 'Active Rule',
+            label: t('marketing.active_rule') || 'Active Rule',
             children: (
               <Table rowKey="id" columns={columns as any} dataSource={(rulesQuery.data || []).filter((r: any) => r.isActive)} pagination={false} />
             ),
           },
           {
             key: 'all',
-            label: 'All Rules',
+            label: t('marketing.all_rules') || 'All Rules',
             children: (
               <>
                 <Table rowKey="id" columns={columns as any} dataSource={rulesQuery.data || []} pagination={false} style={{ marginBottom: 16 }} />
                 <Form layout="inline" form={form} onFinish={(values) => createRule.mutate(values)}>
-                  <Form.Item name="earnRate" label="Earn Rate" rules={[{ required: true }]}>
+                  <Form.Item name="earnRate" label={t('marketing.earn_rate') || 'Earn Rate'} rules={[{ required: true }]}>
                     <InputNumber step={0.01} />
                   </Form.Item>
-                  <Form.Item name="redeemRate" label="Redeem Rate" rules={[{ required: true }]}>
+                  <Form.Item name="redeemRate" label={t('marketing.redeem_rate') || 'Redeem Rate'} rules={[{ required: true }]}>
                     <InputNumber step={0.01} />
                   </Form.Item>
-                  <Form.Item name="minRedeemPoints" label="Min Redeem">
+                  <Form.Item name="minRedeemPoints" label={t('marketing.min_redeem') || 'Min Redeem'}>
                     <InputNumber />
                   </Form.Item>
-                  <Form.Item name="isActive" label="Active" valuePropName="checked">
+                  <Form.Item name="isActive" label={t('marketing.active') || 'Active'} valuePropName="checked">
                     <Switch />
                   </Form.Item>
                   <Form.Item>
-                    <Button type="primary" htmlType="submit">Create Rule</Button>
+                    <Button type="primary" htmlType="submit">{t('marketing.create_rule') || 'Create Rule'}</Button>
                   </Form.Item>
                 </Form>
               </>

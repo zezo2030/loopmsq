@@ -99,29 +99,16 @@ services:
     environment:
       REDIS_HOSTS: local:redis:6379
 
-  # Admin React (Vite)
-  admin:
+  # Unified Console (Vite)
+  console:
     build:
       context: .
       dockerfile: apps/admin/Dockerfile
-    container_name: booking-admin
+    container_name: booking-console
     environment:
       - NEXT_PUBLIC_API_BASE=http://localhost:3000/api/v1
     ports:
       - "3001:80"
-    depends_on:
-      - api
-
-  # Branch React (Vite)
-  branch:
-    build:
-      context: .
-      dockerfile: apps/branch/Dockerfile
-    container_name: booking-branch
-    environment:
-      - NEXT_PUBLIC_API_BASE=http://localhost:3000/api/v1
-    ports:
-      - "3002:80"
     depends_on:
       - api
 
