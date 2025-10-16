@@ -121,3 +121,4 @@ const WorkingHoursEditor: React.FC<WorkingHoursEditorProps> = ({ value = {}, onC
 }
 
 export default WorkingHoursEditor
+
