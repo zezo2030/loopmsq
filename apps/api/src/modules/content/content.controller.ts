@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -187,6 +188,20 @@ export class ContentController {
     @Body('status') status: 'available' | 'maintenance' | 'reserved',
   ) {
     return this.contentService.updateHallStatus(id, status);
+  }
+
+  @Delete('halls/:id')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete hall (Any authenticated user)' })
+  @ApiResponse({ status: 200, description: 'Hall deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Hall not found' })
+  async deleteHall(
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.contentService.deleteHall(id);
+    return { success: true };
   }
 
   // Utility endpoints

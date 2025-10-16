@@ -42,7 +42,7 @@ export function useAdminAuth() {
           return;
         }
         const roles = profile.roles || [];
-        const allowed = roles.includes('admin');
+        const allowed = roles.includes('admin') || roles.includes('branch_manager');
         setStatus(allowed ? 'authorized' : 'unauthorized');
         setMe(profile);
       } catch (e: any) {

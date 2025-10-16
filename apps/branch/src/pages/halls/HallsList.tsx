@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Tag, message, Modal, Row, Col, Statistic } from 'antd'
-import { PlusOutlined, EditOutlined, EyeOutlined, SettingOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, EyeOutlined, SettingOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
-import { apiGet, apiPatch } from '../../api'
+import { apiGet, apiPatch, apiDelete } from '../../api'
 import { useBranchAuth } from '../../auth'
 import HallForm from './HallForm'
 
@@ -17,7 +17,19 @@ export default function HallsList() {
   const [isEditMode, setIsEditMode] = useState(false)
 
   useEffect(() => {
-    loadHalls()
+    if (me?.branchId) {
+      loadHalls()
+    }
+  }, [me?.branchId])
+
+  // Also reload when component mounts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (me?.branchId) {
+        loadHalls()
+      }
+    }, 500)
+    return () => clearTimeout(timer)
   }, [])
 
   const loadHalls = async () => {
@@ -38,10 +50,35 @@ export default function HallsList() {
     try {
       await apiPatch(`/content/halls/${hallId}/status`, { status })
       message.success(t('halls.status_updated') || 'Status updated successfully')
-      loadHalls()
+      // Force reload halls data
+      setTimeout(() => {
+        loadHalls()
+      }, 100)
     } catch (error) {
       message.error(t('halls.status_update_failed') || 'Failed to update status')
     }
+  }
+
+  const handleDelete = async (hallId: string, hallName: string) => {
+    Modal.confirm({
+      title: t('halls.delete_confirm_title') || 'Delete Hall',
+      content: t('halls.delete_confirm_message', { name: hallName }) || `Are you sure you want to delete "${hallName}"? This action cannot be undone.`,
+      okText: t('common.delete') || 'Delete',
+      okType: 'danger',
+      cancelText: t('common.cancel') || 'Cancel',
+      onOk: async () => {
+        try {
+          await apiDelete(`/content/halls/${hallId}`)
+          message.success(t('halls.deleted') || 'Hall deleted successfully')
+          // Force reload halls data
+          setTimeout(() => {
+            loadHalls()
+          }, 100)
+        } catch (error) {
+          message.error(t('halls.delete_failed') || 'Failed to delete hall')
+        }
+      },
+    })
   }
 
   const handleEdit = (hall: any) => {
@@ -64,18 +101,21 @@ export default function HallsList() {
 
   const handleFormSuccess = () => {
     handleFormClose()
-    loadHalls()
+    // Force reload halls data
+    setTimeout(() => {
+      loadHalls()
+    }, 100)
   }
 
   const columns = [
     {
       title: t('halls.name') || 'Name',
-      dataIndex: 'nameAr',
-      key: 'nameAr',
+      dataIndex: 'name_ar',
+      key: 'name_ar',
       render: (text: string, record: any) => (
         <div>
           <div style={{ fontWeight: 'bold' }}>{text}</div>
-          <div style={{ fontSize: '12px', color: '#666' }}>{record.nameEn}</div>
+          <div style={{ fontSize: '12px', color: '#666' }}>{record.name_en}</div>
         </div>
       ),
     },
@@ -98,7 +138,7 @@ export default function HallsList() {
       title: t('halls.pricing') || 'Pricing',
       key: 'pricing',
       render: (record: any) => {
-        const basePrice = record.pricing?.base || 0
+        const basePrice = record.priceConfig?.basePrice || 0
         return `${basePrice} SAR`
       },
     },
@@ -134,6 +174,14 @@ export default function HallsList() {
             }}
           >
             {record.status === 'available' ? t('halls.set_maintenance') || 'Set Maintenance' : t('halls.set_available') || 'Set Available'}
+          </Button>
+          <Button 
+            size="small" 
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record.id, record.name_ar || record.name_en)}
+          >
+            {t('common.delete') || 'Delete'}
           </Button>
         </Space>
       ),
@@ -173,6 +221,13 @@ export default function HallsList() {
             <p className="page-subtitle">{t('halls.subtitle') || 'Manage your branch halls and their availability'}</p>
           </div>
           <Space>
+            <Button 
+              icon={<ReloadOutlined />}
+              onClick={loadHalls}
+              loading={loading}
+            >
+              {t('common.refresh') || 'Refresh'}
+            </Button>
             <Button 
               type="primary" 
               icon={<PlusOutlined />}

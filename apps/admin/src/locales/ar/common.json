@@ -30,7 +30,6 @@
   "cms.packages": "الباقات",
   "finance.payments": "المدفوعات",
   "finance.wallets": "المحافظ",
-  "marketing.loyalty": "الولاء",
   "marketing.referrals": "الإحالات",
   "login.subtitle": "مرحباً بعودتك! فضلاً قم بتسجيل الدخول للمتابعة",
   "login.email": "البريد الإلكتروني",
@@ -332,7 +331,6 @@
   "staff.deactivate_failed": "فشل تعطيل الموظف",
   "staff.name": "الاسم",
   "staff.unnamed": "موظف بدون اسم",
-  "staff.phone": "الهاتف",
   "staff.role": "الدور",
   "staff.status": "الحالة",
   "staff.joined": "تاريخ الانضمام",
@@ -443,10 +441,14 @@
   "halls.set_maintenance": "وضع صيانة",
   "halls.set_available": "وضع متاح",
   "halls.available_halls": "متاحة",
-  "halls.maintenance_halls": "قاعات الصيانة",
   "halls.reserved_halls": "محجوزة",
   "halls.view_details_not_implemented": "عرض التفاصيل غير متاح حالياً",
-  "halls.subtitle": "إدارة قاعات الفرع وتوفرها"
+  "halls.subtitle": "إدارة قاعات الفرع وتوفرها",
+  "halls.halls": "القاعات",
+  "halls.delete_confirm_title": "حذف القاعة",
+  "halls.delete_confirm_message": "هل أنت متأكد من حذف \"{{name}}\"؟ لا يمكن التراجع عن هذا الإجراء.",
+  "halls.deleted": "تم حذف القاعة بنجاح",
+  "halls.delete_failed": "فشل حذف القاعة"
 }
 
 

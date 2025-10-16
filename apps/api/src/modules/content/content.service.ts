@@ -135,6 +135,9 @@ export class ContentService {
     await this.redisService.del(`branch:${createHallDto.branchId}`);
     await this.redisService.del('branches:all');
     await this.redisService.del('branches:active');
+    // Clear halls caches so new halls appear immediately
+    await this.redisService.del(`halls:branch:${createHallDto.branchId}`);
+    await this.redisService.del('halls:all');
 
     this.logger.log(
       `Hall created: ${savedHall.id} in branch ${createHallDto.branchId}`,
@@ -227,6 +230,32 @@ export class ContentService {
 
     this.logger.log(`Hall status updated: ${id} -> ${status}`);
     return updatedHall;
+  }
+
+  async deleteHall(id: string): Promise<void> {
+    const hall = await this.findHallById(id);
+    
+    // Check if hall has any bookings
+    // TODO: Add booking check when booking system is implemented
+    // Defensive: nullify hallId in any existing bookings (in case FK isn't set to SET NULL in DB)
+    try {
+      await this.branchRepository.query(
+        `UPDATE bookings SET "hallId" = NULL WHERE "hallId" = $1`,
+        [id],
+      );
+    } catch {
+      // ignore - best effort
+    }
+
+    await this.hallRepository.delete(id);
+
+    // Clear cache
+    await this.redisService.del(`hall:${id}`);
+    await this.redisService.del(`halls:branch:${hall.branchId}`);
+    await this.redisService.del('halls:all');
+    await this.redisService.del(`branch:${hall.branchId}`);
+
+    this.logger.log(`Hall deleted: ${id}`);
   }
 
   // Availability Check

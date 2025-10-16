@@ -95,7 +95,7 @@ export class Booking {
   @JoinColumn({ name: 'branchId' })
   branch: Branch;
 
-  @ManyToOne(() => Hall)
+  @ManyToOne(() => Hall, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'hallId' })
   hall: Hall;
 

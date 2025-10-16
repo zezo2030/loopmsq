@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Row, Col } from 'antd'
-import { apiGet, apiPost, apiPut, apiPatch } from '../../api'
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Row, Col, Tag } from 'antd'
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../api'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useAdminAuth } from '../../auth'
@@ -11,6 +11,7 @@ type Hall = {
   branchId: string
   name_ar: string
   name_en: string
+  branch?: { id: string; name_ar: string; name_en: string }
   priceConfig: {
     basePrice: number
     hourlyRate: number
@@ -29,9 +30,19 @@ type Hall = {
 
 export default function Halls() {
   const { t } = useTranslation()
-  const { me } = useAdminAuth()
-  const canEdit = (me?.roles || []).includes('admin')
-  const canUpdateStatus = canEdit || (me?.roles || []).includes('branch_manager')
+  const { me, status } = useAdminAuth()
+  const isAuthLoading = status === 'loading'
+  const canEditRaw = (me?.roles || []).includes('admin')
+  const canDeleteRaw = canEditRaw || (me?.roles || []).includes('branch_manager')
+  const canUpdateStatusRaw = canDeleteRaw
+  const canEdit = !isAuthLoading && canEditRaw
+  const canDelete = !isAuthLoading && canDeleteRaw
+  const canUpdateStatus = !isAuthLoading && canUpdateStatusRaw
+  
+  // Debug logging
+  console.log('Halls component render - me:', me)
+  console.log('Halls component render - canEdit:', canEdit)
+  console.log('Halls component render - canDelete:', canDelete)
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Hall | null>(null)
@@ -54,6 +65,9 @@ export default function Halls() {
       const res = await apiGet<any>(`/content/halls?${params.toString()}`)
       return Array.isArray(res) ? res : (res.items || res.halls || [])
     },
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
   })
 
   // Initialize from URL
@@ -89,52 +103,119 @@ export default function Halls() {
     onSuccess: () => { message.success(t('halls.status_updated') || 'Status updated'); qc.invalidateQueries({ queryKey: ['halls'] }) },
   })
 
+  const deleteHall = useMutation({
+    mutationFn: async (id: string) => {
+      console.log('Deleting hall:', id)
+      const result = await apiDelete(`/content/halls/${id}`)
+      console.log('Delete result:', result)
+      return result
+    },
+    onSuccess: () => {
+      console.log('Delete success')
+      message.success(t('halls.deleted') || 'Hall deleted')
+      // Invalidate any halls queries and immediately refetch the current one
+      qc.invalidateQueries({ queryKey: ['halls'] })
+      refetch()
+    },
+    onError: (error: any) => {
+      console.error('Delete error:', error)
+      message.error(error?.message || 'Failed to delete hall')
+    },
+  })
+
   const columns = [
-    { title: t('halls.branch') || 'الفرع', dataIndex: 'branchId', key: 'branchId' },
+    {
+      title: t('halls.branch') || 'الفرع',
+      key: 'branch',
+      render: (_: any, r: Hall) => r.branch?.name_ar || r.branch?.name_en || r.branchId,
+    },
     { title: t('halls.name_ar') || 'الاسم (AR)', dataIndex: 'name_ar', key: 'name_ar' },
     { title: t('halls.name_en') || 'الاسم (EN)', dataIndex: 'name_en', key: 'name_en' },
     { title: t('halls.capacity') || 'السعة', dataIndex: 'capacity', key: 'capacity' },
-    { title: t('halls.status') || 'الحالة', dataIndex: 'status', key: 'status' },
+    {
+      title: t('halls.status') || 'الحالة',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: NonNullable<Hall['status']>) => {
+        const color = status === 'available' ? 'green' : status === 'maintenance' ? 'orange' : 'red'
+        const label = status === 'available' ? (t('halls.available') || 'Available') : status === 'maintenance' ? (t('halls.maintenance') || 'Maintenance') : (t('halls.reserved') || 'Reserved')
+        return <Tag color={color}>{label}</Tag>
+      },
+    },
     {
       title: t('halls.pricing') || 'التسعير',
       key: 'pricing',
-      render: (_: any, r: Hall) => `${r.priceConfig.basePrice} + ${r.priceConfig.hourlyRate}/h`,
+      render: (_: any, r: Hall) => {
+        const base = r.priceConfig.basePrice
+        const hourly = r.priceConfig.hourlyRate
+        const wkd = r.priceConfig.weekendMultiplier
+        const hol = r.priceConfig.holidayMultiplier
+        const deco = r.priceConfig.decorationPrice
+        const parts = [
+          `${base} SAR`,
+          `${hourly} SAR/h`,
+          `Wkd x${wkd}`,
+          `Hol x${hol}`,
+        ]
+        if (deco != null) parts.push(`Dec ${deco}`)
+        return parts.join(' | ')
+      },
     },
     {
       title: t('common.actions') || 'إجراءات',
       key: 'actions',
-      render: (_: any, r: Hall) => (
-        <Space>
-          <Button size="small" disabled={!canEdit} onClick={() => { setEditing(r); form.setFieldsValue({
-            branchId: r.branchId,
-            name_ar: r.name_ar,
-            name_en: r.name_en,
-            capacity: r.capacity,
-            isDecorated: r.isDecorated,
-            price_basePrice: r.priceConfig.basePrice,
-            price_hourlyRate: r.priceConfig.hourlyRate,
-            price_weekendMultiplier: r.priceConfig.weekendMultiplier,
-            price_holidayMultiplier: r.priceConfig.holidayMultiplier,
-            price_decorationPrice: r.priceConfig.decorationPrice,
-            description_ar: r.description_ar,
-            description_en: r.description_en,
-            features: r.features,
-            images: r.images,
-          }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
-          <Select
-            value={r.status}
-            style={{ width: 170 }}
-            disabled={!canUpdateStatus}
-            onChange={(v) => updateStatus.mutate({ id: r.id, status: v as any })}
-            options={[
-              { label: t('halls.available') || 'Available', value: 'available' },
-              { label: t('halls.maintenance') || 'Maintenance', value: 'maintenance' },
-              { label: t('halls.reserved') || 'Reserved', value: 'reserved' },
-            ]}
-          />
-          <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ hallId: r.id }) }}>{t('halls.preview') || 'معاينة السعر/التوفر'}</Button>
-        </Space>
-      ),
+      render: (_: any, r: Hall) => {
+        if (isAuthLoading) return null
+        return (
+          <Space>
+            <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue({
+              branchId: r.branchId,
+              name_ar: r.name_ar,
+              name_en: r.name_en,
+              capacity: r.capacity,
+              isDecorated: r.isDecorated,
+              price_basePrice: r.priceConfig.basePrice,
+              price_hourlyRate: r.priceConfig.hourlyRate,
+              price_weekendMultiplier: r.priceConfig.weekendMultiplier,
+              price_holidayMultiplier: r.priceConfig.holidayMultiplier,
+              price_decorationPrice: r.priceConfig.decorationPrice,
+              description_ar: r.description_ar,
+              description_en: r.description_en,
+              features: r.features,
+              images: r.images,
+            }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
+            <Select
+              value={r.status}
+              style={{ width: 170 }}
+              disabled={!canUpdateStatus}
+              onChange={(v) => updateStatus.mutate({ id: r.id, status: v as any })}
+              options={[
+                { label: t('halls.available') || 'Available', value: 'available' },
+                { label: t('halls.maintenance') || 'Maintenance', value: 'maintenance' },
+                { label: t('halls.reserved') || 'Reserved', value: 'reserved' },
+              ]}
+            />
+            <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ hallId: r.id }) }}>{t('halls.preview') || 'معاينة السعر/التوفر'}</Button>
+            <Button
+              size="small"
+              danger
+              loading={deleteHall.isPending}
+              onClick={() => {
+                Modal.confirm({
+                  title: t('halls.delete_confirm_title') || 'Delete Hall',
+                  content: t('halls.delete_confirm_message', { name: r.name_ar || r.name_en }) || `Are you sure you want to delete "${r.name_ar || r.name_en}"? This action cannot be undone.`,
+                  okText: t('common.delete') || 'Delete',
+                  okType: 'danger',
+                  cancelText: t('common.cancel') || 'Cancel',
+                  onOk: () => deleteHall.mutate(r.id),
+                })
+              }}
+            >
+              {t('common.delete') || 'Delete'}
+            </Button>
+          </Space>
+        )
+      },
     },
   ]
 
@@ -143,7 +224,9 @@ export default function Halls() {
       <Space>
         <Input placeholder={t('halls.filter_branch') || 'تصفية بالفرع (UUID)'} value={branchFilter} onChange={(e) => setBranchFilter(e.target.value || undefined)} style={{ width: 260 }} />
         <Button onClick={() => refetch()}>{t('common.refresh') || 'تحديث'}</Button>
-        <Button type="primary" disabled={!canEdit} onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('halls.new') || 'قاعة جديدة'}</Button>
+        {!isAuthLoading && (
+          <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('halls.new') || 'قاعة جديدة'}</Button>
+        )}
       </Space>
     }>
       <Table

@@ -25,16 +25,22 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
   useEffect(() => {
     if (hall) {
       form.setFieldsValue({
-        nameAr: hall.nameAr,
-        nameEn: hall.nameEn,
+        nameAr: hall.name_ar,
+        nameEn: hall.name_en,
         capacity: hall.capacity,
         status: hall.status,
-        pricing: hall.pricing,
+        pricing: {
+          base: hall.priceConfig?.basePrice,
+          hourly: hall.priceConfig?.hourlyRate,
+          weekend: hall.priceConfig?.weekendMultiplier,
+          holiday: hall.priceConfig?.holidayMultiplier,
+          decoration: hall.priceConfig?.decorationPrice,
+        },
         features: hall.features,
         images: hall.images,
-        decorated: hall.decorated,
-        descriptionAr: hall.descriptionAr,
-        descriptionEn: hall.descriptionEn,
+        decorated: hall.isDecorated,
+        descriptionAr: hall.description_ar,
+        descriptionEn: hall.description_en,
       })
     }
   }, [hall, form])
@@ -44,18 +50,54 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
     
     setLoading(true)
     try {
+      const featuresArray = Array.isArray(values.features)
+        ? values.features
+        : (typeof values.features === 'string'
+            ? values.features
+                .split(/\r?\n|,/)
+                .map((s: string) => s.trim())
+                .filter(Boolean)
+            : undefined)
+
+      const imagesArray = Array.isArray(values.images)
+        ? values.images
+        : (typeof values.images === 'string'
+            ? values.images
+                .split(/\r?\n|,/)
+                .map((s: string) => s.trim())
+                .filter(Boolean)
+            : undefined)
+
       const hallData = {
-        ...values,
         branchId: me.branchId,
-        pricing: {
-          base: values.pricing?.base || 0,
-          hourly: values.pricing?.hourly || 0,
-          weekend: values.pricing?.weekend || 1,
-          holiday: values.pricing?.holiday || 1,
-          decoration: values.pricing?.decoration || 0,
+        name_ar: values.nameAr,
+        name_en: values.nameEn,
+        capacity: Number(values.capacity || 0),
+        isDecorated: !!values.decorated,
+        priceConfig: {
+          basePrice: Number(values.pricing?.base || 0),
+          hourlyRate: Number(values.pricing?.hourly || 0),
+          weekendMultiplier: Number(values.pricing?.weekend || 1),
+          holidayMultiplier: Number(values.pricing?.holiday || 1),
+          decorationPrice: values.pricing?.decoration != null ? Number(values.pricing.decoration) : undefined,
         },
-        description_ar: values.descriptionAr,
-        description_en: values.descriptionEn,
+        description_ar: values.descriptionAr || null,
+        description_en: values.descriptionEn || null,
+        features: featuresArray && featuresArray.length ? featuresArray : undefined,
+        images: imagesArray && imagesArray.length ? imagesArray : undefined,
+      }
+
+      
+      // Validate required fields
+      if (!hallData.name_ar || !hallData.name_en || !hallData.capacity || hallData.capacity <= 0) {
+        message.error('Please fill in all required fields correctly')
+        return
+      }
+      
+      // Validate priceConfig
+      if (!hallData.priceConfig.basePrice || hallData.priceConfig.basePrice <= 0) {
+        message.error('Base price is required and must be greater than 0')
+        return
       }
 
       if (isEditMode) {
@@ -67,8 +109,10 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
       }
       
       onSuccess()
-    } catch (error) {
-      message.error(t('halls.save_failed') || 'Failed to save hall')
+    } catch (error: any) {
+      console.error('Hall creation error:', error)
+      const errorMessage = error?.response?.data?.message || error?.message || t('halls.save_failed') || 'Failed to save hall'
+      message.error(errorMessage)
     } finally {
       setLoading(false)
     }

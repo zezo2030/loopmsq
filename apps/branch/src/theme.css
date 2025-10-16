@@ -32,7 +32,7 @@ html, body {
   padding: 0;
   width: 100%;
   height: 100vh;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 body {
@@ -221,7 +221,7 @@ body {
 .branch-content-wrapper {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   width: 100%;
   background: var(--background-main);
   padding-bottom: 40px;
@@ -277,9 +277,15 @@ body {
 }
 
 .page-content-inner {
-  max-width: 1400px;
+  max-width: none;
   margin: 0 auto;
   width: 100%;
+}
+
+/* Ensure long modals scroll internally */
+.ant-modal-body {
+  max-height: 80vh;
+  overflow: auto;
 }
 
 /* Cards */

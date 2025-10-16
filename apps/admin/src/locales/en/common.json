@@ -30,7 +30,6 @@
   "cms.packages": "Packages",
   "finance.payments": "Payments",
   "finance.wallets": "Wallets",
-  "marketing.loyalty": "Loyalty",
   "marketing.referrals": "Referrals",
   "login.subtitle": "Welcome back! Please sign in to continue",
   "login.email": "Email Address",
@@ -332,7 +331,6 @@
   "staff.deactivate_failed": "Failed to deactivate staff",
   "staff.name": "Name",
   "staff.unnamed": "Unnamed Staff",
-  "staff.phone": "Phone",
   "staff.role": "Role",
   "staff.status": "Status",
   "staff.joined": "Joined",
@@ -443,10 +441,14 @@
   "halls.set_maintenance": "Set Maintenance",
   "halls.set_available": "Set Available",
   "halls.available_halls": "Available",
-  "halls.maintenance_halls": "Maintenance Halls",
   "halls.reserved_halls": "Reserved",
   "halls.view_details_not_implemented": "View details not implemented yet",
-  "halls.subtitle": "Manage your branch halls and their availability"
+  "halls.subtitle": "Manage your branch halls and their availability",
+  "halls.halls": "Halls",
+  "halls.delete_confirm_title": "Delete Hall",
+  "halls.delete_confirm_message": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+  "halls.deleted": "Hall deleted successfully",
+  "halls.delete_failed": "Failed to delete hall"
 }
 
 
