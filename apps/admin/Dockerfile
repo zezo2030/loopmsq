@@ -16,6 +16,7 @@ WORKDIR /usr/share/nginx/html
 RUN apk add --no-cache nginx
 COPY --from=build /app/apps/admin/dist .
 COPY apps/admin/nginx.conf /etc/nginx/http.d/default.conf
-RUN mkdir -p /run/nginx
+COPY apps/admin/runtime-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && mkdir -p /run/nginx
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
