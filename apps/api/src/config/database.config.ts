@@ -12,7 +12,12 @@ export const getDatabaseConfig = (
   database: configService.get<string>('DATABASE_NAME'),
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
-  synchronize: configService.get<string>('NODE_ENV') === 'development',
+  // Allow forcing synchronize via env for first-time bootstrap
+  synchronize: (() => {
+    const syncEnv = (configService.get<string>('DATABASE_SYNCHRONIZE') || '').toLowerCase();
+    if (syncEnv === 'true' || syncEnv === '1' || syncEnv === 'yes') return true;
+    return configService.get<string>('NODE_ENV') === 'development';
+  })(),
   logging: configService.get<string>('NODE_ENV') === 'development',
   // Make SSL optional via env flag; default to disabled
   ssl: (() => {
