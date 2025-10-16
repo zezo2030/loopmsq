@@ -1,0 +1,38 @@
+/* Reset and Base Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Ant Design Global Overrides */
+.ant-layout {
+  height: 100% !important;
+}
+
+.ant-menu-dark {
+  background: transparent !important;
+}
+
+/* Remove default focus outlines - we handle them in theme.css */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+}

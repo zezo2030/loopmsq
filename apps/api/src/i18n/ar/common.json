@@ -1,0 +1,12 @@
+{
+  "auth.invalid_credentials": "بيانات الدخول غير صحيحة",
+  "auth.access_denied": "تم رفض الوصول",
+  "errors.not_allowed": "غير مسموح",
+  "support.ticket_not_found": "التذكرة غير موجودة",
+  "reviews.rating_range": "التقييم يجب أن يكون بين 1 و5",
+  "reviews.before_end": "لا يمكن التقييم قبل انتهاء الحجز",
+  "reviews.already_submitted": "تم إرسال مراجعة مسبقاً",
+  "bookings.not_found": "الحجز غير موجود"
+}
+
+

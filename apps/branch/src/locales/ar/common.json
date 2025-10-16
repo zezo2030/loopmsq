@@ -1,0 +1,294 @@
+{
+  "app.title": "لوحة تحكم الفروع",
+  "login.title": "تسجيل الدخول",
+  "menu.dashboard": "نظرة عامة",
+  "menu.branch": "الفرع",
+  "menu.halls": "القاعات",
+  "menu.bookings": "الحجوزات",
+  "menu.staff": "الموظفين",
+  "menu.reports": "التقارير",
+  "login.subtitle": "مرحباً بعودتك! فضلاً قم بتسجيل الدخول للمتابعة",
+  "login.email": "البريد الإلكتروني",
+  "login.email_required": "أدخل بريدك الإلكتروني",
+  "login.email_valid": "أدخل بريد إلكتروني صحيح",
+  "login.password": "كلمة المرور",
+  "login.password_required": "أدخل كلمة المرور",
+  "login.password_placeholder": "أدخل كلمة المرور",
+  "login.signin": "تسجيل الدخول",
+  "login.footer": "🔒 دخول آمن لمديري الفروع فقط",
+  "login.success": "تم تسجيل الدخول بنجاح",
+  "login.failed": "فشل تسجيل الدخول",
+  "auth.invalid": "بيانات الدخول غير صحيحة",
+  "common.view_all": "عرض الكل",
+  "common.actions": "إجراءات",
+  "common.view_details": "عرض التفاصيل",
+  "common.cancel": "إلغاء",
+  "common.delete": "حذف",
+  "common.edit": "تعديل",
+  "common.update": "تحديث",
+  "common.create": "إنشاء",
+  "common.save": "حفظ",
+  "common.refresh": "تحديث",
+  "common.from": "من",
+  "common.to": "إلى",
+  "common.of": "من",
+  "common.yes": "نعم",
+  "common.no": "لا",
+  "common.year": "سنة",
+  "common.apply": "تطبيق",
+  "dashboard.title": "نظرة عامة على الفرع",
+  "dashboard.subtitle": "راقب أداء فرعك والمؤشرات الرئيسية",
+  "dashboard.go_bookings": "الانتقال إلى الحجوزات",
+  "dashboard.recent_activity": "آخر الأنشطة",
+  "dashboard.status_summary": "ملخص الحالة",
+  "dashboard.view_reports": "عرض التقارير",
+  "dashboard.analytics": "التحليلات",
+  "dashboard.booking": "حجز",
+  "dashboard.pending_approvals": "الموافقات المعلقة",
+  "dashboard.school_trips_events": "الرحلات المدرسية والفعاليات",
+  "dashboard.todays_events": "فعاليات اليوم",
+  "dashboard.active_bookings": "الحجوزات النشطة",
+  "dashboard.this_week": "هذا الأسبوع",
+  "dashboard.revenue": "الإيرادات",
+  "dashboard.kpi_bookings": "حجوزات",
+  "dashboard.kpi_revenue": "الإيرادات",
+  "dashboard.no_change": "لا تغيير",
+  "profile.settings": "إعدادات الملف الشخصي",
+  "profile.preferences": "التفضيلات",
+  "profile.sign_out": "تسجيل الخروج",
+  "page.dashboard_overview": "نظرة عامة على الفرع",
+  "page.branch_info": "معلومات الفرع",
+  "page.halls_management": "إدارة القاعات",
+  "page.bookings_management": "إدارة الحجوزات",
+  "page.staff_management": "إدارة الموظفين",
+  "page.reports_overview": "نظرة عامة على التقارير",
+  "page.branch_control": "لوحة تحكم الفرع",
+  "branch.title": "معلومات الفرع",
+  "branch.name_ar": "الاسم (AR)",
+  "branch.name_en": "الاسم (EN)",
+  "branch.location": "الموقع",
+  "branch.capacity": "السعة",
+  "branch.status": "الحالة",
+  "branch.active": "فعّال",
+  "branch.inactive": "غير فعّال",
+  "branch.maintenance": "صيانة",
+  "branch.contact_phone": "هاتف التواصل",
+  "branch.amenities": "الخدمات",
+  "branch.amenities_ph": "أدخل الخدمات",
+  "branch.working_hours": "أوقات العمل",
+  "branch.description_ar": "الوصف (AR)",
+  "branch.description_en": "الوصف (EN)",
+  "working_hours.days": "الأيام",
+  "working_hours.open": "فتح",
+  "working_hours.close": "إغلاق",
+  "working_hours.closed": "مغلق",
+  "working_hours.sunday": "الأحد",
+  "working_hours.monday": "الاثنين",
+  "working_hours.tuesday": "الثلاثاء",
+  "working_hours.wednesday": "الأربعاء",
+  "working_hours.thursday": "الخميس",
+  "working_hours.friday": "الجمعة",
+  "working_hours.saturday": "السبت",
+  "branch.edit_title": "تعديل الفرع",
+  "branch.updated": "تم تحديث الفرع",
+  "branch.status_updated": "تم تحديث الحالة",
+  "branch.working_hours_invalid": "صيغة أوقات العمل غير صحيحة (JSON)",
+  "halls.title": "القاعات",
+  "halls.new": "قاعة جديدة",
+  "halls.created": "تم إنشاء القاعة",
+  "halls.updated": "تم تحديث القاعة",
+  "halls.status_updated": "تم تحديث الحالة",
+  "halls.branch": "الفرع",
+  "halls.branch_id": "معرف الفرع",
+  "halls.name_ar": "الاسم (AR)",
+  "halls.name_en": "الاسم (EN)",
+  "halls.capacity": "السعة",
+  "halls.status": "الحالة",
+  "halls.pricing": "التسعير",
+  "halls.available": "متاحة",
+  "halls.maintenance": "صيانة",
+  "halls.reserved": "محجوزة",
+  "halls.preview": "معاينة السعر/التوفر",
+  "halls.preview_title": "معاينة السعر والتوفر",
+  "halls.total": "الإجمالي",
+  "halls.available_q": "التوفر",
+  "halls.preview_failed": "فشل المعاينة",
+  "halls.hall": "القاعة",
+  "halls.start_time": "وقت البدء (ISO)",
+  "halls.duration": "المدة (ساعات)",
+  "halls.persons": "الأشخاص",
+  "halls.edit_title": "تعديل قاعة",
+  "halls.create_title": "إنشاء قاعة",
+  "halls.price_base": "أساسي",
+  "halls.price_hourly": "بالساعة",
+  "halls.price_weekend": "نهاية الأسبوع x",
+  "halls.price_holiday": "العطل x",
+  "halls.price_decoration": "الزينة",
+  "halls.decorated": "مزينة",
+  "halls.features": "المزايا",
+  "halls.features_ph": "أدخل المزايا",
+  "halls.images": "صور (روابط)",
+  "halls.images_ph": "أدخل روابط الصور",
+  "halls.description_ar": "الوصف (عربي)",
+  "halls.description_en": "الوصف (إنجليزي)",
+  "bookings.title": "الحجوزات",
+  "bookings.id": "معرف الحجز",
+  "bookings.user": "المستخدم",
+  "bookings.hall": "القاعة",
+  "bookings.start_time": "وقت البدء",
+  "bookings.end_time": "وقت الانتهاء",
+  "bookings.status": "الحالة",
+  "bookings.amount": "المبلغ",
+  "bookings.status_pending": "معلّق",
+  "bookings.status_confirmed": "مؤكد",
+  "bookings.status_cancelled": "ملغي",
+  "bookings.status_completed": "مكتمل",
+  "bookings.cancel": "إلغاء الحجز",
+  "bookings.cancelled": "تم إلغاء الحجز",
+  "bookings.cancel_failed": "فشل إلغاء الحجز",
+  "bookings.load_failed": "فشل تحميل الحجوزات",
+  "staff.title": "الموظفين",
+  "staff.new": "موظف جديد",
+  "staff.created": "تم إنشاء الموظف",
+  "staff.updated": "تم تحديث الموظف",
+  "staff.status_updated": "تم تحديث الحالة",
+  "staff.name": "الاسم",
+  "staff.email": "البريد الإلكتروني",
+  "staff.phone": "الهاتف",
+  "staff.role": "الدور",
+  "staff.status": "الحالة",
+  "staff.active": "نشط",
+  "staff.inactive": "غير نشط",
+  "staff.activate": "تفعيل",
+  "staff.deactivate": "تعطيل",
+  "staff.activated": "تم تفعيل الموظف",
+  "staff.deactivated": "تم تعطيل الموظف",
+  "staff.activate_failed": "فشل تفعيل الموظف",
+  "staff.deactivate_failed": "فشل تعطيل الموظف",
+  "staff.load_failed": "فشل تحميل الموظفين",
+  "reports.overview": "نظرة عامة على التقارير",
+  "reports.branch": "الفرع",
+  "reports.export_csv": "تصدير CSV",
+  "reports.bookings_total": "الحجوزات (إجمالي)",
+  "reports.bookings_confirmed": "الحجوزات (مؤكد)",
+  "reports.bookings_cancelled": "الحجوزات (ملغي)",
+  "reports.scans": "التمريرات/المسح",
+  "reports.revenue_by_method": "الإيرادات حسب الطريقة",
+  "reports.load_failed": "فشل تحميل التقرير",
+  "reports.exported": "تم تصدير التقرير بنجاح",
+  "reports.export_failed": "فشل تصدير التقرير",
+  "reports.subtitle": "حلل أداء فرعك واصدر التقارير",
+  "reports.revenue_summary": "ملخص الإيرادات",
+  "reports.total_revenue": "إجمالي الإيرادات",
+  "reports.average_booking": "متوسط الحجز",
+  "reports.recent_bookings": "آخر الحجوزات",
+  "reports.performance_metrics": "مؤشرات الأداء",
+  "reports.confirmation_rate": "معدل التأكيد",
+  "reports.cancellation_rate": "معدل الإلغاء",
+  "reports.scan_rate": "معدل المسح",
+  "reports.utilization": "معدل الاستخدام",
+  "common.close": "إغلاق",
+  "branch.subtitle": "إدارة تفاصيل فرعك وإعداداته",
+  "branch.details": "تفاصيل الفرع",
+  "branch.name_ar_required": "أدخل الاسم العربي",
+  "branch.name_en_required": "أدخل الاسم الإنجليزي",
+  "branch.location_required": "أدخل الموقع",
+  "branch.capacity_required": "أدخل السعة",
+  "branch.name_ar_ph": "أدخل الاسم العربي",
+  "branch.name_en_ph": "أدخل الاسم الإنجليزي",
+  "branch.location_ph": "أدخل موقع الفرع",
+  "branch.capacity_ph": "أدخل السعة",
+  "branch.contact_phone_ph": "أدخل هاتف التواصل",
+  "branch.working_hours_help": "أدخل أوقات العمل بصيغة JSON",
+  "branch.working_hours_ph": "{\"monday\": {\"open\": \"09:00\", \"close\": \"18:00\"}}",
+  "branch.description_ar_ph": "أدخل الوصف العربي",
+  "branch.description_en_ph": "أدخل الوصف الإنجليزي",
+  "branch.status_management": "إدارة الحالة",
+  "branch.current_status": "الحالة الحالية",
+  "branch.branch_id": "معرف الفرع",
+  "branch.last_updated": "آخر تحديث",
+  "branch.update_failed": "فشل تحديث الفرع",
+  "branch.status_update_failed": "فشل تحديث الحالة",
+  "halls.subtitle": "إدارة قاعات فرعك وتوفرها",
+  "halls.name": "الاسم",
+  "halls.halls": "قاعات",
+  "halls.total_halls": "إجمالي القاعات",
+  "halls.available_halls": "متاحة",
+  "halls.maintenance_halls": "صيانة",
+  "halls.reserved_halls": "محجوزة",
+  "halls.set_maintenance": "وضع صيانة",
+  "halls.set_available": "وضع متاحة",
+  "halls.load_failed": "فشل تحميل القاعات",
+  "halls.status_update_failed": "فشل تحديث الحالة",
+  "halls.name_ar_required": "أدخل الاسم العربي",
+  "halls.name_en_required": "أدخل الاسم الإنجليزي",
+  "halls.capacity_required": "أدخل السعة",
+  "halls.status_required": "اختر الحالة",
+  "halls.name_ar_ph": "أدخل الاسم العربي",
+  "halls.name_en_ph": "أدخل الاسم الإنجليزي",
+  "halls.capacity_ph": "أدخل السعة",
+  "halls.status_ph": "اختر الحالة",
+  "halls.pricing_section": "التسعير",
+  "halls.base_price_required": "أدخل السعر الأساسي",
+  "halls.base_price_ph": "أدخل السعر الأساسي",
+  "halls.hourly_rate_ph": "أدخل السعر بالساعة",
+  "halls.weekend_multiplier_ph": "أدخل مضاعف نهاية الأسبوع",
+  "halls.holiday_multiplier_ph": "أدخل مضاعف العطل",
+  "halls.decoration_fee_ph": "أدخل رسوم الزينة",
+  "halls.additional_info": "معلومات إضافية",
+  "halls.save_failed": "فشل حفظ القاعة",
+  "bookings.subtitle": "إدارة حجوزات فرعك والتحفظات",
+  "bookings.calendar_view": "عرض التقويم",
+  "bookings.date_range": "نطاق التاريخ",
+  "bookings.select_status": "اختر الحالة",
+  "bookings.bookings": "حجوزات",
+  "bookings.total_bookings": "إجمالي الحجوزات",
+  "bookings.confirmed_bookings": "مؤكدة",
+  "bookings.pending_bookings": "معلقة",
+  "bookings.cancelled_bookings": "ملغية",
+  "bookings.booking_details": "تفاصيل الحجز",
+  "bookings.unnamed_user": "مستخدم بدون اسم",
+  "bookings.booking_info": "معلومات الحجز",
+  "bookings.created_at": "تاريخ الإنشاء",
+  "bookings.updated_at": "تاريخ التحديث",
+  "bookings.user_info": "معلومات المستخدم",
+  "bookings.user_name": "الاسم",
+  "bookings.user_email": "البريد الإلكتروني",
+  "bookings.user_phone": "الهاتف",
+  "bookings.hall_info": "معلومات القاعة",
+  "bookings.hall_name": "اسم القاعة",
+  "bookings.branch_name": "الفرع",
+  "bookings.hall_capacity": "سعة القاعة",
+  "bookings.duration": "المدة",
+  "bookings.hours": "ساعات",
+  "bookings.people": "أشخاص",
+  "bookings.payment_info": "معلومات الدفع",
+  "bookings.base_amount": "المبلغ الأساسي",
+  "bookings.add_ons": "الإضافات",
+  "bookings.total_amount": "المبلغ الإجمالي",
+  "bookings.cancel_booking": "إلغاء الحجز",
+  "bookings.cancel_confirmation": "هل أنت متأكد من إلغاء هذا الحجز؟ لا يمكن التراجع عن هذا الإجراء.",
+  "staff.subtitle": "إدارة موظفي فرعك ووصولهم",
+  "staff.staff": "موظف",
+  "staff.staff_members": "موظفين",
+  "staff.total_staff": "إجمالي الموظفين",
+  "staff.active_staff": "نشط",
+  "staff.inactive_staff": "غير نشط",
+  "staff.create_title": "إنشاء موظف",
+  "staff.name_required": "أدخل الاسم",
+  "staff.email_required": "أدخل البريد الإلكتروني",
+  "staff.email_valid": "أدخل بريد إلكتروني صحيح",
+  "staff.phone_required": "أدخل رقم الهاتف",
+  "staff.password_required": "أدخل كلمة المرور",
+  "staff.password_min": "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
+  "staff.name_ph": "أدخل اسم الموظف",
+  "staff.email_ph": "أدخل البريد الإلكتروني",
+  "staff.phone_ph": "أدخل رقم الهاتف",
+  "staff.password_ph": "أدخل كلمة المرور",
+  "staff.notes": "ملاحظات (اختياري)",
+  "staff.notes_ph": "أدخل أي ملاحظات إضافية حول هذا الموظف",
+  "staff.create": "إنشاء موظف",
+  "staff.create_failed": "فشل إنشاء الموظف",
+  "staff.unnamed": "موظف بدون اسم",
+  "errors.forbidden": "غير مصرح"
+}
