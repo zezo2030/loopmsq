@@ -35,24 +35,31 @@ jobs:
               git reset --hard origin/master
             fi
 
-            # Write .env from GitHub Secrets (set first, then toggle as needed)
+            # Write .env from GitHub Secrets
             cat > .env << 'EOF'
-# POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-# JWT_SECRET=${{ secrets.JWT_SECRET }}
-# JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-# ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
-# ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
-# ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-# ADMIN_NAME=${{ secrets.ADMIN_NAME }}
-# ADMIN_PHONE=${{ secrets.ADMIN_PHONE }}
-# ADMIN_OVERWRITE=${{ secrets.ADMIN_OVERWRITE }}
-# NEXT_PUBLIC_API_BASE=${{ secrets.NEXT_PUBLIC_API_BASE }}
-# # Optional bootstrapping flags
-# DATABASE_SYNCHRONIZE=${{ secrets.DATABASE_SYNCHRONIZE }}
-# EOF
+POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+JWT_SECRET=${{ secrets.JWT_SECRET }}
+JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+ADMIN_NAME=${{ secrets.ADMIN_NAME }}
+ADMIN_PHONE=${{ secrets.ADMIN_PHONE }}
+ADMIN_OVERWRITE=${{ secrets.ADMIN_OVERWRITE }}
+NEXT_PUBLIC_API_BASE=${{ secrets.NEXT_PUBLIC_API_BASE }}
+DATABASE_SYNCHRONIZE=${{ secrets.DATABASE_SYNCHRONIZE }}
+EOF
+
+            # Install docker-compose if not present
+            if ! command -v docker compose &> /dev/null; then
+              sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+            fi
 
             # Bring up services
             docker compose -f docker-compose.prod.yml up -d --build
+
+            # Show status
+            docker compose -f docker-compose.prod.yml ps
 
             # Optional cleanup
             docker system prune -f || true
