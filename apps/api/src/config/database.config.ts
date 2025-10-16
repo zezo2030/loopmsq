@@ -14,8 +14,10 @@ export const getDatabaseConfig = (
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
   synchronize: configService.get<string>('NODE_ENV') === 'development',
   logging: configService.get<string>('NODE_ENV') === 'development',
-  ssl:
-    configService.get<string>('NODE_ENV') === 'production'
-      ? { rejectUnauthorized: false }
-      : false,
+  // Make SSL optional via env flag; default to disabled
+  ssl: (() => {
+    const sslEnv = (configService.get<string>('DATABASE_SSL') || '').toLowerCase();
+    const enabled = sslEnv === 'true' || sslEnv === '1' || sslEnv === 'yes';
+    return enabled ? { rejectUnauthorized: false } : false;
+  })(),
 });
