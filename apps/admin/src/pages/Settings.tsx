@@ -51,24 +51,61 @@ export default function Settings() {
       if (values.pixelId !== undefined) localStorage.setItem('settings.pixelId', values.pixelId)
 
       // Backend configs
-      const smsPayload: any = {
-        enabled: values.smsEnabled,
-        twilioFromNumber: values.twilioFromNumber,
-      }
-      if (values.twilioAccountSid && values.twilioAccountSid !== '****') smsPayload.twilioAccountSid = values.twilioAccountSid
-      if (values.twilioAuthToken && values.twilioAuthToken !== '****') smsPayload.twilioAuthToken = values.twilioAuthToken
-      await updateSmsConfig(smsPayload).catch(() => {})
+      try {
+        // SMS Config - فقط أرسل الحقول التي تم تغييرها أو المطلوبة
+        if (values.smsEnabled !== undefined || values.twilioFromNumber || values.twilioAccountSid || values.twilioAuthToken) {
+          const smsPayload: any = {}
 
-      const otpPayload: Partial<OtpConfig> = {
-        enabled: values.otpEnabled,
-        length: Number(values.otpLength || 6),
-        expirySeconds: Number(values.otpExpiry || 300),
-        rateTtlSeconds: Number(values.otpRateTtl || 300),
-        rateMaxAttempts: Number(values.otpRateMax || 3),
-      }
-      await updateOtpConfig(otpPayload).catch(() => {})
+          if (values.smsEnabled !== undefined) {
+            smsPayload.enabled = values.smsEnabled
+          }
 
-      message.success(t('settings.saved') || 'Saved')
+          if (values.twilioFromNumber) {
+            // تحقق من صحة رقم الهاتف
+            const phoneRegex = /^\+?[0-9]{7,15}$/
+            if (phoneRegex.test(values.twilioFromNumber)) {
+              smsPayload.twilioFromNumber = values.twilioFromNumber
+            } else {
+              message.error(t('settings.invalid_phone_format') || 'Invalid phone number format')
+              return
+            }
+          }
+
+          // فقط أضف Account SID إذا كان طوله مناسب وليس مخفي
+          if (values.twilioAccountSid &&
+              values.twilioAccountSid !== '****' &&
+              values.twilioAccountSid.length >= 10) {
+            smsPayload.twilioAccountSid = values.twilioAccountSid
+          }
+
+          // فقط أضف Auth Token إذا كان طوله مناسب وليس مخفي
+          if (values.twilioAuthToken &&
+              values.twilioAuthToken !== '****' &&
+              values.twilioAuthToken.length >= 10) {
+            smsPayload.twilioAuthToken = values.twilioAuthToken
+          }
+
+          // فقط أرسل إذا كان هناك بيانات للإرسال
+          if (Object.keys(smsPayload).length > 0) {
+            await updateSmsConfig(smsPayload)
+          }
+        }
+
+        // OTP Config
+        const otpPayload: Partial<OtpConfig> = {
+          enabled: values.otpEnabled,
+          length: Number(values.otpLength || 6),
+          expirySeconds: Number(values.otpExpiry || 300),
+          rateTtlSeconds: Number(values.otpRateTtl || 300),
+          rateMaxAttempts: Number(values.otpRateMax || 3),
+        }
+        await updateOtpConfig(otpPayload)
+
+        message.success(t('settings.saved') || 'Saved')
+      } catch (e: any) {
+        console.error('Settings save error:', e)
+        message.error(e?.message || (t('settings.save_failed') || 'Failed to save'))
+      }
     } catch (e: any) {
       message.error(e?.message || (t('settings.save_failed') || 'Failed to save'))
     } finally {

@@ -233,6 +233,7 @@
   "settings.test_sms": "اختبار الرسائل النصية",
   "settings.sms_test_success": "تم إرسال رسالة الاختبار",
   "settings.sms_test_failed": "فشل اختبار الرسائل النصية",
+  "settings.invalid_phone_format": "تنسيق رقم الهاتف غير صحيح",
   "common.save": "حفظ"
   ,
   "dashboard.kpi_bookings": "حجوزات",

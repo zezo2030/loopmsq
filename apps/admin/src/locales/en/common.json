@@ -233,6 +233,7 @@
   "settings.test_sms": "Test SMS",
   "settings.sms_test_success": "Test SMS sent",
   "settings.sms_test_failed": "SMS test failed",
+  "settings.invalid_phone_format": "Invalid phone number format",
   "common.save": "Save"
   ,
   "dashboard.kpi_bookings": "bookings",
