@@ -70,4 +70,40 @@ async function safeText(resp: Response): Promise<string | null> {
   try { return await resp.text() } catch { return null }
 }
 
+// Admin Config APIs
+export type SmsConfigMasked = {
+  enabled: boolean
+  provider: 'twilio'
+  twilioAccountSid?: string // masked '****'
+  twilioFromNumber?: string
+}
+
+export type OtpConfig = {
+  enabled: boolean
+  length: number
+  expirySeconds: number
+  rateTtlSeconds: number
+  rateMaxAttempts: number
+}
+
+export async function getSmsConfig(): Promise<SmsConfigMasked> {
+  return apiGet('/admin/config/sms')
+}
+
+export async function updateSmsConfig(body: Partial<{ enabled: boolean; provider: 'twilio'; twilioAccountSid: string; twilioAuthToken: string; twilioFromNumber: string }>): Promise<SmsConfigMasked> {
+  return apiPut('/admin/config/sms', body)
+}
+
+export async function testSms(to: string, message: string): Promise<{ success: boolean }> {
+  return apiPost('/admin/config/sms/test', { to, message })
+}
+
+export async function getOtpConfig(): Promise<OtpConfig> {
+  return apiGet('/admin/config/otp')
+}
+
+export async function updateOtpConfig(body: Partial<OtpConfig>): Promise<OtpConfig> {
+  return apiPut('/admin/config/otp', body)
+}
+
 

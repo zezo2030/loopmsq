@@ -32,6 +32,7 @@ import { CouponsModule } from './modules/coupons/coupons.module';
 import { PackagesModule } from './modules/packages/packages.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { SearchModule } from './modules/search/search.module';
+import { AdminConfigModule } from './modules/admin-config/admin-config.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { SearchModule } from './modules/search/search.module';
     PackagesModule,
     ReferralsModule,
     SearchModule,
+    AdminConfigModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],

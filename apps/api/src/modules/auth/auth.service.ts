@@ -46,12 +46,24 @@ export class AuthService {
     const lang: 'ar' | 'en' = language === 'en' ? 'en' : 'ar';
     const normalizedPhone = this.normalizePhone(sendOtpDto.phone);
 
-    // Rate limiting check
+    // Read OTP config from Redis
+    const otpCfg = ((await this.redisService.get('config:otp')) as any) || {
+      enabled: true,
+      length: 6,
+      expirySeconds: 300,
+      rateTtlSeconds: 300,
+      rateMaxAttempts: 3,
+    };
+    if (otpCfg.enabled === false) {
+      throw new BadRequestException('OTP is disabled by configuration');
+    }
+
+    // Rate limiting check (configurable)
     const rateLimitKey = `otp_rate:${normalizedPhone}`;
     const attempts = await this.redisService.incrementRateLimit(
       rateLimitKey,
-      300,
-    ); // 5 minutes
+      Number(otpCfg.rateTtlSeconds) || 300,
+    );
 
     if (attempts > 3) {
       throw new BadRequestException(
@@ -60,10 +72,14 @@ export class AuthService {
     }
 
     // Generate OTP
-    const otp = this.generateOtp();
+    const otp = this.generateOtp(otpCfg.length || 6);
 
     // Store OTP in Redis with 5 minutes expiry
-    await this.redisService.setOTP(normalizedPhone, otp, 300);
+    await this.redisService.setOTP(
+      normalizedPhone,
+      otp,
+      Number(otpCfg.expirySeconds) || 300,
+    );
 
     // Enqueue SMS OTP
     await this.notifications.enqueue({
@@ -112,25 +128,41 @@ export class AuthService {
       throw new ConflictException('Phone number already exists');
     }
 
-    // Rate limiting check
+    // Read OTP config from Redis
+    const otpCfg = ((await this.redisService.get('config:otp')) as any) || {
+      enabled: true,
+      length: 6,
+      expirySeconds: 300,
+      rateTtlSeconds: 300,
+      rateMaxAttempts: 3,
+    };
+    if (otpCfg.enabled === false) {
+      throw new BadRequestException('OTP is disabled by configuration');
+    }
+
+    // Rate limiting check (configurable)
     const rateLimitKey = `otp_register_rate:${normalizedPhone}`;
     const attempts = await this.redisService.incrementRateLimit(
       rateLimitKey,
-      300,
+      Number(otpCfg.rateTtlSeconds) || 300,
     );
-    if (attempts > 3) {
+    if (attempts > Number(otpCfg.rateMaxAttempts || 3)) {
       throw new BadRequestException(
         'Too many OTP requests. Please try again later.',
       );
     }
 
     // Generate OTP
-    const otp = this.generateOtp();
+    const otp = this.generateOtp(otpCfg.length || 6);
 
     // Store OTP and pending registration data (password hashed)
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    await this.redisService.setOTP(normalizedPhone, otp, 300); // 5 minutes for OTP
+    await this.redisService.setOTP(
+      normalizedPhone,
+      otp,
+      Number(otpCfg.expirySeconds) || 300,
+    ); // OTP expiry
     await this.redisService.set(
       `reg:${normalizedPhone}`,
       {
@@ -529,8 +561,11 @@ export class AuthService {
     };
   }
 
-  private generateOtp(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+  private generateOtp(length: number = 6): string {
+    const l = Math.min(Math.max(length, 4), 8);
+    const min = Math.pow(10, l - 1);
+    const max = Math.pow(10, l) - 1;
+    return Math.floor(min + Math.random() * (max - min)).toString();
   }
 
   private async generateTokens(user: User): Promise<{

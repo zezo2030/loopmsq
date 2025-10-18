@@ -21,7 +21,7 @@ import {
   StarOutlined,
   BarChartOutlined,
 } from '@ant-design/icons'
-import { DollarOutlined, WalletOutlined, RocketOutlined } from '@ant-design/icons'
+import { DollarOutlined, WalletOutlined, RocketOutlined, SettingOutlined } from '@ant-design/icons'
 import '../theme.css'
 import { useTranslation } from 'react-i18next'
 
@@ -68,6 +68,9 @@ export default function MainLayout() {
   }
   if (path.startsWith('/reports/overview')) {
     return ['reports-overview']
+  }
+  if (path.startsWith('/settings')) {
+    return ['settings']
   }
     return [path === '/' ? 'dashboard' : path.replace('/', '')]
   }
@@ -235,6 +238,11 @@ export default function MainLayout() {
         { key: 'reports-overview', icon: <BarChartOutlined />, label: <Link to="/admin/reports/overview">{t('menu.reports.overview')}</Link> },
       ],
     },
+    {
+      key: 'settings',
+      icon: <SettingOutlined />,
+      label: <Link to="/admin/settings">{t('menu.settings') || (t('settings.title') || 'Settings')}</Link>,
+    },
   ]
 
   return (
@@ -348,6 +356,8 @@ function getPageTitle(pathname: string): string {
   if (path === '/cms/coupons') return t('page.cms_coupons')
   if (path === '/cms/packages') return t('page.cms_packages')
   
+  if (path === '/settings') return t('settings.title')
+
   return t('page.admin_control')
 }
 

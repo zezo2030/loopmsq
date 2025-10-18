@@ -13,6 +13,7 @@ import { NotificationsController } from './notifications.controller';
 import { DeviceToken } from '../../database/entities/device-token.entity';
 import { PushProvider } from './providers/push.provider';
 import { PushProcessor } from './processors/push.processor';
+import { RedisService } from '../../utils/redis.service';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { PushProcessor } from './processors/push.processor';
     ),
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService, SmsProcessor, EmailProcessor, PushProcessor, SmsProvider, EmailProvider, PushProvider, EncryptionService],
+  providers: [NotificationsService, SmsProcessor, EmailProcessor, PushProcessor, SmsProvider, EmailProvider, PushProvider, EncryptionService, RedisService],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}
