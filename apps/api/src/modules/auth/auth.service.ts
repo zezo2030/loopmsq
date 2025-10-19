@@ -174,8 +174,14 @@ export class AuthService {
       900,
     ); // 15 minutes for registration data
 
-    // TODO: Integrate SMS provider here
-    this.logger.log(`Registration OTP for ${normalizedPhone}: ${otp}`);
+    // Enqueue SMS OTP for registration
+    await this.notifications.enqueue({
+      type: 'OTP',
+      to: { phone: normalizedPhone },
+      data: { otp },
+      lang: language as 'ar' | 'en',
+      channels: ['sms'],
+    });
 
     const message =
       language === 'ar'
