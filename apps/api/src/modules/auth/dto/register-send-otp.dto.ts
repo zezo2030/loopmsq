@@ -4,6 +4,7 @@ import {
   IsString,
   MinLength,
   IsOptional,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -22,7 +23,8 @@ export class RegisterSendOtpDto {
     required: false,
   })
   @IsOptional()
-  @IsPhoneNumber()
+  @ValidateIf((o) => o.phone && o.phone.trim() !== '')
+  @IsPhoneNumber('SA', { message: 'Phone must be a valid phone number' })
   phone?: string;
 
   @ApiProperty({ description: 'Account password', example: 'StrongPass#2025' })
