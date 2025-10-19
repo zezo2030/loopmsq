@@ -60,6 +60,12 @@ services:
       ADMIN_NAME: Admin
       ADMIN_PHONE: +966500000000
       ADMIN_OVERWRITE: 'true'
+      # SMTP Email Configuration
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: zezosaad194@gmail.com
+      SMTP_PASS: yluw wgiu gogn ohys
+      SMTP_FROM: zezosaad194@gmail.com
     ports:
       - "3000:3000"
     depends_on:

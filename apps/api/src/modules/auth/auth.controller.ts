@@ -24,12 +24,16 @@ import { UserLoginDto } from './dto/user-login.dto';
 import { StaffLoginDto } from './dto/staff-login.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @ApiTags('auth')
 @Controller('auth')
 @UseGuards(ThrottlerGuard)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   @Post('otp/send')
   @HttpCode(HttpStatus.OK)
@@ -109,5 +113,12 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async userLogin(@Body() dto: UserLoginDto) {
     return this.authService.userLogin(dto);
+  }
+
+  @Get('email-config')
+  @ApiOperation({ summary: 'Check email configuration status' })
+  @ApiResponse({ status: 200, description: 'Email configuration status' })
+  async checkEmailConfig() {
+    return this.notificationsService.getEmailConfigStatus();
   }
 }

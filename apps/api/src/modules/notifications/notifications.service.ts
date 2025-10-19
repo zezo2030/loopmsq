@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { DeviceToken } from '../../database/entities/device-token.entity';
 import { EncryptionService } from '../../utils/encryption.util';
+import { EmailProvider } from './providers/email.provider';
 
 export type NotificationChannel = 'sms' | 'email' | 'push';
 
@@ -42,6 +43,7 @@ export class NotificationsService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(DeviceToken) private readonly tokenRepo: Repository<DeviceToken>,
     private readonly encryption: EncryptionService,
+    private readonly emailProvider: EmailProvider,
   ) {}
 
   async enqueue(n: EnqueueNotification): Promise<void> {
@@ -205,6 +207,13 @@ export class NotificationsService {
       default:
         return String(d.message || (lang === 'ar' ? 'تنبيه' : 'Notification'));
     }
+  }
+
+  /**
+   * Get email configuration status for debugging
+   */
+  getEmailConfigStatus() {
+    return this.emailProvider.getConfigStatus();
   }
 }
 
