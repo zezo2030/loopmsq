@@ -18,16 +18,15 @@ import { SupportTicket } from './support-ticket.entity';
 import { SchoolTripRequest } from './school-trip-request.entity';
 
 @Entity('users')
-@Index(['phone'], { unique: true })
 @Index(['email'], { unique: true, where: 'email IS NOT NULL' })
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 255, unique: true, nullable: true })
-  phone: string;
-
   @Column({ type: 'varchar', length: 255, nullable: true })
+  phone?: string;
+
+  @Column({ type: 'varchar', length: 255, unique: true })
   email: string;
 
   @Column({ type: 'varchar', length: 100 })

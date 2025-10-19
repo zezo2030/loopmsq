@@ -17,11 +17,13 @@ export class RegisterSendOtpDto {
   email: string;
 
   @ApiProperty({
-    description: 'Phone number in international format',
+    description: 'Phone number in international format (optional)',
     example: '+966501234567',
+    required: false,
   })
+  @IsOptional()
   @IsPhoneNumber()
-  phone: string;
+  phone?: string;
 
   @ApiProperty({ description: 'Account password', example: 'StrongPass#2025' })
   @IsString()

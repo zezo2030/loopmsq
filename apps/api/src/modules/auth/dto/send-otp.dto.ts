@@ -1,16 +1,16 @@
-import { IsPhoneNumber, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SendOtpDto {
   @ApiProperty({
-    description: 'Phone number in international format',
-    example: '+966501234567',
+    description: 'Email address',
+    example: 'user@example.com',
   })
-  @IsPhoneNumber()
-  phone: string;
+  @IsEmail()
+  email: string;
 
   @ApiProperty({
-    description: 'Language preference for SMS',
+    description: 'Language preference for email',
     example: 'ar',
     required: false,
   })
