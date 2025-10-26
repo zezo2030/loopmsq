@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, DatePicker, Form, Input, Modal, Switch, Table, message } from 'antd'
+import { Button, DatePicker, Form, Input, Modal, Switch, Table, message, Upload } from 'antd'
+import { UploadOutlined } from '@ant-design/icons'
 import { useState } from 'react'
-import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
+import { apiDelete, apiGet, apiPatch, apiPost, apiUpload } from '../../api'
 import dayjs from 'dayjs'
 
 type Banner = {
@@ -20,6 +21,18 @@ export default function Banners() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Banner | null>(null)
   const [form] = Form.useForm()
+
+  const handleImageUpload = async (file: File) => {
+    try {
+      const result = await apiUpload('/admin/banners/upload', file)
+      form.setFieldsValue({ imageUrl: result.url })
+      message.success('Image uploaded successfully')
+      return false // Prevent default upload
+    } catch (error) {
+      message.error('Failed to upload image')
+      return false
+    }
+  }
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<Banner>) => apiPost<Banner>('/admin/banners', body),
@@ -79,8 +92,25 @@ export default function Banners() {
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="imageUrl" label="Image URL" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item name="imageUrl" label="Image" rules={[{ required: true }]}>
+            <div>
+              <Upload
+                beforeUpload={handleImageUpload}
+                showUploadList={false}
+                accept="image/*"
+              >
+                <Button icon={<UploadOutlined />}>Upload Image</Button>
+              </Upload>
+              {form.getFieldValue('imageUrl') && (
+                <div style={{ marginTop: 8 }}>
+                  <img 
+                    src={form.getFieldValue('imageUrl')} 
+                    alt="Preview" 
+                    style={{ width: 200, height: 'auto', border: '1px solid #d9d9d9', borderRadius: 4 }} 
+                  />
+                </div>
+              )}
+            </div>
           </Form.Item>
           <Form.Item name="link" label="Link">
             <Input />

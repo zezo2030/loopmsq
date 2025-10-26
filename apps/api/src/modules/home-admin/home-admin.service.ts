@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { RedisService } from '../../utils/redis.service';
 import { Banner } from '../../database/entities/banner.entity';
 import { Offer } from '../../database/entities/offer.entity';
+import { BadRequestException } from '@nestjs/common';
 
 @Injectable()
 export class HomeAdminService {
@@ -53,6 +54,31 @@ export class HomeAdminService {
     const res = await this.offerRepo.delete(id);
     await this.redis.del('home:v1');
     return res;
+  }
+
+  async uploadBannerImage(file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // Validate file type
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Only image files (jpg, jpeg, png, gif, webp) are allowed');
+    }
+
+    // Validate file size (5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      throw new BadRequestException('File size must be less than 5MB');
+    }
+
+    return {
+      filename: file.filename,
+      originalName: file.originalname,
+      size: file.size,
+      url: `/uploads/banners/${file.filename}`,
+    };
   }
 }
 
