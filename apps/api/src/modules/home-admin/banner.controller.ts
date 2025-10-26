@@ -46,12 +46,7 @@ export class BannerAdminController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: (req, file, cb) => {
-          const uploadPath = process.env.NODE_ENV === 'production' 
-            ? '/app/uploads/banners' 
-            : './uploads/banners';
-          cb(null, uploadPath);
-        },
+        destination: './uploads/banners',
         filename: (req, file, cb) => {
           const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
           cb(null, unique + extname(file.originalname));
