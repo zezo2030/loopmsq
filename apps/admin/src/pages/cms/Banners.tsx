@@ -24,7 +24,7 @@ export default function Banners() {
 
   const handleImageUpload = async (file: File) => {
     try {
-      const result = await apiUpload('/admin/banners/upload', file)
+      const result = await apiUpload<{url: string}>('/admin/banners/upload', file)
       form.setFieldsValue({ imageUrl: result.url })
       message.success('Image uploaded successfully')
       return false // Prevent default upload
