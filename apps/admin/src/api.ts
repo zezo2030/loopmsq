@@ -66,22 +66,6 @@ export async function apiDelete<T>(path: string): Promise<T> {
   try { return await resp.json() } catch { return undefined as unknown as T }
 }
 
-export async function apiUpload<T>(path: string, file: File): Promise<T> {
-  const token = localStorage.getItem('accessToken')
-  const formData = new FormData()
-  formData.append('file', file)
-  
-  const resp = await fetch(`${getApiBase()}${path}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  })
-  if (!resp.ok) throw new Error(await safeText(resp) || 'Upload failed')
-  return resp.json()
-}
-
 async function safeText(resp: Response): Promise<string | null> {
   try { return await resp.text() } catch { return null }
 }
