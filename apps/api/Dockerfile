@@ -16,5 +16,9 @@ WORKDIR /app/apps/api
 ENV NODE_ENV=production
 COPY --from=deps /app/apps/api/node_modules ./node_modules
 COPY --from=build /app/apps/api/dist ./dist
+
+# إنشاء مجلد uploads مع الصلاحيات المناسبة
+RUN mkdir -p /app/uploads/banners && chmod -R 755 /app/uploads
+
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

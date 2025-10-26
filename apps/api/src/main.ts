@@ -88,7 +88,7 @@ async function bootstrap() {
   }
 
   // Serve static files
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+  app.useStaticAssets(join(__dirname, '..', '..', 'uploads'), {
     prefix: '/uploads/',
   });
 
