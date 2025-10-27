@@ -50,6 +50,16 @@ type BookingRow = {
   couponCode?: string
   discountAmount?: number
   createdAt: string
+  // Pricing details from backend
+  pricing?: {
+    basePrice: number
+    hourlyPrice: number
+    personsPrice: number
+    pricePerPerson: number
+    multiplier: number
+    decorationPrice: number
+    totalPrice: number
+  }
 }
 
 type BookingStats = {
@@ -546,7 +556,49 @@ export default function BookingsList() {
                 expandedRowRender: (record) => (
                   <div style={{ paddingInlineEnd: '24px' }}>
                     <Row gutter={[16, 8]}>
-                      <Col xs={24} md={12}>
+                      {/* Pricing Details */}
+                      {record.pricing && (
+                        <Col xs={24} md={8}>
+                          <div style={{ fontWeight: 600, marginBottom: 8, color: '#1890ff' }}>تفصيل التسعير</div>
+                          <div style={{ fontSize: '12px', lineHeight: '1.6' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span>السعر الأساسي:</span>
+                              <span>{record.pricing.basePrice?.toLocaleString() || 0} ر.س</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span>السعر بالساعة:</span>
+                              <span>{record.pricing.hourlyPrice?.toLocaleString() || 0} ر.س</span>
+                            </div>
+                            {record.pricing.pricePerPerson > 0 && (
+                              <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                  <span>السعر لكل شخص:</span>
+                                  <span style={{ color: '#52c41a' }}>{record.pricing.pricePerPerson?.toLocaleString() || 0} ر.س</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                  <span>إجمالي الأشخاص:</span>
+                                  <span style={{ color: '#52c41a' }}>{record.pricing.personsPrice?.toLocaleString() || 0} ر.س</span>
+                                </div>
+                              </>
+                            )}
+                            {record.pricing.decorationPrice > 0 && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span>سعر الديكور:</span>
+                                <span>{record.pricing.decorationPrice?.toLocaleString() || 0} ر.س</span>
+                              </div>
+                            )}
+                            {record.pricing.multiplier !== 1 && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span>المضاعف:</span>
+                                <span style={{ color: '#fa8c16' }}>× {record.pricing.multiplier || 1}</span>
+                              </div>
+                            )}
+                          </div>
+                        </Col>
+                      )}
+                      
+                      {/* Add-ons */}
+                      <Col xs={24} md={record.pricing ? 8 : 12}>
                         <div style={{ fontWeight: 600, marginBottom: 8 }}>الإضافات</div>
                         {(record.addOns && record.addOns.length > 0) ? (
                           <ul style={{ margin: 0, paddingInlineStart: 18 }}>
@@ -560,7 +612,9 @@ export default function BookingsList() {
                           <div style={{ color: '#8c8c8c' }}>لا توجد إضافات</div>
                         )}
                       </Col>
-                      <Col xs={24} md={12}>
+                      
+                      {/* Coupon and Discount */}
+                      <Col xs={24} md={record.pricing ? 8 : 12}>
                         <div style={{ fontWeight: 600, marginBottom: 8 }}>الكوبون والخصم</div>
                         {record.couponCode ? (
                           <Space>

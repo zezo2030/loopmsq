@@ -716,4 +716,37 @@ export class BookingsService {
       return coupon.value;
     }
   }
+
+  async getBookingPricing(bookingId: string): Promise<{
+    basePrice: number;
+    hourlyPrice: number;
+    personsPrice: number;
+    pricePerPerson: number;
+    multiplier: number;
+    decorationPrice: number;
+    totalPrice: number;
+  }> {
+    const booking = await this.bookingRepository.findOne({
+      where: { id: bookingId },
+      relations: ['hall'],
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (!booking.hallId) {
+      throw new BadRequestException('Booking has no associated hall');
+    }
+
+    // Calculate pricing using the same logic as quote calculation
+    const pricing = await this.contentService.calculateHallPrice(
+      booking.hallId,
+      booking.startTime,
+      booking.durationHours,
+      booking.persons,
+    );
+
+    return pricing;
+  }
 }

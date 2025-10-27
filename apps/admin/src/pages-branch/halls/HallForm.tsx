@@ -32,6 +32,7 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
         pricing: {
           base: hall.priceConfig?.basePrice,
           hourly: hall.priceConfig?.hourlyRate,
+          pricePerPerson: hall.priceConfig?.pricePerPerson,
           weekend: hall.priceConfig?.weekendMultiplier,
           holiday: hall.priceConfig?.holidayMultiplier,
           decoration: hall.priceConfig?.decorationPrice,
@@ -77,6 +78,7 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
         priceConfig: {
           basePrice: Number(values.pricing?.base || 0),
           hourlyRate: Number(values.pricing?.hourly || 0),
+          pricePerPerson: Number(values.pricing?.pricePerPerson || 0),
           weekendMultiplier: Number(values.pricing?.weekend || 1),
           holidayMultiplier: Number(values.pricing?.holiday || 1),
           decorationPrice: values.pricing?.decoration != null ? Number(values.pricing.decoration) : undefined,
@@ -202,6 +204,18 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
               min={0} 
               style={{ width: '100%' }} 
               placeholder={t('halls.hourly_rate_ph') || 'Enter hourly rate'} 
+            />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Form.Item
+            label={t('halls.price_per_person') || 'Price Per Person (SAR)'}
+            name={['pricing', 'pricePerPerson']}
+          >
+            <InputNumber 
+              min={0} 
+              style={{ width: '100%' }} 
+              placeholder={t('halls.price_per_person_ph') || 'Enter price per person'} 
             />
           </Form.Item>
         </Col>

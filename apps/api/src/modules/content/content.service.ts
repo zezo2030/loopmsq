@@ -287,6 +287,8 @@ export class ContentService {
   ): Promise<{
     basePrice: number;
     hourlyPrice: number;
+    personsPrice: number;
+    pricePerPerson: number;
     multiplier: number;
     decorationPrice: number;
     totalPrice: number;
@@ -310,16 +312,20 @@ export class ContentService {
 
     const basePrice = priceConfig.basePrice;
     const hourlyPrice = priceConfig.hourlyRate * durationHours;
+    const pricePerPerson = priceConfig.pricePerPerson || 0;
+    const personsPrice = pricePerPerson * persons;
     const decorationPrice = hall.isDecorated
       ? priceConfig.decorationPrice || 0
       : 0;
 
-    const subtotal = basePrice + hourlyPrice + decorationPrice;
+    const subtotal = basePrice + hourlyPrice + personsPrice + decorationPrice;
     const totalPrice = subtotal * multiplier;
 
     return {
       basePrice,
       hourlyPrice,
+      personsPrice,
+      pricePerPerson,
       multiplier,
       decorationPrice,
       totalPrice: Math.round(totalPrice * 100) / 100, // Round to 2 decimal places

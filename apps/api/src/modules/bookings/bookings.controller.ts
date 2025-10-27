@@ -139,6 +139,14 @@ export class BookingsController {
     return this.bookingsService.getBookingTickets(id, user.id, user.branchId, isManager);
   }
 
+  @Get(':id/pricing')
+  @ApiOperation({ summary: 'Get detailed pricing for existing booking' })
+  @ApiResponse({ status: 200, description: 'Pricing details retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
+  async getBookingPricing(@Param('id', ParseUUIDPipe) id: string) {
+    return this.bookingsService.getBookingPricing(id);
+  }
+
   @Post(':id/cancel')
   @ApiOperation({ summary: 'Cancel booking' })
   @ApiResponse({ status: 200, description: 'Booking cancelled successfully' })

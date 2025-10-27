@@ -70,6 +70,16 @@ type Booking = {
   cancellationReason?: string
   createdAt: string
   updatedAt: string
+  // Pricing details from backend
+  pricing?: {
+    basePrice: number
+    hourlyPrice: number
+    personsPrice: number
+    pricePerPerson: number
+    multiplier: number
+    decorationPrice: number
+    totalPrice: number
+  }
 }
 
 type Ticket = {
@@ -437,6 +447,66 @@ export default function BookingDetail() {
             <Col xs={24} lg={8}>
               <Card className="custom-card" title="تفاصيل السعر" extra={<DollarOutlined />}>
                 <Space direction="vertical" style={{ width: '100%' }}>
+                  {/* Detailed Pricing Breakdown */}
+                  {booking.pricing && (
+                    <>
+                      <div style={{ fontWeight: '600', marginBottom: '8px', color: '#1890ff' }}>
+                        تفصيل التسعير:
+                      </div>
+                      
+                      {/* Base Price */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                        <span>السعر الأساسي:</span>
+                        <span style={{ fontWeight: '500' }}>
+                          {booking.pricing.basePrice.toLocaleString()} ر.س
+                        </span>
+                      </div>
+                      
+                      {/* Hourly Price */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                        <span>السعر بالساعة ({booking.durationHours} ساعات):</span>
+                        <span style={{ fontWeight: '500' }}>
+                          {booking.pricing.hourlyPrice.toLocaleString()} ر.س
+                        </span>
+                      </div>
+                      
+                      {/* Persons Price */}
+                      {booking.pricing.pricePerPerson > 0 && (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                            <span>السعر لكل شخص ({booking.persons} أشخاص):</span>
+                            <span style={{ fontWeight: '500', color: '#52c41a' }}>
+                              {booking.pricing.pricePerPerson.toLocaleString()} ر.س × {booking.persons} = {booking.pricing.personsPrice.toLocaleString()} ر.س
+                            </span>
+                          </div>
+                        </>
+                      )}
+                      
+                      {/* Decoration Price */}
+                      {booking.pricing.decorationPrice > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                          <span>سعر الديكور:</span>
+                          <span style={{ fontWeight: '500' }}>
+                            {booking.pricing.decorationPrice.toLocaleString()} ر.س
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Multiplier */}
+                      {booking.pricing.multiplier !== 1 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                          <span>المضاعف ({booking.pricing.multiplier === 1.5 ? 'نهاية الأسبوع' : 'عطلة'}):</span>
+                          <span style={{ fontWeight: '500', color: '#fa8c16' }}>
+                            × {booking.pricing.multiplier}
+                          </span>
+                        </div>
+                      )}
+                      
+                      <Divider style={{ margin: '8px 0' }} />
+                    </>
+                  )}
+
+                  {/* Add-ons */}
                   {booking.addOns && booking.addOns.length > 0 && (
                     <>
                       <div style={{ fontWeight: '600', marginBottom: '8px' }}>الإضافات:</div>
@@ -462,6 +532,7 @@ export default function BookingDetail() {
                     </>
                   )}
 
+                  {/* Coupon and Discount */}
                   {booking.couponCode && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <div>

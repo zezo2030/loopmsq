@@ -151,11 +151,73 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
           <DollarOutlined style={{ marginRight: '8px' }} />
           {t('bookings.payment_info') || 'Payment Information'}
         </Title>
+        
+        {/* Detailed Pricing Breakdown */}
+        {booking.pricing && (
+          <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#1890ff' }}>
+              تفصيل التسعير
+            </div>
+            <Row gutter={[16, 8]}>
+              <Col xs={24} sm={12}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span>السعر الأساسي:</span>
+                  <span style={{ fontWeight: '500' }}>{booking.pricing.basePrice?.toLocaleString() || 0} ر.س</span>
+                </div>
+              </Col>
+              <Col xs={24} sm={12}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span>السعر بالساعة:</span>
+                  <span style={{ fontWeight: '500' }}>{booking.pricing.hourlyPrice?.toLocaleString() || 0} ر.س</span>
+                </div>
+              </Col>
+              {booking.pricing.pricePerPerson > 0 && (
+                <>
+                  <Col xs={24} sm={12}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span>السعر لكل شخص:</span>
+                      <span style={{ fontWeight: '500', color: '#52c41a' }}>
+                        {booking.pricing.pricePerPerson?.toLocaleString() || 0} ر.س
+                      </span>
+                    </div>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span>إجمالي سعر الأشخاص:</span>
+                      <span style={{ fontWeight: '500', color: '#52c41a' }}>
+                        {booking.pricing.personsPrice?.toLocaleString() || 0} ر.س
+                      </span>
+                    </div>
+                  </Col>
+                </>
+              )}
+              {booking.pricing.decorationPrice > 0 && (
+                <Col xs={24} sm={12}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span>سعر الديكور:</span>
+                    <span style={{ fontWeight: '500' }}>{booking.pricing.decorationPrice?.toLocaleString() || 0} ر.س</span>
+                  </div>
+                </Col>
+              )}
+              {booking.pricing.multiplier !== 1 && (
+                <Col xs={24} sm={12}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span>المضاعف:</span>
+                    <span style={{ fontWeight: '500', color: '#fa8c16' }}>
+                      × {booking.pricing.multiplier || 1}
+                    </span>
+                  </div>
+                </Col>
+              )}
+            </Row>
+          </div>
+        )}
+        
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={8}>
             <Statistic
               title={t('bookings.base_amount') || 'Base Amount'}
-              value={booking.baseAmount || 0}
+              value={booking.baseAmount || booking.pricing?.basePrice || 0}
               suffix="SAR"
               valueStyle={{ fontSize: '18px', color: '#3b82f6' }}
             />
@@ -171,7 +233,7 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
           <Col xs={24} sm={8}>
             <Statistic
               title={t('bookings.total_amount') || 'Total Amount'}
-              value={booking.amount || 0}
+              value={booking.amount || booking.totalPrice || 0}
               suffix="SAR"
               valueStyle={{ fontSize: '20px', color: '#ef4444', fontWeight: 'bold' }}
             />

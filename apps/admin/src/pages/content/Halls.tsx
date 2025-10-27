@@ -16,6 +16,7 @@ type Hall = {
   priceConfig: {
     basePrice: number
     hourlyRate: number
+    pricePerPerson: number
     weekendMultiplier: number
     holidayMultiplier: number
     decorationPrice?: number
@@ -146,6 +147,14 @@ export default function Halls() {
             ),
           },
           {
+            key: 'perPerson',
+            label: (
+              <div>
+                <strong>{t('halls.price_per_person') || 'Per Person'}:</strong> {formatCurrency(price.pricePerPerson)}
+              </div>
+            ),
+          },
+          {
             key: 'weekend',
             label: (
               <div>
@@ -263,6 +272,7 @@ export default function Halls() {
               priceConfig: {
                 basePrice: Number(values.price_basePrice || 0),
                 hourlyRate: Number(values.price_hourlyRate || 0),
+                pricePerPerson: Number(values.price_pricePerPerson || 0),
                 weekendMultiplier: Number(values.price_weekendMultiplier || 1),
                 holidayMultiplier: Number(values.price_holidayMultiplier || 1),
                 decorationPrice: values.price_decorationPrice != null ? Number(values.price_decorationPrice) : undefined,
@@ -313,22 +323,29 @@ export default function Halls() {
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="price_weekendMultiplier" label={t('halls.price_weekend') || 'Weekend x'}>
-                <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
+              <Form.Item name="price_pricePerPerson" label={t('halls.price_per_person') || 'Per Person'}>
+                <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="price_holidayMultiplier" label={t('halls.price_holiday') || 'Holiday x'}>
+              <Form.Item name="price_weekendMultiplier" label={t('halls.price_weekend') || 'Weekend x'}>
                 <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={6}>
+              <Form.Item name="price_holidayMultiplier" label={t('halls.price_holiday') || 'Holiday x'}>
+                <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
               <Form.Item name="price_decorationPrice" label={t('halls.price_decoration') || 'Decoration'}>
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
+          </Row>
+          <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="isDecorated" label={t('halls.decorated') || 'مزينة'} valuePropName="checked">
                 <Select

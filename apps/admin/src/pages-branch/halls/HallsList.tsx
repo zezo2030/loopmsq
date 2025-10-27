@@ -140,6 +140,14 @@ export default function HallsList() {
             ),
           },
           {
+            key: 'perPerson',
+            label: (
+              <div>
+                <strong>{t('halls.price_per_person') || 'Per Person'}:</strong> {formatCurrency(price.pricePerPerson)}
+              </div>
+            ),
+          },
+          {
             key: 'weekend',
             label: (
               <div>

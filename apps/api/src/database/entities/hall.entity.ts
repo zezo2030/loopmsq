@@ -27,6 +27,7 @@ export class Hall {
   priceConfig: {
     basePrice: number;
     hourlyRate: number;
+    pricePerPerson: number;
     weekendMultiplier: number;
     holidayMultiplier: number;
     decorationPrice?: number;

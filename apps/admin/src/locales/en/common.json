@@ -182,6 +182,8 @@
   "halls.create_title": "Create Hall",
   "halls.price_base": "Base",
   "halls.price_hourly": "Hourly",
+  "halls.price_per_person": "Per Person",
+  "halls.price_per_person_ph": "Enter price per person",
   "halls.price_weekend": "Weekend x",
   "halls.price_holiday": "Holiday x",
   "halls.price_decoration": "Decoration",

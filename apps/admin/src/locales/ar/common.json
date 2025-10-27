@@ -182,6 +182,8 @@
   "halls.create_title": "إنشاء قاعة",
   "halls.price_base": "أساسي",
   "halls.price_hourly": "بالساعة",
+  "halls.price_per_person": "لكل شخص",
+  "halls.price_per_person_ph": "أدخل السعر لكل شخص",
   "halls.price_weekend": "نهاية الأسبوع x",
   "halls.price_holiday": "العطل x",
   "halls.price_decoration": "الزينة",
