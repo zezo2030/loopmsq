@@ -47,88 +47,110 @@ export class BookingsService {
     totalPrice: number;
     available: boolean;
   }> {
-    const {
-      branchId,
-      hallId,
-      startTime,
-      durationHours,
-      persons,
-      addOns = [],
-      couponCode,
-    } = quoteDto;
-
-    // Find available hall if not specified
-    let selectedHall: Hall;
-    if (hallId) {
-      selectedHall = await this.contentService.findHallById(hallId);
-    } else {
-      // Find available hall in the branch
-      const availableHalls = await this.findAvailableHalls(
+    try {
+      this.logger.log(`Getting quote for branch: ${quoteDto.branchId}, hall: ${quoteDto.hallId || 'auto'}`);
+      
+      const {
         branchId,
+        hallId,
+        startTime,
+        durationHours,
+        persons,
+        addOns = [],
+        couponCode,
+      } = quoteDto;
+
+      // Find available hall if not specified
+      let selectedHall: Hall;
+      if (hallId) {
+        this.logger.log(`Looking for specific hall: ${hallId}`);
+        selectedHall = await this.contentService.findHallById(hallId);
+        this.logger.log(`Found hall: ${selectedHall.name_en} with capacity: ${selectedHall.capacity}`);
+      } else {
+        this.logger.log(`Looking for available halls in branch: ${branchId}`);
+        // Find available hall in the branch
+        const availableHalls = await this.findAvailableHalls(
+          branchId,
+          new Date(startTime),
+          durationHours,
+          persons,
+        );
+        this.logger.log(`Found ${availableHalls.length} available halls`);
+        
+        if (availableHalls.length === 0) {
+          throw new BadRequestException(
+            'No available halls for the specified time and capacity',
+          );
+        }
+        selectedHall = availableHalls[0]; // Select the first available hall
+        this.logger.log(`Selected hall: ${selectedHall.name_en} with capacity: ${selectedHall.capacity}`);
+      }
+
+      // Check availability
+      this.logger.log(`Checking availability for hall: ${selectedHall.id}`);
+      const isAvailable = await this.contentService.checkHallAvailability(
+        selectedHall.id,
+        new Date(startTime),
+        durationHours,
+      );
+      this.logger.log(`Hall availability: ${isAvailable}`);
+
+      if (!isAvailable) {
+        throw new ConflictException(
+          'Selected hall is not available for the specified time',
+        );
+      }
+
+      // Calculate pricing
+      this.logger.log(`Calculating pricing for hall: ${selectedHall.id}`);
+      const pricing = await this.contentService.calculateHallPrice(
+        selectedHall.id,
         new Date(startTime),
         durationHours,
         persons,
       );
-      if (availableHalls.length === 0) {
-        throw new BadRequestException(
-          'No available halls for the specified time and capacity',
+      this.logger.log(`Pricing calculated: ${JSON.stringify(pricing)}`);
+
+      // Calculate add-ons cost
+      const addOnsCost = addOns.reduce((total, addOn) => {
+        // In a real implementation, you would fetch add-on prices from database
+        const addOnPrice = 50; // Mock price
+        return total + addOnPrice * addOn.quantity;
+      }, 0);
+
+      // Apply coupon discount
+      let discount = 0;
+      if (couponCode) {
+        this.logger.log(`Applying coupon: ${couponCode}`);
+        discount = await this.calculateCouponDiscount(
+          couponCode,
+          pricing.totalPrice + addOnsCost,
         );
+        this.logger.log(`Discount applied: ${discount}`);
       }
-      selectedHall = availableHalls[0]; // Select the first available hall
+
+      const totalPrice = pricing.totalPrice + addOnsCost - discount;
+
+      const result = {
+        hallId: selectedHall.id,
+        hallName: selectedHall.name_en,
+        pricing,
+        addOns: addOns.map((addOn) => ({
+          ...addOn,
+          price: 50, // Mock price
+          total: 50 * addOn.quantity,
+        })),
+        discount,
+        totalPrice: Math.round(totalPrice * 100) / 100,
+        available: isAvailable,
+      };
+
+      this.logger.log(`Quote result: ${JSON.stringify(result)}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Error in getQuote: ${error.message}`, error.stack);
+      throw error;
     }
-
-    // Check availability
-    const isAvailable = await this.contentService.checkHallAvailability(
-      selectedHall.id,
-      new Date(startTime),
-      durationHours,
-    );
-
-    if (!isAvailable) {
-      throw new ConflictException(
-        'Selected hall is not available for the specified time',
-      );
-    }
-
-    // Calculate pricing
-    const pricing = await this.contentService.calculateHallPrice(
-      selectedHall.id,
-      new Date(startTime),
-      durationHours,
-      persons,
-    );
-
-    // Calculate add-ons cost
-    const addOnsCost = addOns.reduce((total, addOn) => {
-      // In a real implementation, you would fetch add-on prices from database
-      const addOnPrice = 50; // Mock price
-      return total + addOnPrice * addOn.quantity;
-    }, 0);
-
-    // Apply coupon discount
-    let discount = 0;
-    if (couponCode) {
-      discount = await this.calculateCouponDiscount(
-        couponCode,
-        pricing.totalPrice + addOnsCost,
-      );
-    }
-
-    const totalPrice = pricing.totalPrice + addOnsCost - discount;
-
-    return {
-      hallId: selectedHall.id,
-      hallName: selectedHall.name_en,
-      pricing,
-      addOns: addOns.map((addOn) => ({
-        ...addOn,
-        price: 50, // Mock price
-        total: 50 * addOn.quantity,
-      })),
-      discount,
-      totalPrice: Math.round(totalPrice * 100) / 100,
-      available: isAvailable,
-    };
   }
 
   async createBooking(

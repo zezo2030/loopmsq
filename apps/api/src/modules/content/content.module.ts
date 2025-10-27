@@ -5,6 +5,7 @@ import { ContentService } from './content.service';
 import { Branch } from '../../database/entities/branch.entity';
 import { Hall } from '../../database/entities/hall.entity';
 import { RedisService } from '../../utils/redis.service';
+import { SampleDataSeeder } from '../../database/seeders/sample-data.seeder';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Branch, Hall])],
@@ -12,6 +13,7 @@ import { RedisService } from '../../utils/redis.service';
   providers: [
     ContentService,
     RedisService,
+    SampleDataSeeder,
   ],
   exports: [ContentService],
 })
