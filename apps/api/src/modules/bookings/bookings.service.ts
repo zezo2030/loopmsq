@@ -376,6 +376,25 @@ export class BookingsService {
       }
     }
 
+    // Log bookings with missing branch data for debugging and try to fix them
+    const bookingsWithoutBranch = bookings.filter(b => !b.branch);
+    if (bookingsWithoutBranch.length > 0) {
+      this.logger.warn(`Found ${bookingsWithoutBranch.length} bookings without branch data in branch ${branchId}: ${bookingsWithoutBranch.map(b => b.id).join(', ')}`);
+      
+      // Try to load branch data manually for each booking
+      for (const booking of bookingsWithoutBranch) {
+        if (booking.branchId) {
+          try {
+            const branch = await this.contentService.findBranchById(booking.branchId);
+            booking.branch = branch;
+            this.logger.log(`Successfully loaded branch manually for booking ${booking.id}`);
+          } catch (error) {
+            this.logger.error(`Failed to load branch ${booking.branchId} for booking ${booking.id}`, error);
+          }
+        }
+      }
+    }
+
     this.logger.log(`Found ${total} bookings for branch ${branchId}`);
     return { bookings, total, page, totalPages: Math.ceil(total / limit) };
   }
@@ -423,6 +442,25 @@ export class BookingsService {
             this.logger.log(`Successfully loaded hall manually for booking ${booking.id}`);
           } catch (error) {
             this.logger.error(`Failed to load hall ${booking.hallId} for booking ${booking.id}`, error);
+          }
+        }
+      }
+    }
+
+    // Log bookings with missing branch data for debugging and try to fix them
+    const bookingsWithoutBranch = bookings.filter(b => !b.branch);
+    if (bookingsWithoutBranch.length > 0) {
+      this.logger.warn(`Found ${bookingsWithoutBranch.length} bookings without branch data: ${bookingsWithoutBranch.map(b => b.id).join(', ')}`);
+      
+      // Try to load branch data manually for each booking
+      for (const booking of bookingsWithoutBranch) {
+        if (booking.branchId) {
+          try {
+            const branch = await this.contentService.findBranchById(booking.branchId);
+            booking.branch = branch;
+            this.logger.log(`Successfully loaded branch manually for booking ${booking.id}`);
+          } catch (error) {
+            this.logger.error(`Failed to load branch ${booking.branchId} for booking ${booking.id}`, error);
           }
         }
       }

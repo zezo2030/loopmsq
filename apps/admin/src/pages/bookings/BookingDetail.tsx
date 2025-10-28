@@ -42,12 +42,16 @@ type Booking = {
   branch: {
     id: string
     name: string
+    name_ar?: string
+    name_en?: string
     location?: string
     address?: string
   }
   hall?: {
     id: string
     name: string
+    name_ar?: string
+    name_en?: string
     capacity: number
     amenities?: string[]
   }
@@ -84,11 +88,9 @@ type Booking = {
 
 type Ticket = {
   id: string
-  type: string
-  qrCode: string
-  status: 'active' | 'used' | 'expired'
-  usedAt?: string
-  scannedBy?: string
+  status: 'VALID' | 'USED' | 'EXPIRED' | 'CANCELLED'
+  scannedAt?: string
+  staffId?: string
 }
 
 export default function BookingDetail() {
@@ -112,7 +114,21 @@ export default function BookingDetail() {
     try {
       // Load booking details
       const bookingData = await apiGet<Booking>(`/bookings/${id}`)
-      setBooking(bookingData)
+      
+      // Normalize hall and branch names
+      const normalizedBooking = {
+        ...bookingData,
+        branch: bookingData.branch ? {
+          ...bookingData.branch,
+          name: bookingData.branch.name || bookingData.branch.name_ar || bookingData.branch.name_en || 'غير محدد'
+        } : bookingData.branch,
+        hall: bookingData.hall ? {
+          ...bookingData.hall,
+          name: bookingData.hall.name || bookingData.hall.name_ar || bookingData.hall.name_en || 'غير محدد'
+        } : bookingData.hall
+      }
+      
+      setBooking(normalizedBooking)
 
       // Load tickets
       const ticketsData = await apiGet<Ticket[]>(`/bookings/${id}/tickets`)
@@ -172,54 +188,36 @@ export default function BookingDetail() {
   const ticketColumns = [
     {
       title: 'رقم التذكرة',
-      dataIndex: 'qrCode',
-      key: 'qrCode',
-      render: (qrCode: string) => (
-        <Space>
-          <QrcodeOutlined />
-          <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{qrCode}</span>
-        </Space>
+      dataIndex: 'id',
+      key: 'id',
+      render: (id: string) => (
+        <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{id}</span>
       )
     },
     {
       title: 'النوع',
-      dataIndex: 'type',
       key: 'type',
+      render: () => 'عادي',
     },
     {
       title: 'الحالة',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => {
-        const colors = {
-          active: 'success',
-          used: 'default',
-          expired: 'error'
-        }
-        const texts = {
-          active: 'نشط',
-          used: 'مستخدم',
-          expired: 'منتهي الصلاحية'
-        }
-        return <Tag color={colors[status as keyof typeof colors]}>{texts[status as keyof typeof texts]}</Tag>
+      render: (status: Ticket['status'], record: Ticket) => {
+        const isUsed = status === 'USED' || !!record.scannedAt
+        return (
+          <Tag color={isUsed ? 'default' : 'success'}>
+            {isUsed ? 'مستخدمة' : 'غير مستخدمة'}
+          </Tag>
+        )
       }
     },
     {
       title: 'تاريخ الاستخدام',
       key: 'usage',
-      render: (_: any, record: Ticket) => {
-        if (record.status === 'used' && record.usedAt) {
-          return (
-            <div>
-              <div>{new Date(record.usedAt).toLocaleDateString('ar-SA')}</div>
-              <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                بواسطة: {record.scannedBy}
-              </div>
-            </div>
-          )
-        }
-        return '—'
-      }
+      render: () => (
+        <span>{new Date(booking!.startTime).toLocaleDateString('ar-SA')}</span>
+      )
     }
   ]
 
@@ -316,14 +314,18 @@ export default function BookingDetail() {
             <Col xs={24} lg={12}>
               <Card className="custom-card" title="معلومات المكان" extra={<EnvironmentOutlined />}>
                 <Descriptions column={1} size="small">
-                  <Descriptions.Item label="الفرع">{booking.branch.name}</Descriptions.Item>
-                  <Descriptions.Item label="العنوان">{booking.branch.address}</Descriptions.Item>
+                  <Descriptions.Item label="الفرع">
+                    {booking.branch?.name || 'غير محدد'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="العنوان">
+                    {booking.branch?.address || 'غير محدد'}
+                  </Descriptions.Item>
                   <Descriptions.Item label="القاعة">
                     <span style={{ 
-                      color: booking.hall?.name ? 'inherit' : '#ff4d4f',
-                      fontWeight: booking.hall?.name ? 'normal' : '500'
+                      color: booking.hall?.name && booking.hall.name !== 'غير محدد' ? 'inherit' : '#ff4d4f',
+                      fontWeight: booking.hall?.name && booking.hall.name !== 'غير محدد' ? 'normal' : '500'
                     }}>
-                      {booking.hall?.name || '⚠️ لم يتم تحديد القاعة'}
+                      {booking.hall?.name && booking.hall.name !== 'غير محدد' ? booking.hall.name : '⚠️ لم يتم تحديد القاعة'}
                     </span>
                   </Descriptions.Item>
                   {booking.hall?.capacity && (

@@ -163,8 +163,16 @@ export default function BookingsList() {
       // Normalize names so UI can always use .name
       const normalized = (response.bookings || []).map((b: any) => ({
         ...b,
-        branch: b.branch ? { ...b.branch, name: displayName(b.branch) } : b.branch,
-        hall: b.hall ? { ...b.hall, name: displayName(b.hall) } : b.hall,
+        branch: b.branch ? { 
+          ...b.branch, 
+          name: displayName(b.branch),
+          id: b.branch.id || b.branchId 
+        } : { id: b.branchId, name: 'غير محدد' },
+        hall: b.hall ? { 
+          ...b.hall, 
+          name: displayName(b.hall),
+          id: b.hall.id || b.hallId 
+        } : b.hallId ? { id: b.hallId, name: 'غير محدد' } : null,
       }))
 
       setBookings(normalized as BookingRow[])
@@ -312,14 +320,14 @@ export default function BookingsList() {
       render: (_: any, record: BookingRow) => (
         <div>
           <div style={{ fontWeight: '600', fontSize: '14px' }}>
-            {displayName(record.branch) || 'غير محدد'}
+            {record.branch?.name || 'غير محدد'}
           </div>
           <div style={{ 
-            color: displayName(record.hall) ? '#8c8c8c' : '#ff4d4f', 
+            color: record.hall?.name ? '#8c8c8c' : '#ff4d4f', 
             fontSize: '12px',
-            fontWeight: displayName(record.hall) ? 'normal' : '500'
+            fontWeight: record.hall?.name ? 'normal' : '500'
           }}>
-            {displayName(record.hall) || '⚠️ لم يتم تحديد القاعة'}
+            {record.hall?.name || '⚠️ لم يتم تحديد القاعة'}
           </div>
         </div>
       ),
