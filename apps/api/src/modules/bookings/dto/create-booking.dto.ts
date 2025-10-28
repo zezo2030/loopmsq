@@ -54,13 +54,12 @@ export class CreateBookingDto {
   branchId: string;
 
   @ApiProperty({
-    description: 'Hall ID (optional, if specific hall is required)',
+    description: 'Hall ID',
     example: 'hall-uuid',
-    required: false,
+    required: true,
   })
-  @IsOptional()
   @IsUUID()
-  hallId?: string;
+  hallId: string;
 
   @ApiProperty({
     description: 'Booking start time',

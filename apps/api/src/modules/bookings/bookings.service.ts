@@ -62,28 +62,13 @@ export class BookingsService {
 
       // Find available hall if not specified
       let selectedHall: Hall;
-      if (hallId) {
-        this.logger.log(`Looking for specific hall: ${hallId}`);
+      this.logger.log(`Looking for specific hall: ${hallId}`);
+      try {
         selectedHall = await this.contentService.findHallById(hallId);
         this.logger.log(`Found hall: ${selectedHall.name_en} with capacity: ${selectedHall.capacity}`);
-      } else {
-        this.logger.log(`Looking for available halls in branch: ${branchId}`);
-        // Find available hall in the branch
-        const availableHalls = await this.findAvailableHalls(
-          branchId,
-          new Date(startTime),
-          durationHours,
-          persons,
-        );
-        this.logger.log(`Found ${availableHalls.length} available halls`);
-        
-        if (availableHalls.length === 0) {
-          throw new BadRequestException(
-            'No available halls for the specified time and capacity',
-          );
-        }
-        selectedHall = availableHalls[0]; // Select the first available hall
-        this.logger.log(`Selected hall: ${selectedHall.name_en} with capacity: ${selectedHall.capacity}`);
+      } catch (error) {
+        this.logger.error(`Failed to find hall with ID: ${hallId}`, error);
+        throw new BadRequestException(`Hall with ID ${hallId} not found`);
       }
 
       // Check availability
@@ -169,6 +154,13 @@ export class BookingsService {
       contactPhone,
     } = createBookingDto;
 
+    // Validate required fields
+    if (!hallId) {
+      throw new BadRequestException('Hall ID is required');
+    }
+
+    this.logger.log(`Creating booking for hallId: ${hallId}, branchId: ${branchId}`);
+
     // Get quote first to validate and calculate pricing
     const quote = await this.getQuote({
       branchId,
@@ -183,6 +175,14 @@ export class BookingsService {
     if (!quote.available) {
       throw new ConflictException('Selected hall is not available');
     }
+
+    // Validate that hallId is present
+    if (!quote.hallId) {
+      this.logger.error(`Hall ID is missing from quote for booking: branchId=${branchId}, hallId=${hallId}`);
+      throw new BadRequestException('Hall ID is required for booking');
+    }
+
+    this.logger.log(`Creating booking with hallId: ${quote.hallId}`);
 
     // Start transaction
     const queryRunner = this.dataSource.createQueryRunner();
@@ -207,7 +207,9 @@ export class BookingsService {
         contactPhone,
       });
 
+      this.logger.log(`Booking created with hallId: ${booking.hallId}`);
       const savedBooking = await queryRunner.manager.save(booking);
+      this.logger.log(`Booking saved with ID: ${savedBooking.id}, hallId: ${savedBooking.hallId}`);
 
       // Generate tickets
       const tickets = await this.generateTickets(
@@ -328,6 +330,7 @@ export class BookingsService {
     limit: number = 10,
     from?: string,
     to?: string,
+    status?: string,
   ): Promise<{
     bookings: Booking[];
     total: number;
@@ -340,13 +343,40 @@ export class BookingsService {
       (where.createdAt as any).$gte = new Date(from) as any;
       (where.createdAt as any).$lte = new Date(to) as any;
     }
+    if (status) {
+      where.status = status as any;
+    }
+
+    this.logger.log(`Finding bookings for branch ${branchId} with filters: ${JSON.stringify(where)}`);
+
     const [bookings, total] = await this.bookingRepository.findAndCount({
       where,
-      relations: ['branch', 'hall', 'tickets', 'payments'],
+      relations: ['user', 'branch', 'hall', 'tickets', 'payments'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     } as any);
+
+    // Log bookings with missing hall data for debugging and try to fix them
+    const bookingsWithoutHall = bookings.filter(b => !b.hall);
+    if (bookingsWithoutHall.length > 0) {
+      this.logger.warn(`Found ${bookingsWithoutHall.length} bookings without hall data in branch ${branchId}: ${bookingsWithoutHall.map(b => b.id).join(', ')}`);
+      
+      // Try to load hall data manually for each booking
+      for (const booking of bookingsWithoutHall) {
+        if (booking.hallId) {
+          try {
+            const hall = await this.contentService.findHallById(booking.hallId);
+            booking.hall = hall;
+            this.logger.log(`Successfully loaded hall manually for booking ${booking.id}`);
+          } catch (error) {
+            this.logger.error(`Failed to load hall ${booking.hallId} for booking ${booking.id}`, error);
+          }
+        }
+      }
+    }
+
+    this.logger.log(`Found ${total} bookings for branch ${branchId}`);
     return { bookings, total, page, totalPages: Math.ceil(total / limit) };
   }
 
@@ -378,6 +408,25 @@ export class BookingsService {
       skip: (page - 1) * limit,
       take: limit,
     } as any);
+
+    // Log bookings with missing hall data for debugging and try to fix them
+    const bookingsWithoutHall = bookings.filter(b => !b.hall);
+    if (bookingsWithoutHall.length > 0) {
+      this.logger.warn(`Found ${bookingsWithoutHall.length} bookings without hall data: ${bookingsWithoutHall.map(b => b.id).join(', ')}`);
+      
+      // Try to load hall data manually for each booking
+      for (const booking of bookingsWithoutHall) {
+        if (booking.hallId) {
+          try {
+            const hall = await this.contentService.findHallById(booking.hallId);
+            booking.hall = hall;
+            this.logger.log(`Successfully loaded hall manually for booking ${booking.id}`);
+          } catch (error) {
+            this.logger.error(`Failed to load hall ${booking.hallId} for booking ${booking.id}`, error);
+          }
+        }
+      }
+    }
 
     // Stats
     const [confirmed, pending, cancelled] = await Promise.all([
@@ -411,8 +460,23 @@ export class BookingsService {
       relations: ['user', 'branch', 'hall', 'tickets', 'payments'],
     });
 
+    this.logger.log(`Found booking ${id}: hallId=${booking?.hallId}, hasHall=${!!booking?.hall}`);
+
     if (!booking) {
       throw new NotFoundException('Booking not found');
+    }
+
+    // Log if hall data is missing and try to load it manually
+    if (!booking.hall && booking.hallId) {
+      this.logger.warn(`Booking ${booking.id} has no hall data despite hallId: ${booking.hallId}`);
+      try {
+        // Try to load hall manually
+        const hall = await this.contentService.findHallById(booking.hallId);
+        booking.hall = hall;
+        this.logger.log(`Successfully loaded hall manually for booking ${booking.id}`);
+      } catch (error) {
+        this.logger.error(`Failed to load hall ${booking.hallId} for booking ${booking.id}`, error);
+      }
     }
 
     if (isRequesterBranchManager && requesterBranchId && booking.branchId !== requesterBranchId) {

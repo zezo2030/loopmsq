@@ -277,7 +277,7 @@ export default function BookingDetail() {
           <div style={{ textAlign: 'center', padding: '40px' }}>
             <WarningOutlined style={{ fontSize: '48px', color: '#faad14', marginBottom: '16px' }} />
             <h3>لم يتم العثور على الحجز</h3>
-            <Button type="primary" onClick={() => navigate('/bookings')}>
+            <Button type="primary" onClick={() => navigate('/admin/bookings')}>
               العودة إلى قائمة الحجوزات
             </Button>
           </div>
@@ -296,7 +296,7 @@ export default function BookingDetail() {
               <Button
                 type="text"
                 icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/bookings')}
+                onClick={() => navigate('/admin/bookings')}
                 size="large"
               />
               <h1 className="page-title" style={{ margin: 0 }}>
@@ -357,7 +357,14 @@ export default function BookingDetail() {
                 <Descriptions column={1} size="small">
                   <Descriptions.Item label="الفرع">{booking.branch.name}</Descriptions.Item>
                   <Descriptions.Item label="العنوان">{booking.branch.address}</Descriptions.Item>
-                  <Descriptions.Item label="القاعة">{booking.hall?.name || 'غير محدد'}</Descriptions.Item>
+                  <Descriptions.Item label="القاعة">
+                    <span style={{ 
+                      color: booking.hall?.name ? 'inherit' : '#ff4d4f',
+                      fontWeight: booking.hall?.name ? 'normal' : '500'
+                    }}>
+                      {booking.hall?.name || '⚠️ لم يتم تحديد القاعة'}
+                    </span>
+                  </Descriptions.Item>
                   {booking.hall?.capacity && (
                     <Descriptions.Item label="سعة القاعة">
                       <Space>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Tag, message, DatePicker, Select, Row, Col, Statistic, Modal } from 'antd'
+import { useSearchParams } from 'react-router-dom'
 import { EyeOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
@@ -13,6 +14,7 @@ const { Option } = Select
 export default function BookingsList() {
   const { t } = useTranslation()
   const { me } = useAuth()
+  const [searchParams] = useSearchParams()
   const [bookings, setBookings] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedBooking, setSelectedBooking] = useState<any>(null)
@@ -26,10 +28,12 @@ export default function BookingsList() {
     pageSize: 10,
     total: 0,
   })
+  const hallIdFromUrl = searchParams.get('hallId') || null
 
   useEffect(() => {
+    if (!me?.branchId) return
     loadBookings()
-  }, [filters, pagination.current, pagination.pageSize])
+  }, [me?.branchId, filters, pagination.current, pagination.pageSize])
 
   const loadBookings = async () => {
     if (!me?.branchId) return
@@ -52,7 +56,8 @@ export default function BookingsList() {
 
       const data: any = await apiGet(`/bookings/branch/me?${params.toString()}`)
       const items = Array.isArray(data) ? data : (data?.bookings || [])
-      setBookings(items)
+      const filtered = hallIdFromUrl ? items.filter((b: any) => b?.hall?.id === hallIdFromUrl) : items
+      setBookings(filtered)
       setPagination(prev => ({ ...prev, total: (data?.total as number) || items.length }))
     } catch (error) {
       message.error(t('bookings.load_failed') || 'Failed to load bookings')

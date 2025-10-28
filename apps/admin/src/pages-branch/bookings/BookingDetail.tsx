@@ -16,6 +16,23 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
   const { t } = useTranslation()
   const [showCancelModal, setShowCancelModal] = useState(false)
 
+  // Derived values for correct display
+  const start = booking?.startTime ? new Date(booking.startTime) : null
+  const durationHrs = Number(booking?.durationHours ?? booking?.duration ?? 0)
+  const end = start && Number.isFinite(durationHrs)
+    ? new Date(start.getTime() + durationHrs * 3600_000)
+    : (booking?.endTime ? new Date(booking.endTime) : null)
+  const toArLocale = (d?: Date | null) => (d ? d.toLocaleString('ar-SA') : '-')
+  const displayName = (o?: any) => o?.name ?? o?.name_ar ?? o?.nameAr ?? o?.name_en ?? o?.nameEn ?? ''
+  const formatPhone = (v?: string) => {
+    if (!v) return '-'
+    const digits = (v.match(/\d+/g) || []).join('')
+    if (digits.length < 6) return '-'
+    const head = digits.slice(0, 2)
+    const tail = digits.slice(-3)
+    return `${head}${'x'.repeat(Math.max(0, digits.length - 5))}${tail}`
+  }
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: 'orange',
@@ -53,10 +70,10 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label={t('bookings.created_at') || 'Created At'}>
-            {booking.createdAt ? new Date(booking.createdAt).toLocaleString() : '-'}
+            {booking.createdAt ? new Date(booking.createdAt).toLocaleString('ar-SA') : '-'}
           </Descriptions.Item>
           <Descriptions.Item label={t('bookings.updated_at') || 'Updated At'}>
-            {booking.updatedAt ? new Date(booking.updatedAt).toLocaleString() : '-'}
+            {booking.updatedAt ? new Date(booking.updatedAt).toLocaleString('ar-SA') : '-'}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -77,7 +94,7 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
                 {booking.user?.email || '-'}
               </Descriptions.Item>
               <Descriptions.Item label={t('bookings.user_phone') || 'Phone'}>
-                {booking.user?.phone || '-'}
+                {formatPhone(booking.user?.phone || booking.contactPhone)}
               </Descriptions.Item>
             </Descriptions>
           </Card>
@@ -92,10 +109,10 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
             </Title>
             <Descriptions column={1} size="small">
               <Descriptions.Item label={t('bookings.hall_name') || 'Hall Name'}>
-                {booking.hall?.nameAr || booking.hall?.nameEn || '-'}
+                {displayName(booking.hall) || '-'}
               </Descriptions.Item>
               <Descriptions.Item label={t('bookings.branch_name') || 'Branch'}>
-                {booking.hall?.branch?.nameAr || booking.hall?.branch?.nameEn || '-'}
+                {displayName(booking.hall?.branch || booking.branch) || '-'}
               </Descriptions.Item>
               <Descriptions.Item label={t('bookings.hall_capacity') || 'Capacity'}>
                 {booking.hall?.capacity || '-'} {t('halls.persons') || 'persons'}
@@ -115,22 +132,22 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
           <Col xs={24} sm={12}>
             <Statistic
               title={t('bookings.start_time') || 'Start Time'}
-              value={booking.startTime ? new Date(booking.startTime).toLocaleString() : '-'}
+              value={toArLocale(start)}
               valueStyle={{ fontSize: '16px' }}
             />
           </Col>
           <Col xs={24} sm={12}>
             <Statistic
               title={t('bookings.end_time') || 'End Time'}
-              value={booking.endTime ? new Date(booking.endTime).toLocaleString() : '-'}
+              value={toArLocale(end)}
               valueStyle={{ fontSize: '16px' }}
             />
           </Col>
           <Col xs={24} sm={12}>
             <Statistic
               title={t('bookings.duration') || 'Duration'}
-              value={booking.duration || '-'}
-              suffix={t('bookings.hours') || 'hours'}
+              value={Number.isFinite(durationHrs) && durationHrs > 0 ? durationHrs : '-'}
+              suffix={` ${t('bookings.hours') || 'ساعات'}`}
               valueStyle={{ fontSize: '16px' }}
             />
           </Col>
@@ -138,7 +155,7 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
             <Statistic
               title={t('bookings.persons') || 'Persons'}
               value={booking.persons || '-'}
-              suffix={t('bookings.people') || 'people'}
+              suffix={` ${t('bookings.people') || 'people'}`}
               valueStyle={{ fontSize: '16px' }}
             />
           </Col>
@@ -218,7 +235,7 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
             <Statistic
               title={t('bookings.base_amount') || 'Base Amount'}
               value={booking.baseAmount || booking.pricing?.basePrice || 0}
-              suffix="SAR"
+              suffix=" SAR"
               valueStyle={{ fontSize: '18px', color: '#3b82f6' }}
             />
           </Col>
@@ -226,7 +243,7 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
             <Statistic
               title={t('bookings.add_ons') || 'Add-ons'}
               value={booking.addOnsAmount || 0}
-              suffix="SAR"
+              suffix=" SAR"
               valueStyle={{ fontSize: '18px', color: '#10b981' }}
             />
           </Col>
@@ -234,7 +251,7 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
             <Statistic
               title={t('bookings.total_amount') || 'Total Amount'}
               value={booking.amount || booking.totalPrice || 0}
-              suffix="SAR"
+              suffix=" SAR"
               valueStyle={{ fontSize: '20px', color: '#ef4444', fontWeight: 'bold' }}
             />
           </Col>

@@ -103,14 +103,16 @@ export class BookingsController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'from', required: false, type: String })
   @ApiQuery({ name: 'to', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, type: String })
   async getBranchBookings(
     @CurrentUser() user: User,
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('status') status?: string,
   ) {
-    return this.bookingsService.findBranchBookings(user.branchId!, page, limit, from, to);
+    return this.bookingsService.findBranchBookings(user.branchId!, page, limit, from, to, status);
   }
 
   @Get(':id')

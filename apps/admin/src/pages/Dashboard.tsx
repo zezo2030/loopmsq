@@ -60,8 +60,14 @@ export default function Dashboard() {
       } catch {}
       try {
         const res = await apiGet<any>('/bookings/admin/all?page=1&limit=8')
+        const displayName = (o?: any) => o?.name ?? o?.name_ar ?? o?.nameAr ?? o?.name_en ?? o?.nameEn ?? ''
         const items = Array.isArray(res?.bookings) ? res.bookings : (res?.items || [])
-        setRecent(items)
+        const normalized = items.map((b: any) => ({
+          ...b,
+          branch: b.branch ? { ...b.branch, name: displayName(b.branch) } : b.branch,
+          hall: b.hall ? { ...b.hall, name: displayName(b.hall) } : b.hall,
+        }))
+        setRecent(normalized)
       } catch {}
     })()
   }, [])

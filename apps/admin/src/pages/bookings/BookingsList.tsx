@@ -19,6 +19,10 @@ import '../../theme.css'
 
 const { RangePicker } = DatePicker
 
+// Helper to safely pick a display name from various possible keys
+const displayName = (o?: any) =>
+  o?.name ?? o?.name_ar ?? o?.nameAr ?? o?.name_en ?? o?.nameEn ?? ''
+
 type BookingRow = {
   id: string
   user: {
@@ -156,7 +160,14 @@ export default function BookingsList() {
         stats: BookingStats
       }>('/bookings/admin/all?page=1&limit=100')
       
-      setBookings(response.bookings || [])
+      // Normalize names so UI can always use .name
+      const normalized = (response.bookings || []).map((b: any) => ({
+        ...b,
+        branch: b.branch ? { ...b.branch, name: displayName(b.branch) } : b.branch,
+        hall: b.hall ? { ...b.hall, name: displayName(b.hall) } : b.hall,
+      }))
+
+      setBookings(normalized as BookingRow[])
       setStats(response.stats || {
         total: 0,
         confirmed: 0,
@@ -290,10 +301,14 @@ export default function BookingsList() {
       render: (_: any, record: BookingRow) => (
         <div>
           <div style={{ fontWeight: '600', fontSize: '14px' }}>
-            {record.branch.name}
+            {displayName(record.branch) || 'غير محدد'}
           </div>
-          <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
-            {record.hall?.name || 'لم يتم تحديد القاعة'}
+          <div style={{ 
+            color: displayName(record.hall) ? '#8c8c8c' : '#ff4d4f', 
+            fontSize: '12px',
+            fontWeight: displayName(record.hall) ? 'normal' : '500'
+          }}>
+            {displayName(record.hall) || '⚠️ لم يتم تحديد القاعة'}
           </div>
         </div>
       ),
@@ -373,7 +388,7 @@ export default function BookingsList() {
               type="text"
               size="small"
               icon={<EyeOutlined />}
-              onClick={() => navigate(`/bookings/${record.id}`)}
+              onClick={() => navigate(`/admin/bookings/${record.id}`)}
             />
           </Tooltip>
         </Space>

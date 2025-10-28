@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Tag, message, Modal, Row, Col, Statistic, Dropdown } from 'antd'
 import { PlusOutlined, EditOutlined, EyeOutlined, SettingOutlined, ReloadOutlined, DownOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiGet, apiPatch } from '../../shared/api'
@@ -15,6 +16,7 @@ const formatCurrency = (value: number | undefined | null, suffix: string = 'SAR'
 export default function HallsList() {
   const { t } = useTranslation()
   const { me } = useAuth()
+  const navigate = useNavigate()
   const [halls, setHalls] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedHall, setSelectedHall] = useState<any>(null)
@@ -216,6 +218,12 @@ export default function HallsList() {
             }}
           >
             {record.status === 'available' ? t('halls.set_maintenance') || 'Set Maintenance' : t('halls.set_available') || 'Set Available'}
+          </Button>
+          <Button
+            size="small"
+            onClick={() => navigate(`/branch/bookings?hallId=${record.id}`)}
+          >
+            {t('bookings.title') || 'Hall Bookings'}
           </Button>
         </Space>
       ),
