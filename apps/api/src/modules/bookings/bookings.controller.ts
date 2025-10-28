@@ -124,8 +124,15 @@ export class BookingsController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const isManager = user.roles?.includes(UserRole.BRANCH_MANAGER) || false;
-    return this.bookingsService.findBookingById(id, user.id, user.branchId, isManager);
+    const roles = user.roles || [];
+    const isAdmin = roles.includes(UserRole.ADMIN);
+    const isManager = roles.includes(UserRole.BRANCH_MANAGER);
+    return this.bookingsService.findBookingById(
+      id,
+      isAdmin ? undefined : user.id,
+      user.branchId,
+      isAdmin || isManager,
+    );
   }
 
   @Get(':id/tickets')
@@ -137,8 +144,15 @@ export class BookingsController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const isManager = user.roles?.includes(UserRole.BRANCH_MANAGER) || false;
-    return this.bookingsService.getBookingTickets(id, user.id, user.branchId, isManager);
+    const roles = user.roles || [];
+    const isAdmin = roles.includes(UserRole.ADMIN);
+    const isManager = roles.includes(UserRole.BRANCH_MANAGER);
+    return this.bookingsService.getBookingTickets(
+      id,
+      isAdmin ? undefined : user.id,
+      user.branchId,
+      isAdmin || isManager,
+    );
   }
 
   @Get(':id/pricing')

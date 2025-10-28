@@ -119,48 +119,9 @@ export default function BookingDetail() {
       setTickets(ticketsData)
     } catch (error) {
       console.error('Failed to load booking:', error)
-      // Mock data for development
-      setBooking({
-        id: '1',
-        user: { 
-          id: '1', 
-          name: 'أحمد محمد علي', 
-          email: 'ahmed@example.com', 
-          phone: '+966501234567' 
-        },
-        branch: { 
-          id: '1', 
-          name: 'فرع الرياض الرئيسي', 
-          location: 'الرياض',
-          address: 'طريق الملك فهد، حي العليا، الرياض 12345'
-        },
-        hall: { 
-          id: '1', 
-          name: 'قاعة الماسة الكبرى', 
-          capacity: 150,
-          amenities: ['مكيف هواء', 'نظام صوتي', 'إضاءة LED', 'مطبخ صغير']
-        },
-        startTime: '2024-01-15T14:00:00Z',
-        durationHours: 4,
-        persons: 75,
-        totalPrice: 3500,
-        status: 'confirmed',
-        addOns: [
-          { id: '1', name: 'كاميرا تصوير احترافية', price: 500, quantity: 1 },
-          { id: '2', name: 'تنسيق زهور', price: 300, quantity: 2 }
-        ],
-        couponCode: 'NEWUSER15',
-        discountAmount: 200,
-        specialRequests: 'يرجى تجهيز الصوتيات قبل ساعة من بداية الحفل',
-        contactPhone: '+966501234567',
-        createdAt: '2024-01-10T10:00:00Z',
-        updatedAt: '2024-01-12T15:30:00Z'
-      })
-
-      setTickets([
-        { id: '1', type: 'عام', qrCode: 'TKT001', status: 'active' },
-        { id: '2', type: 'VIP', qrCode: 'TKT002', status: 'used', usedAt: '2024-01-15T14:30:00Z', scannedBy: 'سارة أحمد' }
-      ])
+      message.error('تعذّر تحميل تفاصيل الحجز')
+      setBooking(null)
+      setTickets([])
     } finally {
       setLoading(false)
     }

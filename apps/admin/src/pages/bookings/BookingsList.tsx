@@ -178,31 +178,42 @@ export default function BookingsList() {
     } catch (error) {
       console.error('Failed to load bookings:', error)
       message.warning('تعذّر تحميل الحجوزات، يتم عرض بيانات تجريبية')
-      // Set mock data for development
-      setBookings([
-        {
-          id: '1',
-          user: { id: '1', name: 'أحمد محمد', email: 'ahmed@example.com', phone: '+966501234567' },
-          branch: { id: '1', name: 'فرع الرياض', location: 'الرياض' },
-          hall: { id: '1', name: 'قاعة A1' },
-          startTime: '2024-01-15T14:00:00Z',
-          durationHours: 3,
-          persons: 25,
-          totalPrice: 2500,
-          status: 'confirmed',
-          addOns: [
-            { id: '1', name: 'كاميرا تصوير', price: 200, quantity: 1 }
-          ],
-          createdAt: '2024-01-10T10:00:00Z'
-        }
-      ])
-      setStats({
-        total: 156,
-        confirmed: 98,
-        pending: 32,
-        cancelled: 26,
-        totalRevenue: 425000
-      })
+      // Set mock data for development only
+      if (import.meta.env.DEV) {
+        setBookings([
+          {
+            id: '1',
+            user: { id: '1', name: 'أحمد محمد', email: 'ahmed@example.com', phone: '+966501234567' },
+            branch: { id: '1', name: 'فرع الرياض', location: 'الرياض' },
+            hall: { id: '1', name: 'قاعة A1' },
+            startTime: '2024-01-15T14:00:00Z',
+            durationHours: 3,
+            persons: 25,
+            totalPrice: 2500,
+            status: 'confirmed',
+            addOns: [
+              { id: '1', name: 'كاميرا تصوير', price: 200, quantity: 1 }
+            ],
+            createdAt: '2024-01-10T10:00:00Z'
+          }
+        ])
+        setStats({
+          total: 156,
+          confirmed: 98,
+          pending: 32,
+          cancelled: 26,
+          totalRevenue: 425000
+        })
+      } else {
+        setBookings([])
+        setStats({
+          total: 0,
+          confirmed: 0,
+          pending: 0,
+          cancelled: 0,
+          totalRevenue: 0
+        })
+      }
     } finally {
       setLoading(false)
     }
