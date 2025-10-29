@@ -282,8 +282,9 @@ export default function Branches() {
               )}
               
               <Upload
-                beforeUpload={(file, fileList) => {
-                  handleImagesUpload([file, ...fileList], editing?.id || '')
+                beforeUpload={(file) => {
+                  // Upload only the current file to avoid duplicate uploads
+                  handleImagesUpload([file], editing?.id || '')
                   return false
                 }}
                 showUploadList={false}
