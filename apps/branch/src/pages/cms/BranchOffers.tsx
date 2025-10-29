@@ -1,16 +1,14 @@
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Switch, Table, message, Upload, Image, Space } from 'antd'
+import { Button, DatePicker, Form, Image, Input, InputNumber, Modal, Select, Space, Switch, Table, Upload, message } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
-import { resolveFileUrl } from '../../shared/url'
-import { useState, useEffect, useMemo } from 'react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
+import { useBranchAuth } from '../../auth'
 import dayjs from 'dayjs'
-import { useLocation } from 'react-router-dom'
-import { useAuth } from '../../shared/auth'
 
 type Offer = {
   id: string
-  branchId: string
+  branchId: string | null
   hallId?: string | null
   title: string
   description?: string | null
@@ -22,21 +20,17 @@ type Offer = {
   imageUrl?: string | null
 }
 
-export default function Offers() {
+export default function BranchOffers() {
   const qc = useQueryClient()
-  const location = useLocation()
-  const { me } = useAuth()
-  const isBranchMode = useMemo(() => location.pathname.startsWith('/branch'), [location.pathname])
-  const enforcedBranchId = isBranchMode ? (me?.branchId || undefined) : undefined
-  const [branchFilter, setBranchFilter] = useState<string | undefined>(enforcedBranchId)
+  const { me } = useBranchAuth()
+  const branchId = me?.branchId
+
   const { data, isLoading } = useQuery<Offer[]>({
-    queryKey: ['offers', branchFilter, isBranchMode],
-    queryFn: () => apiGet(`/admin/offers${(branchFilter || enforcedBranchId) ? `?branchId=${branchFilter || enforcedBranchId}` : ''}`)
+    queryKey: ['branch:offers'],
+    queryFn: () => apiGet('/admin/offers'),
+    enabled: !!me,
   })
-  const { data: branches } = useQuery<any[]>({ queryKey: ['branches:min'], queryFn: async () => {
-    const res = await apiGet<any>('/content/branches?includeInactive=true')
-    return Array.isArray(res) ? res : (res.items || res.branches || [])
-  }})
+
   const [hallsOptions, setHallsOptions] = useState<any[]>([])
   const [loadingHalls, setLoadingHalls] = useState(false)
   const [open, setOpen] = useState(false)
@@ -45,56 +39,39 @@ export default function Offers() {
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<Offer>) => apiPost<Offer>('/admin/offers', body),
-    onSuccess: () => { message.success('Offer created'); qc.invalidateQueries({ queryKey: ['offers'] }); setOpen(false) },
+    onSuccess: () => { message.success('Offer created'); qc.invalidateQueries({ queryKey: ['branch:offers'] }); setOpen(false) },
   })
   const updateMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Partial<Offer> }) => apiPatch(`/admin/offers/${id}`, body),
-    onSuccess: () => { message.success('Offer updated'); qc.invalidateQueries({ queryKey: ['offers'] }); setOpen(false); setEditing(null) },
+    onSuccess: () => { message.success('Offer updated'); qc.invalidateQueries({ queryKey: ['branch:offers'] }); setOpen(false); setEditing(null) },
   })
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiDelete(`/admin/offers/${id}`),
-    onSuccess: () => { message.success('Offer removed'); qc.invalidateQueries({ queryKey: ['offers'] }) },
+    onSuccess: () => { message.success('Offer removed'); qc.invalidateQueries({ queryKey: ['branch:offers'] }) },
   })
 
-  // Load halls when modal opens in edit mode with a branchId
+  // Load halls of this branch when modal opens (new/edit)
   useEffect(() => {
-    if (open && editing && editing.branchId) {
-      const loadHalls = async () => {
-        setLoadingHalls(true)
-        try {
-          const halls = await apiGet<any[]>(`/content/halls?branchId=${editing.branchId}`)
-          setHallsOptions(halls || [])
-        } catch (error) {
-          console.error('Failed to load halls:', error)
-          message.error('Failed to load halls')
-          setHallsOptions([])
-        } finally {
-          setLoadingHalls(false)
-        }
+    if (!open || !branchId) return
+    const load = async () => {
+      setLoadingHalls(true)
+      try {
+        const halls = await apiGet<any[]>(`/content/halls?branchId=${branchId}`)
+        setHallsOptions(halls || [])
+      } catch (e) {
+        message.error('Failed to load halls')
+        setHallsOptions([])
+      } finally {
+        setLoadingHalls(false)
       }
-      loadHalls()
     }
-    // Load halls for branch mode when creating new offer
-    if (open && !editing && isBranchMode && enforcedBranchId) {
-      (async () => {
-        setLoadingHalls(true)
-        try {
-          const halls = await apiGet<any[]>(`/content/halls?branchId=${enforcedBranchId}`)
-          setHallsOptions(halls || [])
-        } catch {
-          setHallsOptions([])
-        } finally {
-          setLoadingHalls(false)
-        }
-      })()
-    }
-  }, [open, editing, isBranchMode, enforcedBranchId])
+    load()
+  }, [open, branchId])
 
   const columns = [
-    { title: 'Branch', dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
     { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? (hallsOptions.find(h => h.id === v)?.name_en || v) : 'All Halls' },
     { title: 'Title', dataIndex: 'title' },
-    { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrl(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
+    { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={v} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: 'Type', dataIndex: 'discountType' },
     { title: 'Value', dataIndex: 'discountValue' },
     { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
@@ -112,41 +89,21 @@ export default function Offers() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space>
-          {!isBranchMode && (
-            <Select
-              allowClear
-              placeholder="Filter by branch"
-              style={{ width: 240 }}
-              value={branchFilter}
-              onChange={(v) => setBranchFilter(v)}
-              options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
-            />
-          )}
-        </Space>
-        <Button type="primary" onClick={() => { 
-          setEditing(null); 
-          form.resetFields(); 
-          setHallsOptions([]);
-          setOpen(true);
-        }}>New Offer</Button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setHallsOptions([]); setOpen(true) }}>New Offer</Button>
       </div>
+
       <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
 
       <Modal
         title={editing ? 'Edit Offer' : 'Create Offer'}
         open={open}
-        onCancel={() => { 
-          setOpen(false); 
-          setEditing(null);
-          setHallsOptions([]);
-          form.resetFields();
-        }}
+        onCancel={() => { setOpen(false); setEditing(null); setHallsOptions([]); form.resetFields() }}
         onOk={() => {
           form.validateFields().then(values => {
             const body: any = {
-              branchId: enforcedBranchId || values.branchId,
+              // branchId enforced on backend for branch manager; send for safety if available
+              branchId: branchId,
               hallId: values.hallId || null,
               title: values.title,
               description: values.description || null,
@@ -164,38 +121,12 @@ export default function Offers() {
         }}
       >
         <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
-          {!isBranchMode && (
-            <Form.Item name="branchId" label="Branch" rules={[{ required: true }]}>
-              <Select
-                placeholder="Select branch"
-                options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
-                onChange={async (v) => {
-                  form.setFieldsValue({ hallId: undefined })
-                  if (!v) {
-                    setHallsOptions([])
-                    return
-                  }
-                  setLoadingHalls(true)
-                  try {
-                    const halls = await apiGet<any[]>(`/content/halls?branchId=${v}`)
-                    setHallsOptions(halls || [])
-                  } catch (error) {
-                    console.error('Failed to load halls:', error)
-                    message.error('Failed to load halls')
-                    setHallsOptions([])
-                  } finally {
-                    setLoadingHalls(false)
-                  }
-                }}
-              />
-            </Form.Item>
-          )}
           <Form.Item name="hallId" label="Hall (optional)">
             <Select
               allowClear
               placeholder="All Halls"
               loading={loadingHalls}
-              disabled={loadingHalls || (isBranchMode ? !enforcedBranchId : !form.getFieldValue('branchId'))}
+              disabled={loadingHalls || !branchId}
               options={(hallsOptions || []).map(h => ({ value: h.id, label: h.name_en }))}
             />
           </Form.Item>
@@ -206,7 +137,7 @@ export default function Offers() {
             <Space direction="vertical" style={{ width: '100%' }}>
               {form.getFieldValue('imageUrl') ? (
                 <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <Image src={resolveFileUrl(form.getFieldValue('imageUrl'))} width={200} height={120} style={{ objectFit: 'cover', borderRadius: 8 }} />
+                  <Image src={form.getFieldValue('imageUrl')} width={200} height={120} style={{ objectFit: 'cover', borderRadius: 8 }} />
                 </div>
               ) : null}
               <Upload
@@ -226,7 +157,7 @@ export default function Offers() {
               >
                 <Button icon={<UploadOutlined />}>Upload Image</Button>
               </Upload>
-              <Form.Item name="imageUrl" hidden> 
+              <Form.Item name="imageUrl" hidden>
                 <Input />
               </Form.Item>
             </Space>
@@ -251,5 +182,7 @@ export default function Offers() {
     </div>
   )
 }
+
+
 
 

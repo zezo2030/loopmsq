@@ -6,10 +6,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, LessThanOrEqual, MoreThanOrEqual, IsNull } from 'typeorm';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { User } from '../../database/entities/user.entity';
+import { Offer } from '../../database/entities/offer.entity';
 import { Branch } from '../../database/entities/branch.entity';
 import { Hall } from '../../database/entities/hall.entity';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -31,6 +32,8 @@ export class BookingsService {
     private ticketRepository: Repository<Ticket>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Offer)
+    private offerRepository: Repository<Offer>,
     private contentService: ContentService,
     private qrCodeService: QRCodeService,
     private redisService: RedisService,
@@ -103,18 +106,27 @@ export class BookingsService {
         return total + addOnPrice * addOn.quantity;
       }, 0);
 
+      // Apply offer discount (branch/hall scoped)
+      const subtotalBeforeDiscounts = pricing.totalPrice + addOnsCost;
+      const offerDiscount = await this.calculateOfferDiscount(
+        branchId,
+        selectedHall.id,
+        subtotalBeforeDiscounts,
+        new Date(startTime),
+      );
+
       // Apply coupon discount
       let discount = 0;
       if (couponCode) {
         this.logger.log(`Applying coupon: ${couponCode}`);
         discount = await this.calculateCouponDiscount(
           couponCode,
-          pricing.totalPrice + addOnsCost,
+          Math.max(0, subtotalBeforeDiscounts - offerDiscount),
         );
         this.logger.log(`Discount applied: ${discount}`);
       }
 
-      const totalPrice = pricing.totalPrice + addOnsCost - discount;
+      const totalPrice = Math.max(0, subtotalBeforeDiscounts - offerDiscount - discount);
 
       const result = {
         hallId: selectedHall.id,
@@ -125,7 +137,7 @@ export class BookingsService {
           price: 50, // Mock price
           total: 50 * addOn.quantity,
         })),
-        discount,
+        discount: Math.round((offerDiscount + discount) * 100) / 100,
         totalPrice: Math.round(totalPrice * 100) / 100,
         available: isAvailable,
       };
@@ -816,6 +828,40 @@ export class BookingsService {
       return (totalAmount * coupon.value) / 100;
     } else {
       return coupon.value;
+    }
+  }
+
+  private async calculateOfferDiscount(
+    branchId: string,
+    hallId: string,
+    amount: number,
+    at: Date,
+  ): Promise<number> {
+    try {
+      const offers = await this.offerRepository.find({
+        where: [
+          { branchId, hallId: IsNull(), isActive: true, startsAt: IsNull(), endsAt: IsNull() },
+          { branchId, hallId, isActive: true, startsAt: IsNull(), endsAt: IsNull() },
+          { branchId, hallId: IsNull(), isActive: true, startsAt: LessThanOrEqual(at), endsAt: IsNull() },
+          { branchId, hallId, isActive: true, startsAt: LessThanOrEqual(at), endsAt: IsNull() },
+          { branchId, hallId: IsNull(), isActive: true, startsAt: IsNull(), endsAt: MoreThanOrEqual(at) },
+          { branchId, hallId, isActive: true, startsAt: IsNull(), endsAt: MoreThanOrEqual(at) },
+          { branchId, hallId: IsNull(), isActive: true, startsAt: LessThanOrEqual(at), endsAt: MoreThanOrEqual(at) },
+          { branchId, hallId, isActive: true, startsAt: LessThanOrEqual(at), endsAt: MoreThanOrEqual(at) },
+        ] as any,
+        order: { createdAt: 'DESC' } as any,
+      });
+      let best = 0;
+      for (const o of offers) {
+        const d = o.discountType === 'percentage'
+          ? (amount * Number(o.discountValue)) / 100
+          : Number(o.discountValue);
+        if (d > best) best = d;
+      }
+      return Math.min(best, amount);
+    } catch (e) {
+      this.logger.error('Failed to calculate offer discount', e as any);
+      return 0;
     }
   }
 

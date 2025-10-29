@@ -1,12 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Switch, Table, message, Upload, Image, Space } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
-import { resolveFileUrl } from '../../shared/url'
-import { useState, useEffect, useMemo } from 'react'
-import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
+import { resolveFileUrl } from '../shared/url'
+import { useState } from 'react'
+import { apiDelete, apiGet, apiPatch, apiPost } from '../api'
 import dayjs from 'dayjs'
-import { useLocation } from 'react-router-dom'
-import { useAuth } from '../../shared/auth'
 
 type Offer = {
   id: string
@@ -22,33 +20,30 @@ type Offer = {
   imageUrl?: string | null
 }
 
-export default function Offers() {
+type BranchOffersTabProps = {
+  branchId: string
+}
+
+export default function BranchOffersTab({ branchId }: BranchOffersTabProps) {
   const qc = useQueryClient()
-  const location = useLocation()
-  const { me } = useAuth()
-  const isBranchMode = useMemo(() => location.pathname.startsWith('/branch'), [location.pathname])
-  const enforcedBranchId = isBranchMode ? (me?.branchId || undefined) : undefined
-  const [branchFilter, setBranchFilter] = useState<string | undefined>(enforcedBranchId)
-  const { data, isLoading } = useQuery<Offer[]>({
-    queryKey: ['offers', branchFilter, isBranchMode],
-    queryFn: () => apiGet(`/admin/offers${(branchFilter || enforcedBranchId) ? `?branchId=${branchFilter || enforcedBranchId}` : ''}`)
+  const { data, isLoading } = useQuery<Offer[]>({ 
+    queryKey: ['offers', branchId], 
+    queryFn: () => apiGet(`/admin/offers?branchId=${branchId}`) 
   })
-  const { data: branches } = useQuery<any[]>({ queryKey: ['branches:min'], queryFn: async () => {
-    const res = await apiGet<any>('/content/branches?includeInactive=true')
-    return Array.isArray(res) ? res : (res.items || res.branches || [])
-  }})
-  const [hallsOptions, setHallsOptions] = useState<any[]>([])
-  const [loadingHalls, setLoadingHalls] = useState(false)
+  const { data: halls } = useQuery<any[]>({ 
+    queryKey: ['halls', branchId], 
+    queryFn: () => apiGet(`/content/halls?branchId=${branchId}`) 
+  })
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Offer | null>(null)
   const [form] = Form.useForm()
 
   const createMutation = useMutation({
-    mutationFn: (body: Partial<Offer>) => apiPost<Offer>('/admin/offers', body),
+    mutationFn: (body: Partial<Offer>) => apiPost<Offer>('/admin/offers', { ...body, branchId }),
     onSuccess: () => { message.success('Offer created'); qc.invalidateQueries({ queryKey: ['offers'] }); setOpen(false) },
   })
   const updateMutation = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Partial<Offer> }) => apiPatch(`/admin/offers/${id}`, body),
+    mutationFn: ({ id, body }: { id: string; body: Partial<Offer> }) => apiPatch(`/admin/offers/${id}`, { ...body, branchId }),
     onSuccess: () => { message.success('Offer updated'); qc.invalidateQueries({ queryKey: ['offers'] }); setOpen(false); setEditing(null) },
   })
   const deleteMutation = useMutation({
@@ -56,43 +51,8 @@ export default function Offers() {
     onSuccess: () => { message.success('Offer removed'); qc.invalidateQueries({ queryKey: ['offers'] }) },
   })
 
-  // Load halls when modal opens in edit mode with a branchId
-  useEffect(() => {
-    if (open && editing && editing.branchId) {
-      const loadHalls = async () => {
-        setLoadingHalls(true)
-        try {
-          const halls = await apiGet<any[]>(`/content/halls?branchId=${editing.branchId}`)
-          setHallsOptions(halls || [])
-        } catch (error) {
-          console.error('Failed to load halls:', error)
-          message.error('Failed to load halls')
-          setHallsOptions([])
-        } finally {
-          setLoadingHalls(false)
-        }
-      }
-      loadHalls()
-    }
-    // Load halls for branch mode when creating new offer
-    if (open && !editing && isBranchMode && enforcedBranchId) {
-      (async () => {
-        setLoadingHalls(true)
-        try {
-          const halls = await apiGet<any[]>(`/content/halls?branchId=${enforcedBranchId}`)
-          setHallsOptions(halls || [])
-        } catch {
-          setHallsOptions([])
-        } finally {
-          setLoadingHalls(false)
-        }
-      })()
-    }
-  }, [open, editing, isBranchMode, enforcedBranchId])
-
   const columns = [
-    { title: 'Branch', dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
-    { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? (hallsOptions.find(h => h.id === v)?.name_en || v) : 'All Halls' },
+    { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? (halls?.find(h => h.id === v)?.name_en || v) : 'All Halls' },
     { title: 'Title', dataIndex: 'title' },
     { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrl(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: 'Type', dataIndex: 'discountType' },
@@ -101,10 +61,14 @@ export default function Offers() {
     { title: 'Schedule', render: (_: any, r: Offer) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
     { title: 'Actions', render: (_: any, r: Offer) => (
       <span style={{ display: 'flex', gap: 8 }}>
-        <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue({
-          ...r,
-          range: [r.startsAt ? dayjs(r.startsAt) : null, r.endsAt ? dayjs(r.endsAt) : null]
-        }); setOpen(true) }}>Edit</Button>
+        <Button size="small" onClick={() => { 
+          setEditing(r); 
+          form.setFieldsValue({
+            ...r,
+            range: [r.startsAt ? dayjs(r.startsAt) : null, r.endsAt ? dayjs(r.endsAt) : null]
+          }); 
+          setOpen(true) 
+        }}>Edit</Button>
         <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>Delete</Button>
       </span>
     )},
@@ -112,41 +76,18 @@ export default function Offers() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space>
-          {!isBranchMode && (
-            <Select
-              allowClear
-              placeholder="Filter by branch"
-              style={{ width: 240 }}
-              value={branchFilter}
-              onChange={(v) => setBranchFilter(v)}
-              options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
-            />
-          )}
-        </Space>
-        <Button type="primary" onClick={() => { 
-          setEditing(null); 
-          form.resetFields(); 
-          setHallsOptions([]);
-          setOpen(true);
-        }}>New Offer</Button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>New Offer</Button>
       </div>
       <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
 
       <Modal
         title={editing ? 'Edit Offer' : 'Create Offer'}
         open={open}
-        onCancel={() => { 
-          setOpen(false); 
-          setEditing(null);
-          setHallsOptions([]);
-          form.resetFields();
-        }}
+        onCancel={() => { setOpen(false); setEditing(null) }}
         onOk={() => {
           form.validateFields().then(values => {
             const body: any = {
-              branchId: enforcedBranchId || values.branchId,
               hallId: values.hallId || null,
               title: values.title,
               description: values.description || null,
@@ -164,39 +105,11 @@ export default function Offers() {
         }}
       >
         <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
-          {!isBranchMode && (
-            <Form.Item name="branchId" label="Branch" rules={[{ required: true }]}>
-              <Select
-                placeholder="Select branch"
-                options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
-                onChange={async (v) => {
-                  form.setFieldsValue({ hallId: undefined })
-                  if (!v) {
-                    setHallsOptions([])
-                    return
-                  }
-                  setLoadingHalls(true)
-                  try {
-                    const halls = await apiGet<any[]>(`/content/halls?branchId=${v}`)
-                    setHallsOptions(halls || [])
-                  } catch (error) {
-                    console.error('Failed to load halls:', error)
-                    message.error('Failed to load halls')
-                    setHallsOptions([])
-                  } finally {
-                    setLoadingHalls(false)
-                  }
-                }}
-              />
-            </Form.Item>
-          )}
           <Form.Item name="hallId" label="Hall (optional)">
             <Select
               allowClear
               placeholder="All Halls"
-              loading={loadingHalls}
-              disabled={loadingHalls || (isBranchMode ? !enforcedBranchId : !form.getFieldValue('branchId'))}
-              options={(hallsOptions || []).map(h => ({ value: h.id, label: h.name_en }))}
+              options={(halls || []).map(h => ({ value: h.id, label: h.name_en }))}
             />
           </Form.Item>
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>
@@ -251,5 +164,4 @@ export default function Offers() {
     </div>
   )
 }
-
 

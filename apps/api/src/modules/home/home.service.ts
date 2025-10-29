@@ -15,7 +15,7 @@ export class HomeService {
     private readonly redis: RedisService,
   ) {}
 
-  async getHome() {
+  async getHome(branchId?: string) {
     const cacheKey = 'home:v1';
     const cached = await this.redis.get(cacheKey);
     if (cached) return cached;
@@ -29,17 +29,32 @@ export class HomeService {
       ] as any,
       order: { createdAt: 'DESC' },
     });
+    // Build where conditions for offers
+    const baseOfferWhere: any = { isActive: true };
+    
+    if (branchId) {
+      baseOfferWhere.branchId = branchId;
+    }
+    // If no branchId filter, we'll still get offers but old ones (without branchId) won't display properly
+    
+    const timeConditions = [
+      { ...baseOfferWhere, startsAt: IsNull(), endsAt: IsNull() },
+      { ...baseOfferWhere, startsAt: LessThanOrEqual(now), endsAt: IsNull() },
+      { ...baseOfferWhere, startsAt: IsNull(), endsAt: MoreThanOrEqual(now) },
+      { ...baseOfferWhere, startsAt: LessThanOrEqual(now), endsAt: MoreThanOrEqual(now) },
+    ];
+    
     const offers = await this.offerRepo.find({
-      where: [
-        { isActive: true, startsAt: IsNull(), endsAt: IsNull() },
-        { isActive: true, startsAt: LessThanOrEqual(now), endsAt: IsNull() },
-        { isActive: true, startsAt: IsNull(), endsAt: MoreThanOrEqual(now) },
-        { isActive: true, startsAt: LessThanOrEqual(now), endsAt: MoreThanOrEqual(now) },
-      ] as any,
+      where: timeConditions as any,
       order: { createdAt: 'DESC' },
     });
+    
+    // Filter out offers without branchId (old data) if no specific branch requested
+    const filteredOffers = branchId 
+      ? offers 
+      : offers.filter(o => o.branchId !== null);
     const featuredBranches = await this.branchRepo.find({ order: { createdAt: 'DESC' }, take: 10 });
-    const payload = { banners, offers, featuredBranches };
+    const payload = { banners, offers: filteredOffers, featuredBranches };
     await this.redis.set(cacheKey, payload, 120);
     return payload;
   }

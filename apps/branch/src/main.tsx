@@ -14,6 +14,8 @@ import HallsList from './pages/halls/HallsList'
 import BookingsList from './pages/bookings/BookingsList'
 import StaffList from './pages/staff/StaffList'
 import ReportsOverview from './pages/reports/Overview'
+import BranchOffers from './pages/cms/BranchOffers'
+import BranchCoupons from './pages/cms/BranchCoupons'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -29,6 +31,8 @@ const router = createBrowserRouter([
           { path: 'dashboard', element: <Dashboard /> },
           { path: 'branch', element: <BranchInfo /> },
           { path: 'halls', element: <HallsList /> },
+          { path: 'offers', element: <BranchOffers /> },
+          { path: 'coupons', element: <BranchCoupons /> },
           { path: 'bookings', element: <BookingsList /> },
           { path: 'staff', element: <StaffList /> },
           { path: 'reports', element: <ReportsOverview /> },

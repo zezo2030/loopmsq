@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useAdminAuth } from '../../auth'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image } from 'antd'
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image, Tabs } from 'antd'
 import { resolveFileUrl } from '../../shared/url'
 import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../api'
 import { useTranslation } from 'react-i18next'
 import WorkingHoursEditor from '../../components/WorkingHoursEditor'
+import BranchOffersTab from '../../components/BranchOffersTab'
+import BranchCouponsTab from '../../components/BranchCouponsTab'
 
 type Branch = {
   id: string
@@ -32,6 +34,8 @@ export default function Branches() {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Branch | null>(null)
+  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null)
+  const [activeTab, setActiveTab] = useState('list')
   const [form] = Form.useForm()
 
   const { data, isLoading } = useQuery<Branch[]>({
@@ -128,6 +132,20 @@ export default function Branches() {
       key: 'actions',
       render: (_: any, r: Branch) => (
         <Space>
+          <Button size="small" onClick={() => { setSelectedBranch(r); setActiveTab('details'); form.setFieldsValue({
+            name_ar: r.name_ar,
+            name_en: r.name_en,
+            location: r.location,
+            capacity: r.capacity,
+            description_ar: r.description_ar,
+            description_en: r.description_en,
+            contactPhone: r.contactPhone,
+            amenities: r.amenities,
+            status: r.status,
+            workingHours: r.workingHours || {}
+          }); setEditing(r) }}>
+            {t('common.view_details') || 'View Details'}
+          </Button>
           <Button size="small" disabled={!canEdit} onClick={() => { setEditing(r); form.setFieldsValue({
             name_ar: r.name_ar,
             name_en: r.name_en,
@@ -155,6 +173,75 @@ export default function Branches() {
       ),
     },
   ]
+
+  if (selectedBranch && activeTab !== 'list') {
+    return (
+      <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+        <Card 
+          title={`${t('branches.title') || 'الفروع'} - ${selectedBranch.name_en}`}
+          extra={
+            <Space>
+              <Button onClick={() => { setSelectedBranch(null); setActiveTab('list'); setEditing(null) }}>
+                {t('common.back') || 'Back to List'}
+              </Button>
+              <Button type="primary" disabled={!canEdit} onClick={() => { setEditing(selectedBranch); form.setFieldsValue({
+                name_ar: selectedBranch.name_ar,
+                name_en: selectedBranch.name_en,
+                location: selectedBranch.location,
+                capacity: selectedBranch.capacity,
+                description_ar: selectedBranch.description_ar,
+                description_en: selectedBranch.description_en,
+                contactPhone: selectedBranch.contactPhone,
+                amenities: selectedBranch.amenities,
+                status: selectedBranch.status,
+                workingHours: selectedBranch.workingHours || {}
+              }); setOpen(true) }}>
+                {t('common.edit') || 'Edit'}
+              </Button>
+            </Space>
+          }
+        >
+          <Tabs 
+            activeKey={activeTab} 
+            onChange={setActiveTab}
+            items={[
+              {
+                key: 'details',
+                label: t('branches.details') || 'Details',
+                children: (
+                  <div>
+                    <p><strong>{t('branches.name_ar') || 'الاسم (AR)'}:</strong> {selectedBranch.name_ar}</p>
+                    <p><strong>{t('branches.name_en') || 'الاسم (EN)'}:</strong> {selectedBranch.name_en}</p>
+                    <p><strong>{t('branches.location') || 'الموقع'}:</strong> {selectedBranch.location}</p>
+                    <p><strong>{t('branches.capacity') || 'السعة'}:</strong> {selectedBranch.capacity}</p>
+                    <p><strong>{t('branches.status') || 'الحالة'}:</strong> {selectedBranch.status}</p>
+                    {selectedBranch.description_ar && <p><strong>{t('branches.description_ar') || 'الوصف (AR)'}:</strong> {selectedBranch.description_ar}</p>}
+                    {selectedBranch.description_en && <p><strong>{t('branches.description_en') || 'الوصف (EN)'}:</strong> {selectedBranch.description_en}</p>}
+                    {selectedBranch.coverImage && (
+                      <div style={{ marginTop: 16 }}>
+                        <strong>{t('branches.cover_image') || 'صورة الغلاف'}:</strong>
+                        <Image src={resolveFileUrl(selectedBranch.coverImage)} width={200} height={150} style={{ marginTop: 8, objectFit: 'cover', borderRadius: 8 }} />
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: 'offers',
+                label: t('offers.title') || 'Offers',
+                children: <BranchOffersTab branchId={selectedBranch.id} />,
+              },
+              {
+                key: 'coupons',
+                label: t('coupons.title') || 'Coupons',
+                children: <BranchCouponsTab branchId={selectedBranch.id} />,
+              },
+            ]}
+          />
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>

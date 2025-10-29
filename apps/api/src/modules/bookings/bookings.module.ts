@@ -5,13 +5,14 @@ import { BookingsService } from './bookings.service';
 import { Booking } from '../../database/entities/booking.entity';
 import { Ticket } from '../../database/entities/ticket.entity';
 import { User } from '../../database/entities/user.entity';
+import { Offer } from '../../database/entities/offer.entity';
 import { ContentModule } from '../content/content.module';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { RedisService } from '../../utils/redis.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Booking, Ticket, User]), ContentModule, NotificationsModule],
+  imports: [TypeOrmModule.forFeature([Booking, Ticket, User, Offer]), ContentModule, NotificationsModule],
   controllers: [BookingsController],
   providers: [BookingsService, QRCodeService, RedisService],
   exports: [BookingsService],

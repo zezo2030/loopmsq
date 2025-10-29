@@ -37,6 +37,12 @@ export default function MainLayout() {
     if (path.startsWith('/halls')) {
       return ['halls']
     }
+  if (path.startsWith('/offers')) {
+    return ['offers']
+  }
+  if (path.startsWith('/coupons')) {
+    return ['coupons']
+  }
     if (path.startsWith('/bookings')) {
       return ['bookings']
     }
@@ -110,6 +116,16 @@ export default function MainLayout() {
       key: 'halls',
       icon: <AppstoreOutlined />,
       label: <Link to="/halls">{t('menu.halls')}</Link>,
+    },
+    {
+      key: 'offers',
+      icon: <AppstoreOutlined />,
+      label: <Link to="/offers">{t('menu.offers') || 'Offers'}</Link>,
+    },
+    {
+      key: 'coupons',
+      icon: <AppstoreOutlined />,
+      label: <Link to="/coupons">{t('menu.coupons') || 'Coupons'}</Link>,
     },
     {
       key: 'bookings',
@@ -208,6 +224,8 @@ function getPageTitle(pathname: string): string {
   if (pathname === '/') return t('page.dashboard_overview')
   if (pathname === '/branch') return t('page.branch_info')
   if (pathname === '/halls') return t('page.halls_management')
+  if (pathname === '/offers') return t('page.offers_management')
+  if (pathname === '/coupons') return t('page.coupons_management')
   if (pathname === '/bookings') return t('page.bookings_management')
   if (pathname === '/staff') return t('page.staff_management')
   if (pathname === '/reports') return t('page.reports_overview')

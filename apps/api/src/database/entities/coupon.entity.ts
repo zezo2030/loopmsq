@@ -1,9 +1,18 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Branch } from './branch.entity';
+import { Hall } from './hall.entity';
 
 @Entity('coupons')
 export class Coupon {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  // Temporarily nullable to allow migration - will be enforced via validation
+  @Column({ type: 'uuid', nullable: true })
+  branchId: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  hallId: string | null;
 
   @Index({ unique: true })
   @Column({ type: 'varchar', length: 50 })
@@ -29,6 +38,15 @@ export class Coupon {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // Relations
+  @ManyToOne(() => Branch, (branch) => branch.bookings)
+  @JoinColumn({ name: 'branchId' })
+  branch: Branch;
+
+  @ManyToOne(() => Hall, (hall) => hall.id, { nullable: true, onDelete: 'SET NULL' } as any)
+  @JoinColumn({ name: 'hallId' })
+  hall: Hall | null;
 }
 
 

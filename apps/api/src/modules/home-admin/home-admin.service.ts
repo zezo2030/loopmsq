@@ -35,10 +35,18 @@ export class HomeAdminService {
   }
 
   // Offer
-  listOffers() {
-    return this.offerRepo.find({ order: { createdAt: 'DESC' } as any });
+  listOffers(filter?: { branchId?: string }) {
+    const where: any = {};
+    if (filter?.branchId) where.branchId = filter.branchId;
+    return this.offerRepo.find({ where, order: { createdAt: 'DESC' } as any });
+  }
+  async listOffersByBranch(branchId: string) {
+    return this.listOffers({ branchId });
   }
   async createOffer(dto: Partial<Offer>) {
+    if (!dto.branchId) {
+      throw new Error('branchId is required');
+    }
     const entity = this.offerRepo.create(dto);
     const saved = await this.offerRepo.save(entity);
     await this.redis.del('home:v1');

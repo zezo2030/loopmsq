@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { HomeService } from './home.service';
 
@@ -8,8 +8,8 @@ export class HomeController {
   constructor(private readonly home: HomeService) {}
 
   @Get()
-  async getHome() {
-    return this.home.getHome();
+  async getHome(@Query('branchId') branchId?: string) {
+    return this.home.getHome(branchId);
   }
 }
 

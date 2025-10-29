@@ -1,14 +1,12 @@
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Switch, Table, message } from 'antd'
-import { useMemo, useState } from 'react'
+import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, message } from 'antd'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
-import dayjs from 'dayjs'
-import { useLocation } from 'react-router-dom'
-import { useAuth } from '../../shared/auth'
+import { useBranchAuth } from '../../auth'
 
 type Coupon = {
   id: string
-  branchId: string
+  branchId: string | null
   hallId?: string | null
   code: string
   discountType: 'percentage' | 'fixed'
@@ -18,19 +16,19 @@ type Coupon = {
   isActive: boolean
 }
 
-export default function Coupons() {
+export default function BranchCoupons() {
   const qc = useQueryClient()
-  const location = useLocation()
-  const { me } = useAuth()
-  const isBranchMode = useMemo(() => location.pathname.startsWith('/branch'), [location.pathname])
-  const enforcedBranchId = isBranchMode ? (me?.branchId || undefined) : undefined
-  const [branchFilter, setBranchFilter] = useState<string | undefined>(enforcedBranchId)
-  const { data, isLoading } = useQuery<Coupon[]>({ queryKey: ['coupons', branchFilter, isBranchMode], queryFn: () => apiGet(`/admin/coupons${(branchFilter || enforcedBranchId) ? `?branchId=${branchFilter || enforcedBranchId}` : ''}`) })
-  const { data: branches } = useQuery<any[]>({ queryKey: ['branches:min'], queryFn: async () => {
-    const res = await apiGet<any>('/content/branches?includeInactive=true')
-    return Array.isArray(res) ? res : (res.items || res.branches || [])
-  }})
+  const { me } = useBranchAuth()
+  const branchId = me?.branchId
+
+  const { data, isLoading } = useQuery<Coupon[]>({
+    queryKey: ['branch:coupons'],
+    queryFn: () => apiGet('/admin/coupons'),
+    enabled: !!me,
+  })
+
   const [hallsOptions, setHallsOptions] = useState<any[]>([])
+  const [loadingHalls, setLoadingHalls] = useState(false)
   const [open, setOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [editing, setEditing] = useState<Coupon | null>(null)
@@ -39,15 +37,15 @@ export default function Coupons() {
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<Coupon>) => apiPost<Coupon>('/admin/coupons', body),
-    onSuccess: () => { message.success('Coupon created'); qc.invalidateQueries({ queryKey: ['coupons'] }); setOpen(false) },
+    onSuccess: () => { message.success('Coupon created'); qc.invalidateQueries({ queryKey: ['branch:coupons'] }); setOpen(false) },
   })
   const updateMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Partial<Coupon> }) => apiPatch(`/admin/coupons/${id}`, body),
-    onSuccess: () => { message.success('Coupon updated'); qc.invalidateQueries({ queryKey: ['coupons'] }); setOpen(false); setEditing(null) },
+    onSuccess: () => { message.success('Coupon updated'); qc.invalidateQueries({ queryKey: ['branch:coupons'] }); setOpen(false); setEditing(null) },
   })
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiDelete(`/admin/coupons/${id}`),
-    onSuccess: () => { message.success('Coupon removed'); qc.invalidateQueries({ queryKey: ['coupons'] }) },
+    onSuccess: () => { message.success('Coupon removed'); qc.invalidateQueries({ queryKey: ['branch:coupons'] }) },
   })
 
   const previewMutation = useMutation({
@@ -58,8 +56,24 @@ export default function Coupons() {
     }
   })
 
+  useEffect(() => {
+    if (!open || !branchId) return
+    const load = async () => {
+      setLoadingHalls(true)
+      try {
+        const halls = await apiGet<any[]>(`/content/halls?branchId=${branchId}`)
+        setHallsOptions(halls || [])
+      } catch (e) {
+        message.error('Failed to load halls')
+        setHallsOptions([])
+      } finally {
+        setLoadingHalls(false)
+      }
+    }
+    load()
+  }, [open, branchId])
+
   const columns = [
-    { title: 'Branch', dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
     { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? (hallsOptions.find(h => h.id === v)?.name_en || v) : 'All Halls' },
     { title: 'Code', dataIndex: 'code' },
     { title: 'Type', dataIndex: 'discountType' },
@@ -68,11 +82,7 @@ export default function Coupons() {
     { title: 'Schedule', render: (_: any, r: Coupon) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
     { title: 'Actions', render: (_: any, r: Coupon) => (
       <span style={{ display: 'flex', gap: 8 }}>
-        <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue({
-          ...r,
-          range: [r.startsAt ? dayjs(r.startsAt) : null, r.endsAt ? dayjs(r.endsAt) : null]
-        }); setOpen(true) }}>Edit</Button>
-        <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ code: r.code }) }}>Preview</Button>
+        <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue(r); setOpen(true) }}>Edit</Button>
         <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>Delete</Button>
       </span>
     )},
@@ -81,29 +91,23 @@ export default function Coupons() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        {!isBranchMode && (
-          <Select
-            allowClear
-            placeholder="Filter by branch"
-            style={{ width: 240 }}
-            value={branchFilter}
-            onChange={(v) => setBranchFilter(v)}
-            options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
-          />
-        )}
-        <Button onClick={() => { setPreviewOpen(true); previewForm.resetFields() }}>Preview Any Code</Button>
-        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>New Coupon</Button>
+        <Space>
+          <Button onClick={() => { setPreviewOpen(true); previewForm.resetFields() }}>Preview Any Code</Button>
+        </Space>
+        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setHallsOptions([]); setOpen(true) }}>New Coupon</Button>
       </div>
+
       <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
 
       <Modal
         title={editing ? 'Edit Coupon' : 'Create Coupon'}
         open={open}
-        onCancel={() => { setOpen(false); setEditing(null) }}
+        onCancel={() => { setOpen(false); setEditing(null); setHallsOptions([]); form.resetFields() }}
         onOk={() => {
           form.validateFields().then(values => {
             const body: any = {
-              branchId: enforcedBranchId || values.branchId,
+              branchId: branchId,
+              hallId: values.hallId || null,
               code: values.code,
               discountType: values.discountType,
               discountValue: Number(values.discountValue),
@@ -118,23 +122,12 @@ export default function Coupons() {
         }}
       >
         <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
-          {!isBranchMode && (
-            <Form.Item name="branchId" label="Branch" rules={[{ required: true }]}> 
-              <Select
-                placeholder="Select branch"
-                options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
-                onChange={async (v) => {
-                  form.setFieldsValue({ hallId: undefined })
-                  const halls = await apiGet<any[]>(`/content/halls?branchId=${v}`)
-                  setHallsOptions(halls || [])
-                }}
-              />
-            </Form.Item>
-          )}
           <Form.Item name="hallId" label="Hall (optional)">
             <Select
               allowClear
               placeholder="All Halls"
+              loading={loadingHalls}
+              disabled={loadingHalls || !branchId}
               options={(hallsOptions || []).map(h => ({ value: h.id, label: h.name_en }))}
             />
           </Form.Item>
@@ -178,5 +171,7 @@ export default function Coupons() {
     </div>
   )
 }
+
+
 
 

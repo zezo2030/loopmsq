@@ -127,6 +127,8 @@ const router = createBrowserRouter([
           { index: true, element: <BranchDashboard /> },
           { path: 'branch', element: <BranchInfo /> },
           { path: 'halls', element: <BranchHalls /> },
+          { path: 'offers', element: <Offers /> },
+          { path: 'coupons', element: <Coupons /> },
           { path: 'bookings', element: <BranchBookings /> },
           { path: 'staff', element: <BranchStaff /> },
           { path: 'reports', element: <BranchReports /> },

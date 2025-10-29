@@ -9,11 +9,20 @@ export class CouponsService {
     @InjectRepository(Coupon) private readonly repo: Repository<Coupon>,
   ) {}
 
-  list() {
-    return this.repo.find({ order: { createdAt: 'DESC' } as any });
+  list(filter?: { branchId?: string }) {
+    const where: any = {};
+    if (filter?.branchId) where.branchId = filter.branchId;
+    return this.repo.find({ where, order: { createdAt: 'DESC' } as any });
+  }
+
+  listCouponsByBranch(branchId: string) {
+    return this.list({ branchId });
   }
 
   create(dto: Partial<Coupon>) {
+    if (!dto.branchId) {
+      throw new Error('branchId is required');
+    }
     const entity = this.repo.create(dto);
     return this.repo.save(entity);
   }

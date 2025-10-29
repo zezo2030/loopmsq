@@ -1,7 +1,9 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards, Query, ForbiddenException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CouponsService } from './coupons.service';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from '../../database/entities/user.entity';
 import { CreateCouponDto } from './dto/create-coupon.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -15,17 +17,29 @@ export class CouponsController {
   // Admin CRUD
   @Get('admin/coupons')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.STAFF, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  list() {
-    return this.coupons.list();
+  list(@Query('branchId') branchId?: string, @CurrentUser() me?: User) {
+    if (me?.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      const enforcedBranchId = me.branchId;
+      if (!enforcedBranchId) throw new ForbiddenException('No branch assigned');
+      return this.coupons.list({ branchId: enforcedBranchId });
+    }
+    return this.coupons.list(branchId ? { branchId } : undefined);
   }
 
   @Post('admin/coupons')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  create(@Body() body: CreateCouponDto) {
+  create(@Body() body: CreateCouponDto, @CurrentUser() me: User) {
+    if (me?.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!me.branchId) throw new ForbiddenException('No branch assigned');
+      if (body.branchId && body.branchId !== me.branchId) {
+        throw new ForbiddenException('Not allowed for other branches');
+      }
+      (body as any).branchId = me.branchId;
+    }
     return this.coupons.create({
       ...body,
       startsAt: body.startsAt ? new Date(body.startsAt) : null,
@@ -35,9 +49,16 @@ export class CouponsController {
 
   @Patch('admin/coupons/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  update(@Param('id') id: string, @Body() body: UpdateCouponDto) {
+  update(@Param('id') id: string, @Body() body: UpdateCouponDto, @CurrentUser() me: User) {
+    if (me?.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!me.branchId) throw new ForbiddenException('No branch assigned');
+      if ((body as any).branchId && (body as any).branchId !== me.branchId) {
+        throw new ForbiddenException('Not allowed for other branches');
+      }
+      (body as any).branchId = me.branchId as any;
+    }
     return this.coupons.update(id, {
       ...body,
       startsAt: body.startsAt ? new Date(body.startsAt) : null,
@@ -47,7 +68,7 @@ export class CouponsController {
 
   @Delete('admin/coupons/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
   remove(@Param('id') id: string) {
     return this.coupons.remove(id);
