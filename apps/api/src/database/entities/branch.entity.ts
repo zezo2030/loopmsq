@@ -53,6 +53,12 @@ export class Branch {
   @Column({ type: 'text', nullable: true })
   videoUrl: string;
 
+  @Column({ type: 'text', nullable: true })
+  coverImage: string | null;
+
+  @Column({ type: 'json', nullable: true })
+  images: string[];
+
   @CreateDateColumn()
   createdAt: Date;
 

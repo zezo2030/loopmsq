@@ -1,4 +1,4 @@
-import { Row, Col, Card, Statistic, List, Avatar, Button, Space, Tag, Divider } from 'antd'
+import { Row, Col, Card, Statistic, List, Avatar, Button, Space, Tag, Divider, Image } from 'antd'
 import { 
   CalendarOutlined,
   RiseOutlined,
@@ -29,6 +29,7 @@ export default function Dashboard() {
     startTime?: string; 
     status?: string 
   }>>([])
+  const [branchData, setBranchData] = useState<any>(null)
 
   useEffect(() => {
     ;(async () => {
@@ -42,6 +43,12 @@ export default function Dashboard() {
         const items = Array.isArray(res?.bookings) ? res.bookings : (res?.items || [])
         setRecent(items)
       } catch {}
+      try {
+        if (me?.branchId) {
+          const branch = await apiGet(`/content/branches/${me.branchId}`)
+          setBranchData(branch)
+        }
+      } catch {}
     })()
   }, [me?.branchId])
 
@@ -49,6 +56,18 @@ export default function Dashboard() {
 
   return (
     <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+      {/* Branch Cover Image */}
+      {branchData?.coverImage && (
+        <Card style={{ marginBottom: '24px', padding: 0, overflow: 'hidden' }}>
+          <Image
+            src={branchData.coverImage}
+            alt="Branch Cover"
+            style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+            preview={false}
+          />
+        </Card>
+      )}
+
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-content">
@@ -272,6 +291,29 @@ export default function Dashboard() {
               </Card>
             </Col>
           </Row>
+
+          {/* Branch Images Gallery */}
+          {branchData?.images && branchData.images.length > 0 && (
+            <Row gutter={[24, 24]} style={{ marginTop: '32px' }}>
+              <Col xs={24}>
+                <Card className="custom-card" title={t('branch.images') || 'Branch Images'}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                    {branchData.images.map((imageUrl: string, index: number) => (
+                      <Image
+                        key={index}
+                        src={imageUrl}
+                        alt={`Branch Image ${index + 1}`}
+                        style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8 }}
+                        preview={{
+                          mask: <div style={{ color: 'white' }}>معاينة</div>
+                        }}
+                      />
+                    ))}
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+          )}
         </div>
       </div>
     </div>

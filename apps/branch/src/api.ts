@@ -12,15 +12,22 @@ export async function apiGet<T>(path: string): Promise<T> {
   return resp.json()
 }
 
-export async function apiPost<T>(path: string, body: any): Promise<T> {
+export async function apiPost<T>(path: string, body: any, options?: { headers?: Record<string, string> }): Promise<T> {
   const token = localStorage.getItem('accessToken')
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    ...options?.headers
+  }
+  
+  // If body is FormData, don't set Content-Type (let browser set it with boundary)
+  if (!(body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json'
+  }
+  
   const resp = await fetch(`${getApiBase()}${path}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
+    headers,
+    body: body instanceof FormData ? body : JSON.stringify(body),
   })
   if (!resp.ok) throw new Error(await safeText(resp) || 'Request failed')
   return resp.json()

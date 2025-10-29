@@ -294,5 +294,18 @@
   "staff.create": "إنشاء موظف",
   "staff.create_failed": "فشل إنشاء الموظف",
   "staff.unnamed": "موظف بدون اسم",
+  "branch.cover_image": "صورة الغلاف",
+  "branch.images": "الصور الإضافية",
+  "branch.upload_cover": "رفع صورة الغلاف",
+  "branch.upload_images": "رفع صور إضافية",
+  "branch.remove_image": "حذف الصورة",
+  "branch.image_uploaded": "تم رفع الصورة بنجاح",
+  "branch.image_deleted": "تم حذف الصورة بنجاح",
+  "branch.image_upload_failed": "فشل رفع الصورة",
+  "branch.image_delete_failed": "فشل حذف الصورة",
+  "branch.max_images": "الحد الأقصى 5 صور",
+  "branch.select_image": "اختر صورة",
+  "branch.drag_drop": "اسحب وأفلت الصور هنا أو انقر للاختيار",
+  "branch.image_preview": "معاينة الصورة",
   "errors.forbidden": "غير مصرح"
 }

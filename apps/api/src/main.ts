@@ -12,14 +12,19 @@ import { createBullBoard } from '@bull-board/api';
 import { BullAdapter } from '@bull-board/api/bullAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { join } from 'path';
+import * as fs from 'fs';
+import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
-  // Security
-  app.use(helmet());
+  // Security (allow cross-origin images for admin preview)
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }));
   app.use(compression());
 
   // CORS
@@ -46,6 +51,21 @@ async function bootstrap() {
 
   // Global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  // Static files serving (resolve uploads dir dynamically)
+  const expressInstance = app.getHttpAdapter().getInstance();
+  const uploadsCandidates = [
+    join(__dirname, '..', '..', '..', 'uploads'),
+    join(__dirname, '..', 'uploads'),
+  ];
+  const uploadsRoot = uploadsCandidates.find((p) => {
+    try {
+      return fs.existsSync(p);
+    } catch {
+      return false;
+    }
+  }) || uploadsCandidates[0];
+  expressInstance.use('/uploads', express.static(uploadsRoot));
 
   // Global throttler guard
   // Note: ThrottlerGuard will be applied via module configuration

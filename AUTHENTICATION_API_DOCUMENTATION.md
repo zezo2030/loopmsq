@@ -4,10 +4,10 @@
 
 ### Base URLs للإنتاج:
 ```
-Production API: http://72.61.159.84/api/v1
-Admin Console: http://72.61.159.84:3001
-API Documentation: http://72.61.159.84/api/v1/docs (Development Only)
-Queues Dashboard: http://72.61.159.84/api/v1/queues (Development Only)
+Production API: http://localhost:3000/api/v1
+Admin Console: http://localhost:3001
+API Documentation: http://localhost:3000/api/v1/docs (Development Only)
+Queues Dashboard: http://localhost:3000/api/v1/queues (Development Only)
 ```
 
 ---
@@ -29,7 +29,7 @@ Queues Dashboard: http://72.61.159.84/api/v1/queues (Development Only)
 
 #### Request:
 ```http
-POST http://72.61.159.84/api/v1/auth/login
+POST http://localhost:3000/api/v1/auth/login
 Content-Type: application/json
 
 {
@@ -40,7 +40,7 @@ Content-Type: application/json
 
 #### أو باستخدام رقم الهاتف:
 ```http
-POST http://72.61.159.84/api/v1/auth/login
+POST http://localhost:3000/api/v1/auth/login
 Content-Type: application/json
 
 {
@@ -80,7 +80,7 @@ Content-Type: application/json
 
 #### أ) إرسال OTP:
 ```http
-POST http://72.61.159.84/api/v1/auth/otp/send
+POST http://localhost:3000/api/v1/auth/otp/send
 Content-Type: application/json
 
 {
@@ -99,7 +99,7 @@ Content-Type: application/json
 
 #### ب) تأكيد OTP:
 ```http
-POST http://72.61.159.84/api/v1/auth/otp/verify
+POST http://localhost:3000/api/v1/auth/otp/verify
 Content-Type: application/json
 
 {
@@ -131,7 +131,7 @@ Content-Type: application/json
 
 #### أ) إرسال OTP للتسجيل:
 ```http
-POST http://72.61.159.84/api/v1/auth/register/otp/send
+POST http://localhost:3000/api/v1/auth/register/otp/send
 Content-Type: application/json
 
 {
@@ -153,7 +153,7 @@ Content-Type: application/json
 
 #### ب) تأكيد التسجيل:
 ```http
-POST http://72.61.159.84/api/v1/auth/register/otp/verify
+POST http://localhost:3000/api/v1/auth/register/otp/verify
 Content-Type: application/json
 
 {
@@ -183,7 +183,7 @@ Content-Type: application/json
 
 #### أ) الحصول على الملف الشخصي:
 ```http
-GET http://72.61.159.84/api/v1/auth/me
+GET http://localhost:3000/api/v1/auth/me
 Authorization: Bearer {accessToken}
 ```
 
@@ -210,7 +210,7 @@ Authorization: Bearer {accessToken}
 
 #### ب) تجديد الرمز المميز:
 ```http
-POST http://72.61.159.84/api/v1/auth/refresh
+POST http://localhost:3000/api/v1/auth/refresh
 Content-Type: application/json
 
 {
@@ -232,11 +232,11 @@ Content-Type: application/json
 
 #### Request:
 ```http
-POST http://72.61.159.84/api/v1/auth/staff/login
+POST http://localhost:3000/api/v1/auth/staff/login
 Content-Type: application/json
 
 {
-  "email": "admin@72.61.159.84",
+  "email": "admin@localhost",
   "password": "AdminPassword123!"
 }
 ```
@@ -262,7 +262,7 @@ Content-Type: application/json
 
 #### Request:
 ```http
-GET http://72.61.159.84/api/v1/auth/email-config
+GET http://localhost:3000/api/v1/auth/email-config
 ```
 
 #### Response:
@@ -358,7 +358,7 @@ JWT_REFRESH_SECRET=your-super-secure-refresh-secret-key-for-production
 ENCRYPTION_KEY=your-32-character-encryption-key-for-production
 
 # Admin
-ADMIN_EMAIL=admin@72.61.159.84
+ADMIN_EMAIL=admin@localhost
 ADMIN_PASSWORD=YourSecureAdminPassword123!
 ADMIN_NAME=Admin
 ADMIN_PHONE=+966500000000
@@ -368,10 +368,10 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
-SMTP_FROM=noreply@72.61.159.84
+SMTP_FROM=noreply@localhost
 
 # Frontend
-NEXT_PUBLIC_API_BASE=http://72.61.159.84/api/v1
+NEXT_PUBLIC_API_BASE=http://localhost:3000/api/v1
 ```
 
 ---
@@ -382,7 +382,7 @@ NEXT_PUBLIC_API_BASE=http://72.61.159.84/api/v1
 
 ```javascript
 // Base URL
-const API_BASE = 'http://72.61.159.84/api/v1';
+const API_BASE = 'http://localhost:3000/api/v1';
 
 // تسجيل الدخول
 const login = async (identifier, password) => {
@@ -557,7 +557,7 @@ docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
 docker-compose -f docker-compose.prod.yml logs api
 
 # اختبار API
-curl http://72.61.159.84/api/v1/health
+curl http://localhost:3000/api/v1/health
 ```
 
 ---
@@ -570,8 +570,8 @@ curl http://72.61.159.84/api/v1/health
 3. تحقق من حالة النظام: `GET /api/v1/health`
 
 ### معلومات الاتصال:
-- **API Documentation**: `http://72.61.159.84/api/v1/docs` (Development)
-- **Queues Dashboard**: `http://72.61.159.84/api/v1/queues` (Development)
+- **API Documentation**: `http://localhost:3000/api/v1/docs` (Development)
+- **Queues Dashboard**: `http://localhost:3000/api/v1/queues` (Development)
 
 ---
 

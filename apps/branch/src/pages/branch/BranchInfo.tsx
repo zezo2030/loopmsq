@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Card, Form, Input, Button, message, Row, Col, Select, Switch, Space, Typography, Divider } from 'antd'
-import { SaveOutlined, EditOutlined } from '@ant-design/icons'
+import { Card, Form, Input, Button, message, Row, Col, Select, Switch, Space, Typography, Divider, Upload, Image } from 'antd'
+import { SaveOutlined, EditOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
-import { apiGet, apiPut } from '../../api'
+import { apiGet, apiPut, apiPost, apiDelete } from '../../api'
 import { useBranchAuth } from '../../auth'
 import WorkingHoursEditor from '../../components/WorkingHoursEditor'
 
@@ -70,6 +70,57 @@ export default function BranchInfo() {
       loadBranchData()
     } catch (error) {
       message.error(t('branch.status_update_failed') || 'Failed to update status')
+    }
+  }
+
+  const handleCoverImageUpload = async (file: any) => {
+    if (!me?.branchId) return false
+    
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    try {
+      await apiPost(`/content/branches/${me.branchId}/upload-cover`, formData)
+      message.success(t('branch.image_uploaded') || 'Image uploaded successfully')
+      loadBranchData()
+      return false // Prevent default upload
+    } catch (error) {
+      message.error(t('branch.image_upload_failed') || 'Failed to upload image')
+      return false
+    }
+  }
+
+  const handleImagesUpload = async (fileList: any[]) => {
+    if (!me?.branchId) return false
+    
+    const formData = new FormData()
+    fileList.forEach(file => {
+      formData.append('files', file)
+    })
+    
+    try {
+      await apiPost(`/content/branches/${me.branchId}/upload-images`, formData)
+      message.success(t('branch.image_uploaded') || 'Images uploaded successfully')
+      loadBranchData()
+      return false // Prevent default upload
+    } catch (error) {
+      message.error(t('branch.image_upload_failed') || 'Failed to upload images')
+      return false
+    }
+  }
+
+  const handleDeleteImage = async (imageUrl: string) => {
+    if (!me?.branchId) return
+    
+    const filename = imageUrl.split('/').pop()
+    if (!filename) return
+    
+    try {
+      await apiDelete(`/content/branches/${me.branchId}/images/${filename}`)
+      message.success(t('branch.image_deleted') || 'Image deleted successfully')
+      loadBranchData()
+    } catch (error) {
+      message.error(t('branch.image_delete_failed') || 'Failed to delete image')
     }
   }
 
@@ -223,6 +274,92 @@ export default function BranchInfo() {
                     </Col>
                   </Row>
                 </Form>
+              </Card>
+            </Col>
+
+            {/* Branch Images */}
+            <Col xs={24} lg={16}>
+              <Card className="custom-card" title={t('branch.cover_image') || 'Cover Image'}>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  {branchData?.coverImage ? (
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <Image
+                        src={branchData.coverImage}
+                        alt="Cover"
+                        style={{ width: 200, height: 150, objectFit: 'cover', borderRadius: 8 }}
+                      />
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => handleDeleteImage(branchData.coverImage)}
+                        style={{ position: 'absolute', top: 8, right: 8 }}
+                      />
+                    </div>
+                  ) : (
+                    <Upload
+                      beforeUpload={handleCoverImageUpload}
+                      showUploadList={false}
+                      accept="image/*"
+                    >
+                      <Button icon={<UploadOutlined />}>
+                        {t('branch.upload_cover') || 'Upload Cover Image'}
+                      </Button>
+                    </Upload>
+                  )}
+                </Space>
+              </Card>
+            </Col>
+
+            {/* Additional Images */}
+            <Col xs={24} lg={16}>
+              <Card className="custom-card" title={t('branch.images') || 'Additional Images'}>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  {branchData?.images && branchData.images.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {branchData.images.map((imageUrl: string, index: number) => (
+                        <div key={index} style={{ position: 'relative', display: 'inline-block' }}>
+                          <Image
+                            src={imageUrl}
+                            alt={`Image ${index + 1}`}
+                            style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8 }}
+                          />
+                          <Button
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleDeleteImage(imageUrl)}
+                            style={{ position: 'absolute', top: 4, right: 4 }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <Upload
+                    beforeUpload={(file, fileList) => {
+                      handleImagesUpload([file, ...fileList])
+                      return false
+                    }}
+                    showUploadList={false}
+                    accept="image/*"
+                    multiple
+                    disabled={branchData?.images && branchData.images.length >= 5}
+                  >
+                    <Button 
+                      icon={<UploadOutlined />}
+                      disabled={branchData?.images && branchData.images.length >= 5}
+                    >
+                      {t('branch.upload_images') || 'Upload Additional Images'}
+                    </Button>
+                  </Upload>
+                  
+                  {branchData?.images && branchData.images.length >= 5 && (
+                    <Typography.Text type="secondary">
+                      {t('branch.max_images') || 'Maximum 5 images'}
+                    </Typography.Text>
+                  )}
+                </Space>
               </Card>
             </Col>
 

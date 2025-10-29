@@ -74,7 +74,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./uploads:/app/uploads
+      - ./uploads:/app/apps/api/uploads
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]

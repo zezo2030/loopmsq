@@ -477,7 +477,20 @@
   "halls.delete_confirm_title": "Delete Hall",
   "halls.delete_confirm_message": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
   "halls.deleted": "Hall deleted successfully",
-  "halls.delete_failed": "Failed to delete hall"
+  "halls.delete_failed": "Failed to delete hall",
+  "branches.cover_image": "Cover Image",
+  "branches.images": "Additional Images",
+  "branches.upload_cover": "Upload Cover Image",
+  "branches.upload_images": "Upload Additional Images",
+  "branches.remove_image": "Remove Image",
+  "branches.image_uploaded": "Image uploaded successfully",
+  "branches.image_deleted": "Image deleted successfully",
+  "branches.image_upload_failed": "Failed to upload image",
+  "branches.image_delete_failed": "Failed to delete image",
+  "branches.max_images": "Maximum 5 images",
+  "branches.select_image": "Select Image",
+  "branches.drag_drop": "Drag and drop images here or click to select",
+  "branches.image_preview": "Image Preview"
 }
 
 

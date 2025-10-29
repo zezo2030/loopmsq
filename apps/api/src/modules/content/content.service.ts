@@ -123,6 +123,64 @@ export class ContentService {
     return updatedBranch;
   }
 
+  async uploadBranchCoverImage(branchId: string, filename: string): Promise<Branch> {
+    const branch = await this.findBranchById(branchId);
+
+    branch.coverImage = `/uploads/branches/${filename}`;
+    const updatedBranch = await this.branchRepository.save(branch);
+
+    // Clear cache
+    await this.redisService.del(`branch:${branchId}`);
+    await this.redisService.del('branches:all');
+    await this.redisService.del('branches:active');
+
+    this.logger.log(`Branch cover image updated: ${branchId}`);
+    return updatedBranch;
+  }
+
+  async uploadBranchImages(branchId: string, filenames: string[]): Promise<Branch> {
+    const branch = await this.findBranchById(branchId);
+
+    const imageUrls = filenames.map(filename => `/uploads/branches/${filename}`);
+    branch.images = [...(branch.images || []), ...imageUrls];
+    
+    const updatedBranch = await this.branchRepository.save(branch);
+
+    // Clear cache
+    await this.redisService.del(`branch:${branchId}`);
+    await this.redisService.del('branches:all');
+    await this.redisService.del('branches:active');
+
+    this.logger.log(`Branch images updated: ${branchId}`);
+    return updatedBranch;
+  }
+
+  async deleteBranchImage(branchId: string, filename: string): Promise<Branch> {
+    const branch = await this.findBranchById(branchId);
+
+    const imageUrl = `/uploads/branches/${filename}`;
+    
+    // Remove from cover image if it matches
+    if (branch.coverImage === imageUrl) {
+      branch.coverImage = null;
+    }
+    
+    // Remove from images array
+    if (branch.images) {
+      branch.images = branch.images.filter(img => img !== imageUrl);
+    }
+    
+    const updatedBranch = await this.branchRepository.save(branch);
+
+    // Clear cache
+    await this.redisService.del(`branch:${branchId}`);
+    await this.redisService.del('branches:all');
+    await this.redisService.del('branches:active');
+
+    this.logger.log(`Branch image deleted: ${branchId}`);
+    return updatedBranch;
+  }
+
   // Hall Management
   async createHall(createHallDto: CreateHallDto): Promise<Hall> {
     // Verify branch exists

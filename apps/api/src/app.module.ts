@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { I18nModule, AcceptLanguageResolver, QueryResolver } from 'nestjs-i18n';
 import { join } from 'path';
+import * as fs from 'fs';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -34,8 +36,28 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
 import { SearchModule } from './modules/search/search.module';
 import { AdminConfigModule } from './modules/admin-config/admin-config.module';
 
+// Resolve uploads root dynamically to support local and Docker paths
+const uploadsCandidates = [
+  // Monorepo root uploads (local dev)
+  join(__dirname, '..', '..', '..', 'uploads'),
+  // Inside api app (Docker volume mounts here)
+  join(__dirname, '..', 'uploads'),
+];
+const uploadsRoot = uploadsCandidates.find((p) => {
+  try {
+    return fs.existsSync(p);
+  } catch {
+    return false;
+  }
+}) || uploadsCandidates[0];
+
 @Module({
   imports: [
+    // Static files (serve uploads directory at /uploads)
+    ServeStaticModule.forRoot({
+      rootPath: uploadsRoot,
+      serveRoot: '/uploads',
+    }),
     // i18n
     I18nModule.forRoot({
       fallbackLanguage: 'en',

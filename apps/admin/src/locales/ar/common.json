@@ -477,7 +477,20 @@
   "halls.delete_confirm_title": "حذف القاعة",
   "halls.delete_confirm_message": "هل أنت متأكد من حذف \"{{name}}\"؟ لا يمكن التراجع عن هذا الإجراء.",
   "halls.deleted": "تم حذف القاعة بنجاح",
-  "halls.delete_failed": "فشل حذف القاعة"
+  "halls.delete_failed": "فشل حذف القاعة",
+  "branches.cover_image": "صورة الغلاف",
+  "branches.images": "الصور الإضافية",
+  "branches.upload_cover": "رفع صورة الغلاف",
+  "branches.upload_images": "رفع صور إضافية",
+  "branches.remove_image": "حذف الصورة",
+  "branches.image_uploaded": "تم رفع الصورة بنجاح",
+  "branches.image_deleted": "تم حذف الصورة بنجاح",
+  "branches.image_upload_failed": "فشل رفع الصورة",
+  "branches.image_delete_failed": "فشل حذف الصورة",
+  "branches.max_images": "الحد الأقصى 5 صور",
+  "branches.select_image": "اختر صورة",
+  "branches.drag_drop": "اسحب وأفلت الصور هنا أو انقر للاختيار",
+  "branches.image_preview": "معاينة الصورة"
 }
 
 

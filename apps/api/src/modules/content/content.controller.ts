@@ -13,6 +13,9 @@ import {
   ParseIntPipe,
   ParseBoolPipe,
   ForbiddenException,
+  UploadedFile,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -21,7 +24,12 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import * as fs from 'fs';
 import { ContentService } from './content.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { CreateHallDto } from './dto/create-hall.dto';
@@ -107,6 +115,133 @@ export class ContentController {
     @Body('status') status: 'active' | 'inactive' | 'maintenance',
   ) {
     return this.contentService.updateBranchStatus(id, status);
+  }
+
+  @Post('branches/:id/upload-cover')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload branch cover image' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Cover image uploaded successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          // Resolve uploads directory (supports local and Docker paths)
+          const candidates = [
+            join(__dirname, '..', '..', '..', 'uploads', 'branches'),
+            join(__dirname, '..', 'uploads', 'branches'),
+          ];
+          const target = candidates.find((p) => {
+            try {
+              return fs.existsSync(join(p, '..')) || fs.existsSync(p);
+            } catch {
+              return false;
+            }
+          }) || candidates[0];
+          try {
+            fs.mkdirSync(target, { recursive: true });
+          } catch {}
+          cb(null, target);
+        },
+        filename: (req, file, cb) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `cover-${unique}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
+  async uploadBranchCover(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() requester: User,
+  ) {
+    // Branch manager may only upload to their own branch
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId || requester.branchId !== id) {
+        throw new ForbiddenException('Not allowed');
+      }
+    }
+    return this.contentService.uploadBranchCoverImage(id, file.filename);
+  }
+
+  @Post('branches/:id/upload-images')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload branch additional images' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Images uploaded successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  @UseInterceptors(
+    FilesInterceptor('files', 5, {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const candidates = [
+            join(__dirname, '..', '..', '..', 'uploads', 'branches'),
+            join(__dirname, '..', 'uploads', 'branches'),
+          ];
+          const target = candidates.find((p) => {
+            try {
+              return fs.existsSync(join(p, '..')) || fs.existsSync(p);
+            } catch {
+              return false;
+            }
+          }) || candidates[0];
+          try {
+            fs.mkdirSync(target, { recursive: true });
+          } catch {}
+          cb(null, target);
+        },
+        filename: (req, file, cb) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `img-${unique}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
+  async uploadBranchImages(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() requester: User,
+  ) {
+    // Branch manager may only upload to their own branch
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId || requester.branchId !== id) {
+        throw new ForbiddenException('Not allowed');
+      }
+    }
+    const filenames = files.map(file => file.filename);
+    return this.contentService.uploadBranchImages(id, filenames);
+  }
+
+  @Delete('branches/:id/images/:filename')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete branch image' })
+  @ApiResponse({ status: 200, description: 'Image deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  async deleteBranchImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('filename') filename: string,
+    @CurrentUser() requester: User,
+  ) {
+    // Branch manager may only delete from their own branch
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId || requester.branchId !== id) {
+        throw new ForbiddenException('Not allowed');
+      }
+    }
+    return this.contentService.deleteBranchImage(id, filename);
   }
 
   // Hall endpoints

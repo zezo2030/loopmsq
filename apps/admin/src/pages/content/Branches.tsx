@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useAdminAuth } from '../../auth'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space } from 'antd'
-import { apiGet, apiPost, apiPut, apiPatch } from '../../api'
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image } from 'antd'
+import { resolveFileUrl } from '../../shared/url'
+import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../api'
 import { useTranslation } from 'react-i18next'
 import WorkingHoursEditor from '../../components/WorkingHoursEditor'
 
@@ -18,6 +20,8 @@ type Branch = {
   workingHours?: Record<string, { open: string; close: string; closed?: boolean }>
   amenities?: string[]
   status?: 'active' | 'inactive' | 'maintenance'
+  coverImage?: string | null
+  images?: string[]
 }
 
 export default function Branches() {
@@ -51,6 +55,51 @@ export default function Branches() {
     onSuccess: () => { message.success(t('branches.status_updated') || 'Status updated'); qc.invalidateQueries({ queryKey: ['branches'] }) },
   })
 
+  const handleCoverImageUpload = async (file: any, branchId: string) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    try {
+      await apiPost(`/content/branches/${branchId}/upload-cover`, formData)
+      message.success(t('branches.image_uploaded') || 'Image uploaded successfully')
+      qc.invalidateQueries({ queryKey: ['branches'] })
+      return false // Prevent default upload
+    } catch (error) {
+      message.error(t('branches.image_upload_failed') || 'Failed to upload image')
+      return false
+    }
+  }
+
+  const handleImagesUpload = async (fileList: any[], branchId: string) => {
+    const formData = new FormData()
+    fileList.forEach(file => {
+      formData.append('files', file)
+    })
+    
+    try {
+      await apiPost(`/content/branches/${branchId}/upload-images`, formData)
+      message.success(t('branches.image_uploaded') || 'Images uploaded successfully')
+      qc.invalidateQueries({ queryKey: ['branches'] })
+      return false // Prevent default upload
+    } catch (error) {
+      message.error(t('branches.image_upload_failed') || 'Failed to upload images')
+      return false
+    }
+  }
+
+  const handleDeleteImage = async (imageUrl: string, branchId: string) => {
+    const filename = imageUrl.split('/').pop()
+    if (!filename) return
+    
+    try {
+      await apiDelete(`/content/branches/${branchId}/images/${filename}`)
+      message.success(t('branches.image_deleted') || 'Image deleted successfully')
+      qc.invalidateQueries({ queryKey: ['branches'] })
+    } catch (error) {
+      message.error(t('branches.image_delete_failed') || 'Failed to delete image')
+    }
+  }
+
   const columns = [
     { title: t('branches.id') || 'ID', dataIndex: 'id', key: 'id' },
     { title: t('branches.name_ar') || 'الاسم (AR)', dataIndex: 'name_ar', key: 'name_ar' },
@@ -58,6 +107,22 @@ export default function Branches() {
     { title: t('branches.location') || 'الموقع', dataIndex: 'location', key: 'location' },
     { title: t('branches.capacity') || 'السعة', dataIndex: 'capacity', key: 'capacity' },
     { title: t('branches.status') || 'الحالة', dataIndex: 'status', key: 'status' },
+    { 
+      title: t('branches.cover_image') || 'صورة الغلاف', 
+      dataIndex: 'coverImage', 
+      key: 'coverImage',
+      render: (coverImage: string | null) => (
+        coverImage ? (
+          <Image
+            src={resolveFileUrl(coverImage)}
+            alt="Cover"
+            style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4 }}
+          />
+        ) : (
+          <span style={{ color: '#999' }}>لا توجد صورة</span>
+        )
+      )
+    },
     {
       title: t('common.actions') || 'إجراءات',
       key: 'actions',
@@ -158,6 +223,88 @@ export default function Branches() {
           </Form.Item>
           <Form.Item name="description_en" label={t('branches.description_en') || 'الوصف (EN)'}>
             <Input.TextArea rows={3} />
+          </Form.Item>
+          
+          {/* Cover Image */}
+          <Form.Item label={t('branches.cover_image') || 'صورة الغلاف'}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {editing?.coverImage ? (
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <Image
+                    src={resolveFileUrl(editing.coverImage)}
+                    alt="Cover"
+                    style={{ width: 200, height: 150, objectFit: 'cover', borderRadius: 8 }}
+                  />
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleDeleteImage(editing.coverImage!, editing.id)}
+                    style={{ position: 'absolute', top: 8, right: 8 }}
+                  />
+                </div>
+              ) : (
+                <Upload
+                  beforeUpload={(file) => handleCoverImageUpload(file, editing?.id || '')}
+                  showUploadList={false}
+                  accept="image/*"
+                >
+                  <Button icon={<UploadOutlined />}>
+                    {t('branches.upload_cover') || 'رفع صورة الغلاف'}
+                  </Button>
+                </Upload>
+              )}
+            </Space>
+          </Form.Item>
+
+          {/* Additional Images */}
+          <Form.Item label={t('branches.images') || 'الصور الإضافية'}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {editing?.images && editing.images.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {editing.images.map((imageUrl: string, index: number) => (
+                    <div key={index} style={{ position: 'relative', display: 'inline-block' }}>
+                      <Image
+                        src={resolveFileUrl(imageUrl)}
+                        alt={`Image ${index + 1}`}
+                        style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8 }}
+                      />
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => handleDeleteImage(imageUrl, editing.id)}
+                        style={{ position: 'absolute', top: 4, right: 4 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <Upload
+                beforeUpload={(file, fileList) => {
+                  handleImagesUpload([file, ...fileList], editing?.id || '')
+                  return false
+                }}
+                showUploadList={false}
+                accept="image/*"
+                multiple
+                disabled={editing?.images && editing.images.length >= 5}
+              >
+                <Button 
+                  icon={<UploadOutlined />}
+                  disabled={editing?.images && editing.images.length >= 5}
+                >
+                  {t('branches.upload_images') || 'رفع صور إضافية'}
+                </Button>
+              </Upload>
+              
+              {editing?.images && editing.images.length >= 5 && (
+                <span style={{ color: '#999', fontSize: '12px' }}>
+                  {t('branches.max_images') || 'الحد الأقصى 5 صور'}
+                </span>
+              )}
+            </Space>
           </Form.Item>
         </Form>
       </Modal>

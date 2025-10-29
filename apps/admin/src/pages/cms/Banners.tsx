@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, DatePicker, Form, Input, Modal, Switch, Table, message } from 'antd'
+import { Button, DatePicker, Form, Input, Modal, Switch, Table, message, Upload, Image, Space } from 'antd'
+import { UploadOutlined } from '@ant-design/icons'
+import { resolveFileUrl } from '../../shared/url'
 import { useState } from 'react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
 import dayjs from 'dayjs'
@@ -36,7 +38,7 @@ export default function Banners() {
 
   const columns = [
     { title: 'Title', dataIndex: 'title' },
-    { title: 'Image URL', dataIndex: 'imageUrl' },
+    { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrl(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: 'Link', dataIndex: 'link' },
     { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
     { title: 'Schedule', render: (_: any, r: Banner) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
@@ -79,8 +81,34 @@ export default function Banners() {
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="imageUrl" label="Image URL" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item label="Image" required>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {form.getFieldValue('imageUrl') ? (
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <Image src={resolveFileUrl(form.getFieldValue('imageUrl'))} width={200} height={120} style={{ objectFit: 'cover', borderRadius: 8 }} />
+                </div>
+              ) : null}
+              <Upload
+                accept="image/*"
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  const fd = new FormData()
+                  fd.append('file', file)
+                  apiPost<{ imageUrl: string }>('\/admin\/banners\/upload', fd)
+                    .then((res) => {
+                      form.setFieldsValue({ imageUrl: res.imageUrl })
+                      message.success('Image uploaded')
+                    })
+                    .catch(() => message.error('Upload failed'))
+                  return false
+                }}
+              >
+                <Button icon={<UploadOutlined />}>Upload Image</Button>
+              </Upload>
+              <Form.Item name="imageUrl" hidden rules={[{ required: true, message: 'Please upload an image' }]}> 
+                <Input />
+              </Form.Item>
+            </Space>
           </Form.Item>
           <Form.Item name="link" label="Link">
             <Input />

@@ -1,9 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { HomeAdminService } from './home-admin.service';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import * as fs from 'fs';
 
 @ApiTags('admin/banners')
 @Controller('admin/banners')
@@ -21,6 +25,39 @@ export class BannerAdminController {
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   create(@Body() body: any) { return this.svc.createBanner(body); }
+
+  @Post('upload')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const candidates = [
+            join(__dirname, '..', '..', '..', 'uploads', 'banners'),
+            join(__dirname, '..', 'uploads', 'banners'),
+          ];
+          const target = candidates.find((p) => {
+            try {
+              return fs.existsSync(join(p, '..')) || fs.existsSync(p);
+            } catch {
+              return false;
+            }
+          }) || candidates[0];
+          try { fs.mkdirSync(target, { recursive: true }); } catch {}
+          cb(null, target);
+        },
+        filename: (req, file, cb) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `banner-${unique}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
+  uploadBannerImage(@UploadedFile() file: Express.Multer.File) {
+    return { imageUrl: `/uploads/banners/${file.filename}` };
+  }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)

@@ -294,5 +294,18 @@
   "staff.create": "Create Staff",
   "staff.create_failed": "Failed to create staff member",
   "staff.unnamed": "Unnamed Staff",
+  "branch.cover_image": "Cover Image",
+  "branch.images": "Additional Images",
+  "branch.upload_cover": "Upload Cover Image",
+  "branch.upload_images": "Upload Additional Images",
+  "branch.remove_image": "Remove Image",
+  "branch.image_uploaded": "Image uploaded successfully",
+  "branch.image_deleted": "Image deleted successfully",
+  "branch.image_upload_failed": "Failed to upload image",
+  "branch.image_delete_failed": "Failed to delete image",
+  "branch.max_images": "Maximum 5 images",
+  "branch.select_image": "Select Image",
+  "branch.drag_drop": "Drag and drop images here or click to select",
+  "branch.image_preview": "Image Preview",
   "errors.forbidden": "Forbidden"
 }
