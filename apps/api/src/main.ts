@@ -70,7 +70,7 @@ async function bootstrap() {
       return false;
     }
   }) || uploadsCandidates[0];
-  expressInstance.use('/uploads', express.static(uploadsRoot));
+  expressInstance.use('/uploads', express.static(uploadsRoot, { index: false, redirect: false }));
 
   // Global throttler guard
   // Note: ThrottlerGuard will be applied via module configuration

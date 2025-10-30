@@ -58,6 +58,9 @@ const uploadsRoot = uploadsCandidates.find((p) => {
     ServeStaticModule.forRoot({
       rootPath: uploadsRoot,
       serveRoot: '/uploads',
+      serveStaticOptions: {
+        index: false,
+      },
     }),
     // i18n
     I18nModule.forRoot({
