@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, DatePicker, Form, Input, Modal, Switch, Table, message, Upload, Image, Space } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
-import { resolveFileUrl } from '../../shared/url'
+import { resolveFileUrl, resolveFileUrlWithBust } from '../../shared/url'
 import { useState } from 'react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
 import dayjs from 'dayjs'
@@ -38,7 +38,7 @@ export default function Banners() {
 
   const columns = [
     { title: 'Title', dataIndex: 'title' },
-    { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrl(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
+    { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrlWithBust(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: 'Link', dataIndex: 'link' },
     { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
     { title: 'Schedule', render: (_: any, r: Banner) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
@@ -85,7 +85,7 @@ export default function Banners() {
             <Space direction="vertical" style={{ width: '100%' }}>
               {form.getFieldValue('imageUrl') ? (
                 <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <Image src={resolveFileUrl(form.getFieldValue('imageUrl'))} width={200} height={120} style={{ objectFit: 'cover', borderRadius: 8 }} />
+                  <Image src={resolveFileUrlWithBust(form.getFieldValue('imageUrl'))} width={200} height={120} style={{ objectFit: 'cover', borderRadius: 8 }} />
                 </div>
               ) : null}
               <Upload

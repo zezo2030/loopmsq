@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Switch, Table, message, Upload, Image, Space } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
-import { resolveFileUrl } from '../../shared/url'
+import { resolveFileUrl, resolveFileUrlWithBust } from '../../shared/url'
 import { useState, useEffect, useMemo } from 'react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
 import dayjs from 'dayjs'
@@ -94,7 +94,7 @@ export default function Offers() {
     { title: 'Branch', dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
     { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? (hallsOptions.find(h => h.id === v)?.name_en || v) : 'All Halls' },
     { title: 'Title', dataIndex: 'title' },
-    { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrl(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
+    { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrlWithBust(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: 'Type', dataIndex: 'discountType' },
     { title: 'Value', dataIndex: 'discountValue' },
     { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
@@ -206,7 +206,7 @@ export default function Offers() {
             <Space direction="vertical" style={{ width: '100%' }}>
               {form.getFieldValue('imageUrl') ? (
                 <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <Image src={resolveFileUrl(form.getFieldValue('imageUrl'))} width={200} height={120} style={{ objectFit: 'cover', borderRadius: 8 }} />
+                  <Image src={resolveFileUrlWithBust(form.getFieldValue('imageUrl'))} width={200} height={120} style={{ objectFit: 'cover', borderRadius: 8 }} />
                 </div>
               ) : null}
               <Upload

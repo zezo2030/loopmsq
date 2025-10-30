@@ -1,5 +1,5 @@
 import { Row, Col, Card, Statistic, List, Avatar, Button, Space, Tag, Divider, Image } from 'antd'
-import { resolveFileUrl } from '../shared/url'
+import { resolveFileUrl, resolveFileUrlWithBust } from '../shared/url'
 import { 
   CalendarOutlined,
   RiseOutlined,
@@ -61,7 +61,7 @@ export default function Dashboard() {
       {branchData?.coverImage && (
         <Card style={{ marginBottom: '24px', padding: 0, overflow: 'hidden' }}>
           <Image
-            src={branchData.coverImage}
+            src={resolveFileUrlWithBust(branchData.coverImage)}
             alt="Branch Cover"
             style={{ width: '100%', height: '200px', objectFit: 'cover' }}
             preview={false}
@@ -302,7 +302,7 @@ export default function Dashboard() {
                     {branchData.images.map((imageUrl: string, index: number) => (
                       <Image
                         key={index}
-                        src={resolveFileUrl(imageUrl)}
+                        src={resolveFileUrlWithBust(imageUrl)}
                         alt={`Branch Image ${index + 1}`}
                         style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8 }}
                         preview={{

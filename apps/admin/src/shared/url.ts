@@ -20,4 +20,12 @@ export function resolveFileUrl(path?: string | null): string {
   return `${root}/${path}`
 }
 
+// Append cache-busting query param to force refresh (useful for previews after upload)
+export function resolveFileUrlWithBust(path?: string | null): string {
+  const url = resolveFileUrl(path)
+  if (!url) return ''
+  const sep = url.includes('?') ? '&' : '?'
+  return `${url}${sep}v=${Date.now()}`
+}
+
 
