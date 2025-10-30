@@ -37,6 +37,11 @@ async function bootstrap() {
   const apiPrefix = configService.get<string>('API_PREFIX') || 'api/v1';
   app.setGlobalPrefix(apiPrefix);
 
+  // Raw body for Tap webhook signature verification
+  const rawPaths = [`/${apiPrefix}/payments/webhook`];
+  const http = app.getHttpAdapter().getInstance();
+  rawPaths.forEach((p) => http.use(p, (express as any).raw({ type: '*/*' })));
+
   // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({

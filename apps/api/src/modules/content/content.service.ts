@@ -5,12 +5,14 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In, IsNull } from 'typeorm';
 import { Branch } from '../../database/entities/branch.entity';
 import { Hall } from '../../database/entities/hall.entity';
+import { Addon } from '../../database/entities/addon.entity';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { CreateHallDto } from './dto/create-hall.dto';
 import { RedisService } from '../../utils/redis.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 @Injectable()
 export class ContentService {
@@ -21,7 +23,10 @@ export class ContentService {
     private branchRepository: Repository<Branch>,
     @InjectRepository(Hall)
     private hallRepository: Repository<Hall>,
+    @InjectRepository(Addon)
+    private addonRepository: Repository<Addon>,
     private redisService: RedisService,
+    private realtime: RealtimeGateway,
   ) {}
 
   // Branch Management
@@ -269,6 +274,8 @@ export class ContentService {
     await this.redisService.del(`branch:${hall.branchId}`);
 
     this.logger.log(`Hall updated: ${id}`);
+    // Broadcast hall update (non-status changes may still matter for clients)
+    this.realtime.emitHallUpdated(id, { id, status: updatedHall.status });
     return updatedHall;
   }
 
@@ -287,6 +294,8 @@ export class ContentService {
     await this.redisService.del('halls:all');
 
     this.logger.log(`Hall status updated: ${id} -> ${status}`);
+    // Broadcast realtime status update
+    this.realtime.emitHallUpdated(id, { id, status });
     return updatedHall;
   }
 
@@ -324,10 +333,47 @@ export class ContentService {
   ): Promise<boolean> {
     try {
       this.logger.log(`Checking availability for hall: ${hallId}, startTime: ${startTime}, duration: ${durationHours} hours`);
-      
-      // For now, return true to allow all bookings
-      // In a real implementation, you would check against existing bookings
-      this.logger.log(`Hall availability check passed for hall: ${hallId}`);
+      // Working hours enforcement based on branch workingHours
+      const hall = await this.findHallById(hallId);
+      const branch = hall.branch;
+      const wh: any = branch?.workingHours || {};
+      const day = startTime.getDay(); // 0 Sunday .. 6 Saturday
+      const dayKeys = [
+        String(day),
+        ['sun','mon','tue','wed','thu','fri','sat'][day],
+        ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][day],
+      ];
+      let dayCfg: any;
+      for (const k of dayKeys) {
+        if (wh && wh[k] != null) { dayCfg = wh[k]; break; }
+      }
+      if (!dayCfg) {
+        // If no config for this day, allow by default
+        this.logger.warn(`No working hours for day ${day} on branch ${branch?.id}`);
+      } else {
+        if (dayCfg.closed === true) {
+          this.logger.log(`Branch closed on day ${day}`);
+          return false;
+        }
+        const openStr: string | undefined = dayCfg.open;
+        const closeStr: string | undefined = dayCfg.close;
+        if (openStr && closeStr) {
+          const [oH, oM] = openStr.split(':').map((v: string) => parseInt(v, 10));
+          const [cH, cM] = closeStr.split(':').map((v: string) => parseInt(v, 10));
+          const openAt = new Date(startTime);
+          openAt.setHours(oH || 0, oM || 0, 0, 0);
+          const closeAt = new Date(startTime);
+          closeAt.setHours(cH || 0, cM || 0, 0, 0);
+          const endTime = new Date(startTime.getTime() + durationHours * 60 * 60 * 1000);
+          if (startTime < openAt || endTime > closeAt) {
+            this.logger.log(`Requested time ${startTime.toISOString()} - ${endTime.toISOString()} is outside working hours ${openAt.toISOString()} - ${closeAt.toISOString()}`);
+            return false;
+          }
+        }
+      }
+
+      // TODO: Check against existing bookings calendar
+      this.logger.log(`Hall availability check passed (within working hours) for hall: ${hallId}`);
       return true;
     } catch (error) {
       this.logger.error(`Error checking hall availability: ${error.message}`, error.stack);
@@ -388,5 +434,73 @@ export class ContentService {
       decorationPrice,
       totalPrice: Math.round(totalPrice * 100) / 100, // Round to 2 decimal places
     };
+  }
+
+  // Add-ons fetching
+  async getHallAddOns(hallId: string): Promise<
+    { id: string; name: string; price: number; defaultQuantity: number }[]
+  > {
+    const hall = await this.findHallById(hallId);
+
+    // Pull active add-ons for the hall and its branch
+    const [hallAddons, branchAddons] = await Promise.all([
+      this.addonRepository.find({ where: { isActive: true, hallId: hall.id } }),
+      this.addonRepository.find({ where: { isActive: true, branchId: hall.branchId, hallId: IsNull() } }),
+    ]);
+
+    // Merge, preferring hall-specific when duplicate names exist
+    const merged = new Map<string, Addon>();
+    for (const a of branchAddons) merged.set(a.name.toLowerCase(), a);
+    for (const a of hallAddons) merged.set(a.name.toLowerCase(), a);
+
+    return Array.from(merged.values()).map((a) => ({
+      id: a.id,
+      name: a.name,
+      price: Number(a.price),
+      defaultQuantity: a.defaultQuantity || 1,
+    }));
+  }
+
+  // Admin: CRUD for Addons
+  async createAddon(data: {
+    name: string;
+    price: number;
+    defaultQuantity?: number;
+    isActive?: boolean;
+    branchId?: string | null;
+    hallId?: string | null;
+  }): Promise<Addon> {
+    const addon = this.addonRepository.create({
+      name: data.name,
+      price: data.price,
+      defaultQuantity: data.defaultQuantity ?? 1,
+      isActive: data.isActive ?? true,
+      branchId: data.branchId ?? null,
+      hallId: data.hallId ?? null,
+    });
+    return this.addonRepository.save(addon);
+  }
+
+  async listAddons(filter?: {
+    branchId?: string;
+    hallId?: string;
+    isActive?: boolean;
+  }): Promise<Addon[]> {
+    const where: any = {};
+    if (filter?.branchId) where.branchId = filter.branchId;
+    if (filter?.hallId) where.hallId = filter.hallId;
+    if (filter?.isActive !== undefined) where.isActive = filter.isActive;
+    return this.addonRepository.find({ where, order: { createdAt: 'DESC' } });
+  }
+
+  async updateAddon(id: string, update: Partial<Addon>): Promise<Addon> {
+    const found = await this.addonRepository.findOne({ where: { id } });
+    if (!found) throw new NotFoundException('Addon not found');
+    Object.assign(found, update);
+    return this.addonRepository.save(found);
+  }
+
+  async deleteAddon(id: string): Promise<void> {
+    await this.addonRepository.delete(id);
   }
 }

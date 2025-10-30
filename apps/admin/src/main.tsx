@@ -32,6 +32,7 @@ import Referrals from './pages/marketing/Referrals'
 import WalletsList from './pages/finance/WalletsList'
 import Branches from './pages/content/Branches'
 import Halls from './pages/content/Halls'
+import Addons from './pages/content/Addons'
 import Reviews from './pages/feedback/Reviews'
 import Tickets from './pages/support/Tickets'
 import ReportsOverview from './pages/reports/Overview'
@@ -102,6 +103,7 @@ const router = createBrowserRouter([
           // Content
           { path: 'content/branches', element: <Branches /> },
           { path: 'content/halls', element: <Halls /> },
+          { path: 'content/addons', element: <Addons /> },
 
           // Finance
           { path: 'finance/payments', element: <PaymentsList /> },

@@ -56,6 +56,11 @@ services:
       SMTP_USER: zezosaad194@gmail.com
       SMTP_PASS: yluw wgiu gogn ohys
       SMTP_FROM: zezosaad194@gmail.com
+      #TAP Configuration
+      TAP_SECRET_KEY: ${TAP_SECRET_KEY}
+      TAP_PUBLIC_KEY: ${TAP_PUBLIC_KEY}
+      TAP_API_BASE: ${TAP_API_BASE}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET}
     ports:
       - "3000:3000"
     depends_on:

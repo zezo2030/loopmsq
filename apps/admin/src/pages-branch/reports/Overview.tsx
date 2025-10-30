@@ -16,6 +16,14 @@ export default function Overview() {
   const [recentBookings, setRecentBookings] = useState<any[]>([])
 
   useEffect(() => {
+    // Initialize default date range to last 30 days for better visibility
+    if (!dateRange) {
+      const to = new Date()
+      const from = new Date()
+      from.setDate(from.getDate() - 30)
+      setDateRange([from, to])
+      return
+    }
     loadOverview()
     loadRecentBookings()
   }, [dateRange])

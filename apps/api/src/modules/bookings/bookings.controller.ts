@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Param,
   Body,
   Query,
@@ -215,5 +216,29 @@ export class BookingsController {
   @ApiOperation({ summary: 'List tickets scanned by current staff' })
   async getMyScans(@CurrentUser() user: User) {
     return this.bookingsService.getStaffScans(user.id);
+  }
+
+  // Hard delete booking (Admin/Branch Manager)
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Hard delete a booking (Admin/Branch Manager)' })
+  @ApiResponse({ status: 200, description: 'Booking deleted permanently' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
+  async hardDelete(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const roles = user.roles || [];
+    const isAdmin = roles.includes(UserRole.ADMIN);
+    const isManager = roles.includes(UserRole.BRANCH_MANAGER);
+    return this.bookingsService.deleteBookingHard(
+      id,
+      isAdmin ? undefined : user.id,
+      user.branchId,
+      isAdmin || isManager,
+    );
   }
 }

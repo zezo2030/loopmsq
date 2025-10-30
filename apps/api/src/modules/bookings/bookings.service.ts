@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, LessThanOrEqual, MoreThanOrEqual, IsNull } from 'typeorm';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
+import { Payment } from '../../database/entities/payment.entity';
 import { User } from '../../database/entities/user.entity';
 import { Offer } from '../../database/entities/offer.entity';
 import { Branch } from '../../database/entities/branch.entity';
@@ -20,6 +21,7 @@ import { ContentService } from '../content/content.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { RedisService } from '../../utils/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 @Injectable()
 export class BookingsService {
@@ -39,6 +41,7 @@ export class BookingsService {
     private redisService: RedisService,
     private dataSource: DataSource,
     private notifications: NotificationsService,
+    private realtime?: RealtimeGateway,
   ) {}
 
   async getQuote(quoteDto: BookingQuoteDto): Promise<{
@@ -62,6 +65,13 @@ export class BookingsService {
         addOns = [],
         couponCode,
       } = quoteDto;
+
+      // Prevent quoting in the past
+      const now = new Date();
+      const requestedStart = new Date(startTime);
+      if (requestedStart.getTime() <= now.getTime()) {
+        throw new BadRequestException('Cannot book in the past');
+      }
 
       // Find available hall if not specified
       let selectedHall: Hall;
@@ -99,10 +109,12 @@ export class BookingsService {
       );
       this.logger.log(`Pricing calculated: ${JSON.stringify(pricing)}`);
 
-      // Calculate add-ons cost
+      // Calculate add-ons cost (lookup real prices from content service)
+      const availableAddOns = await this.contentService.getHallAddOns(selectedHall.id);
+      const addOnIdToPrice = new Map(availableAddOns.map((a) => [a.id, a.price]));
+
       const addOnsCost = addOns.reduce((total, addOn) => {
-        // In a real implementation, you would fetch add-on prices from database
-        const addOnPrice = 50; // Mock price
+        const addOnPrice = addOnIdToPrice.get(addOn.id) ?? 0;
         return total + addOnPrice * addOn.quantity;
       }, 0);
 
@@ -132,11 +144,14 @@ export class BookingsService {
         hallId: selectedHall.id,
         hallName: selectedHall.name_en,
         pricing,
-        addOns: addOns.map((addOn) => ({
-          ...addOn,
-          price: 50, // Mock price
-          total: 50 * addOn.quantity,
-        })),
+        addOns: addOns.map((addOn) => {
+          const price = addOnIdToPrice.get(addOn.id) ?? 0;
+          return {
+            ...addOn,
+            price,
+            total: price * addOn.quantity,
+          };
+        }),
         discount: Math.round((offerDiscount + discount) * 100) / 100,
         totalPrice: Math.round(totalPrice * 100) / 100,
         available: isAvailable,
@@ -172,6 +187,13 @@ export class BookingsService {
     }
 
     this.logger.log(`Creating booking for hallId: ${hallId}, branchId: ${branchId}`);
+
+    // Prevent booking in the past
+    const nowForCreate = new Date();
+    const startForCreate = new Date(startTime);
+    if (startForCreate.getTime() <= nowForCreate.getTime()) {
+      throw new BadRequestException('Cannot book in the past');
+    }
 
     // Get quote first to validate and calculate pricing
     const quote = await this.getQuote({
@@ -223,13 +245,6 @@ export class BookingsService {
       const savedBooking = await queryRunner.manager.save(booking);
       this.logger.log(`Booking saved with ID: ${savedBooking.id}, hallId: ${savedBooking.hallId}`);
 
-      // Generate tickets
-      const tickets = await this.generateTickets(
-        queryRunner,
-        savedBooking,
-        persons,
-      );
-
       await queryRunner.commitTransaction();
 
       this.logger.log(`Booking created: ${savedBooking.id} for user ${userId}`);
@@ -253,6 +268,7 @@ export class BookingsService {
           data: { bookingId: savedBooking.id, startTime },
           channels: ['sms', 'push'],
           delayMs: ms24h,
+          jobId: `booking:${savedBooking.id}:reminder:24h`,
         });
       }
       if (ms2h > 0) {
@@ -262,6 +278,7 @@ export class BookingsService {
           data: { bookingId: savedBooking.id, startTime },
           channels: ['sms', 'push'],
           delayMs: ms2h,
+          jobId: `booking:${savedBooking.id}:reminder:2h`,
         });
       }
       if (msEnd > 0) {
@@ -271,6 +288,7 @@ export class BookingsService {
           data: { bookingId: savedBooking.id },
           channels: ['sms', 'push'],
           delayMs: msEnd,
+          jobId: `booking:${savedBooking.id}:end`,
         });
       }
 
@@ -281,6 +299,7 @@ export class BookingsService {
           data: { bookingId: savedBooking.id },
           channels: ['sms', 'push'],
           delayMs: msRating,
+          jobId: `booking:${savedBooking.id}:rating`,
         });
       }
 
@@ -643,6 +662,45 @@ export class BookingsService {
     };
   }
 
+  async deleteBookingHard(
+    bookingId: string,
+    userIdOrRequesterId?: string,
+    requesterBranchId?: string,
+    isRequesterBranchManager?: boolean,
+  ): Promise<{ success: true }> {
+    const booking = await this.findBookingById(
+      bookingId,
+      userIdOrRequesterId,
+      requesterBranchId,
+      isRequesterBranchManager,
+    );
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Delete related tickets and payments, then booking
+      await queryRunner.manager.delete(Ticket, { bookingId: booking.id });
+      await queryRunner.manager.delete(Payment, { bookingId: booking.id });
+      await queryRunner.manager.delete(Booking, { id: booking.id });
+
+      await queryRunner.commitTransaction();
+
+      // Cancel scheduled notifications and clear caches
+      await this.notifications.cancelScheduledForBooking(booking.id);
+      await this.redisService.del(`user:${booking.userId}:bookings`);
+
+      // Realtime notify deletion (optional: using updated event)
+      this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: 'DELETED' as any });
+      return { success: true };
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw e;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async getTicketByToken(token: string): Promise<{
     ticket: Ticket;
     booking: Booking;
@@ -694,16 +752,18 @@ export class BookingsService {
       throw new BadRequestException('Cannot cancel completed booking');
     }
 
-    // Check if booking can be cancelled (e.g., not too close to start time)
+    // Allow cancelling past pending bookings; enforce 24h rule only for future bookings
     const now = new Date();
     const bookingStart = new Date(booking.startTime);
-    const hoursUntilBooking =
-      (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    if (hoursUntilBooking < 24) {
-      throw new BadRequestException(
-        'Cannot cancel booking less than 24 hours before start time',
-      );
+    const isPast = bookingStart.getTime() <= now.getTime();
+    if (!isPast) {
+      const hoursUntilBooking =
+        (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+      if (hoursUntilBooking < 24) {
+        throw new BadRequestException(
+          'Cannot cancel booking less than 24 hours before start time',
+        );
+      }
     }
 
     // Start transaction
@@ -735,6 +795,9 @@ export class BookingsService {
       // Clear cache
       await this.redisService.del(`user:${userIdOrRequesterId}:bookings`);
 
+      // Cancel any scheduled notifications for this booking
+      await this.notifications.cancelScheduledForBooking(booking.id);
+
       // Notify cancellation
       await this.notifications.enqueue({
         type: 'BOOKING_CANCELLED',
@@ -743,6 +806,8 @@ export class BookingsService {
         channels: ['sms', 'push'],
       });
 
+      // realtime
+      this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: booking.status });
       return booking;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -807,6 +872,24 @@ export class BookingsService {
     }
 
     return tickets;
+  }
+
+  async issueTicketsForBooking(bookingId: string): Promise<Ticket[]> {
+    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    if (!booking) throw new NotFoundException('Booking not found');
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const tickets = await this.generateTickets(queryRunner, booking, booking.persons);
+      await queryRunner.commitTransaction();
+      return tickets;
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw e;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   private async calculateCouponDiscount(

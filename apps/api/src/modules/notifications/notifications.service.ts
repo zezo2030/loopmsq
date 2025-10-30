@@ -32,6 +32,7 @@ export interface EnqueueNotification {
   lang?: 'ar' | 'en';
   channels: NotificationChannel[];
   delayMs?: number;
+  jobId?: string;
 }
 
 @Injectable()
@@ -57,7 +58,7 @@ export class NotificationsService {
         this.smsQueue.add(
           'send',
           { to: n.to.phone || resolved.phone!, body, meta: { type: n.type, lang } },
-          { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, ...(n.delayMs ? { delay: n.delayMs } : {}) },
+          { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, ...(n.delayMs ? { delay: n.delayMs } : {}), ...(n.jobId ? { jobId: n.jobId } : {}) },
         ),
       );
     }
@@ -69,7 +70,7 @@ export class NotificationsService {
         this.emailQueue.add(
           'send',
           { to: n.to.email || resolved.email!, subject, html, meta: { type: n.type, lang } },
-          { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, ...(n.delayMs ? { delay: n.delayMs } : {}) },
+          { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, ...(n.delayMs ? { delay: n.delayMs } : {}), ...(n.jobId ? { jobId: n.jobId } : {}) },
         ),
       );
     }
@@ -83,13 +84,27 @@ export class NotificationsService {
           this.pushQueue.add(
             'send',
             { tokens, title, body, data: this.buildPushData(n) },
-            { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, ...(n.delayMs ? { delay: n.delayMs } : {}) },
+            { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, ...(n.delayMs ? { delay: n.delayMs } : {}), ...(n.jobId ? { jobId: n.jobId } : {}) },
           ),
         );
       }
     }
 
     await Promise.all(jobs);
+  }
+
+  async cancelScheduledForBooking(bookingId: string) {
+    const jobIds = [
+      `booking:${bookingId}:reminder:24h`,
+      `booking:${bookingId}:reminder:2h`,
+      `booking:${bookingId}:end`,
+      `booking:${bookingId}:rating`,
+    ];
+    await Promise.all([
+      ...jobIds.map((id) => this.smsQueue.removeJobs(id)),
+      ...jobIds.map((id) => this.emailQueue.removeJobs(id)),
+      ...jobIds.map((id) => this.pushQueue.removeJobs(id)),
+    ]);
   }
 
   private async resolveRecipient(to: { phone?: string; email?: string; userId?: string }): Promise<{ phone?: string; email?: string; lang?: 'ar' | 'en' }> {

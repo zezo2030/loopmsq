@@ -37,6 +37,8 @@ import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
+import { CreateAddonDto } from './dto/create-addon.dto';
+import { UpdateAddonDto } from './dto/update-addon.dto';
 
 @ApiTags('content')
 @Controller('content')
@@ -389,6 +391,61 @@ export class ContentController {
       durationHours,
       persons,
     );
+  }
+
+  @Get('halls/:id/addons')
+  @ApiOperation({ summary: 'List available add-ons for a hall' })
+  @ApiResponse({ status: 200, description: 'Add-ons retrieved successfully' })
+  async getHallAddOns(
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.contentService.getHallAddOns(id);
+  }
+
+  // Admin: Addons CRUD
+  @Post('admin/addons')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create addon (admin)' })
+  async createAddon(@Body() dto: CreateAddonDto) {
+    return this.contentService.createAddon(dto);
+  }
+
+  @Get('admin/addons')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List addons (admin)' })
+  async listAddons(
+    @Query('branchId') branchId?: string,
+    @Query('hallId') hallId?: string,
+    @Query('isActive') isActiveParam?: string,
+  ) {
+    const isActive = isActiveParam === 'true' ? true : isActiveParam === 'false' ? false : undefined;
+    return this.contentService.listAddons({ branchId, hallId, isActive });
+  }
+
+  @Put('admin/addons/:id')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update addon (admin)' })
+  async updateAddon(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateAddonDto,
+  ) {
+    return this.contentService.updateAddon(id, dto);
+  }
+
+  @Delete('admin/addons/:id')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Delete addon (admin)' })
+  async deleteAddon(@Param('id', ParseUUIDPipe) id: string) {
+    await this.contentService.deleteAddon(id);
+    return { success: true };
   }
 
   @Post('seed-sample-data')

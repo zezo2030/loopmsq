@@ -121,4 +121,18 @@ export class AuthController {
   async checkEmailConfig() {
     return this.notificationsService.getEmailConfigStatus();
   }
+
+  @Post('language')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update user language preference' })
+  @ApiResponse({ status: 200, description: 'Language updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  async updateLanguage(
+    @CurrentUser() user: User,
+    @Body('language') language: string,
+  ) {
+    return this.authService.updateLanguage(user.id, language);
+  }
 }

@@ -35,6 +35,7 @@ import { PackagesModule } from './modules/packages/packages.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { SearchModule } from './modules/search/search.module';
 import { AdminConfigModule } from './modules/admin-config/admin-config.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 // Resolve uploads root dynamically to support local and Docker paths
 const uploadsCandidates = [
@@ -130,6 +131,7 @@ const uploadsRoot = uploadsCandidates.find((p) => {
     ReferralsModule,
     SearchModule,
     AdminConfigModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],

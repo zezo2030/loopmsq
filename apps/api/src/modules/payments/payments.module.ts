@@ -7,9 +7,12 @@ import { Payment } from '../../database/entities/payment.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { BookingsModule } from '../bookings/bookings.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { ReferralsModule } from '../referrals/referrals.module';
 import { RedisService } from '../../utils/redis.service';
+import { RealtimeModule } from '../../realtime/realtime.module';
+import { TapService } from '../../integrations/tap/tap.service';
 
 @Module({
   imports: [
@@ -17,11 +20,13 @@ import { RedisService } from '../../utils/redis.service';
     TypeOrmModule.forFeature([Payment, Booking]),
     UsersModule,
     NotificationsModule,
+    BookingsModule,
     LoyaltyModule,
     ReferralsModule,
+    RealtimeModule,
   ],
   controllers: [PaymentsController],
-  providers: [PaymentsService, RedisService],
+  providers: [PaymentsService, RedisService, TapService],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

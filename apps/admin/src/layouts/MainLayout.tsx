@@ -194,6 +194,7 @@ export default function MainLayout() {
       children: [
         { key: 'content-branches', icon: <AppstoreOutlined />, label: <Link to="/admin/content/branches">{t('menu.content.branches')}</Link> },
         { key: 'content-halls', icon: <AppstoreOutlined />, label: <Link to="/admin/content/halls">{t('menu.content.halls')}</Link> },
+        { key: 'content-addons', icon: <AppstoreOutlined />, label: <Link to="/admin/content/addons">{t('menu.content.addons') || 'Add-ons'}</Link> },
       ],
     },
     {
@@ -355,6 +356,11 @@ function getPageTitle(pathname: string): string {
   if (path === '/cms/offers') return t('page.cms_offers')
   if (path === '/cms/coupons') return t('page.cms_coupons')
   if (path === '/cms/packages') return t('page.cms_packages')
+  
+  // Content
+  if (path === '/content/branches') return t('menu.content.branches')
+  if (path === '/content/halls') return t('menu.content.halls')
+  if (path === '/content/addons') return t('addons.title')
   
   if (path === '/settings') return t('settings.title')
 

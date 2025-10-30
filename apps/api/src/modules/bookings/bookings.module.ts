@@ -10,9 +10,10 @@ import { ContentModule } from '../content/content.module';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { RedisService } from '../../utils/redis.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { RealtimeModule } from '../../realtime/realtime.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Booking, Ticket, User, Offer]), ContentModule, NotificationsModule],
+  imports: [TypeOrmModule.forFeature([Booking, Ticket, User, Offer]), ContentModule, NotificationsModule, RealtimeModule],
   controllers: [BookingsController],
   providers: [BookingsService, QRCodeService, RedisService],
   exports: [BookingsService],

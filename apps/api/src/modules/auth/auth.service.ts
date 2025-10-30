@@ -475,6 +475,30 @@ export class AuthService {
     };
   }
 
+  async updateLanguage(userId: string, language: string): Promise<{ message: string }> {
+    // Validate language
+    if (!language || !['ar', 'en'].includes(language)) {
+      throw new BadRequestException('Invalid language. Must be "ar" or "en"');
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    user.language = language;
+    await this.userRepository.save(user);
+
+    return {
+      message: language === 'ar' 
+        ? 'تم تحديث اللغة بنجاح' 
+        : 'Language updated successfully'
+    };
+  }
+
   async refreshToken(refreshToken: string): Promise<{
     accessToken: string;
     refreshToken: string;

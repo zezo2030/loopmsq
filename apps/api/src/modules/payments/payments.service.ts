@@ -22,6 +22,9 @@ import { RedisService } from '../../utils/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { ReferralsService } from '../referrals/referrals.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
+import { BookingsService } from '../bookings/bookings.service';
+import { TapService } from '../../integrations/tap/tap.service';
 
 @Injectable()
 export class PaymentsService {
@@ -38,6 +41,9 @@ export class PaymentsService {
     private readonly notifications: NotificationsService,
     private readonly loyalty: LoyaltyService,
     private readonly referrals?: ReferralsService,
+    private readonly realtime?: RealtimeGateway,
+    private readonly bookings?: BookingsService,
+    private readonly tapService?: TapService,
   ) {}
 
   async createIntent(userId: string, dto: CreatePaymentIntentDto) {
@@ -89,16 +95,38 @@ export class PaymentsService {
 
       const savedPayment = await queryRunner.manager.save(payment);
 
-      // Mock gateway: create session/secret
-      const clientSecret = `mock_secret_${savedPayment.id}`;
-      savedPayment.gatewayRef = clientSecret;
-      savedPayment.status = PaymentStatus.PROCESSING;
-      await queryRunner.manager.save(savedPayment);
+      // Bypass payments if keys are missing or explicitly enabled
+      const bypass = !this.configService.get<string>('TAP_SECRET_KEY') ||
+        (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() === 'true';
+      if (bypass) {
+        savedPayment.gatewayRef = `bypass_${savedPayment.id}`;
+        savedPayment.status = PaymentStatus.PROCESSING;
+        await queryRunner.manager.save(savedPayment);
+      } else {
+        // Create Tap charge (immediate capture, 3DS required)
+        if (!this.tapService) throw new BadRequestException('Payment gateway not configured');
+        const charge = await this.tapService.createCharge({
+          amount: Number(booking.totalPrice),
+          currency: 'SAR',
+          capture: true,
+          threeDS: 'required',
+          source: { payment_method: 'card' },
+          description: `Booking ${booking.id}`,
+          metadata: { bookingId: booking.id, paymentId: savedPayment.id },
+        });
+
+        savedPayment.gatewayRef = charge.id;
+        if (charge.transaction?.authorization_id) {
+          savedPayment.transactionId = charge.transaction.authorization_id;
+        }
+        savedPayment.status = PaymentStatus.PROCESSING;
+        await queryRunner.manager.save(savedPayment);
+      }
 
       await queryRunner.commitTransaction();
       const response = {
         paymentId: savedPayment.id,
-        clientSecret,
+        chargeId: savedPayment.gatewayRef,
         amount: savedPayment.amount,
         currency: savedPayment.currency,
         status: savedPayment.status,
@@ -126,9 +154,16 @@ export class PaymentsService {
     if (payment.status === PaymentStatus.COMPLETED)
       return { success: true, paymentId: payment.id };
 
-    // Mock verify gateway payload
-    if (!dto.gatewayPayload || dto.gatewayPayload.clientSecret !== payment.gatewayRef) {
-      throw new BadRequestException('Invalid gateway payload');
+    const bypass = !this.configService.get<string>('TAP_SECRET_KEY') ||
+      (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() === 'true';
+    if (!bypass) {
+      // Verify with Tap by retrieving the charge status
+      if (!this.tapService) throw new BadRequestException('Payment gateway not configured');
+      const charge = await this.tapService.retrieveCharge(payment.gatewayRef);
+      const succeeded = ['CAPTURED', 'AUTHORIZED', 'SUCCEEDED'].includes((charge.status || '').toUpperCase());
+      if (!succeeded) {
+        throw new BadRequestException('Payment not completed');
+      }
     }
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -137,13 +172,29 @@ export class PaymentsService {
     try {
       payment.status = PaymentStatus.COMPLETED;
       payment.paidAt = new Date();
-      payment.transactionId = `txn_${payment.id}`;
+      if (!payment.transactionId) {
+        payment.transactionId = `txn_${payment.id}`;
+      }
       await queryRunner.manager.save(payment);
 
       booking.status = BookingStatus.CONFIRMED;
       await queryRunner.manager.save(booking);
 
       await queryRunner.commitTransaction();
+      // Issue tickets after payment confirmed
+      try {
+        if (this.bookings) {
+          await this.bookings.issueTicketsForBooking(booking.id);
+          await this.notifications.enqueue({
+            type: 'TICKETS_ISSUED',
+            to: { userId },
+            data: { bookingId: booking.id },
+            channels: ['sms', 'push'],
+          });
+        }
+      } catch (e) {
+        this.logger.error(`Failed to issue tickets post-payment: ${e?.message || e}`);
+      }
       // Notify payment success and booking confirmed
       await this.notifications.enqueue({
         type: 'PAYMENT_SUCCESS',
@@ -159,6 +210,8 @@ export class PaymentsService {
       });
       // Award loyalty points
       await this.loyalty.awardPoints(userId, Number(payment.amount), booking.id);
+      // Realtime updates
+      this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: booking.status });
       // Create referral earning if eligible (fire-and-forget)
       if (this.referrals) {
         try { await this.referrals.createEarningForFirstPayment(userId, payment.id); } catch (_) {}
