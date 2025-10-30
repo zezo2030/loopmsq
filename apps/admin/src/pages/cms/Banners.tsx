@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, DatePicker, Form, Input, Modal, Switch, Table, message, Upload, Image, Space } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
-import { resolveFileUrl, resolveFileUrlWithBust } from '../../shared/url'
+import { resolveFileUrlWithBust } from '../../shared/url'
 import { useState } from 'react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
 import dayjs from 'dayjs'

@@ -1,5 +1,5 @@
 import { Row, Col, Card, Statistic, List, Avatar, Button, Space, Tag, Divider, Image } from 'antd'
-import { resolveFileUrl, resolveFileUrlWithBust } from '../shared/url'
+import { resolveFileUrlWithBust } from '../shared/url'
 import { 
   CalendarOutlined,
   RiseOutlined,
