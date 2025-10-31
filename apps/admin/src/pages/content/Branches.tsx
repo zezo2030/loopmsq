@@ -376,7 +376,7 @@ export default function Branches() {
               )}
               
               <Upload
-                disabled={!editing?.id}
+                disabled={!editing?.id || (editing?.images && editing.images.length >= 5)}
                 beforeUpload={(file) => {
                   if (!editing?.id) {
                     message.error(t('branches.save_first') || 'احفظ الفرع أولاً قبل رفع الصور')
@@ -389,7 +389,6 @@ export default function Branches() {
                 showUploadList={false}
                 accept="image/*"
                 multiple
-                disabled={editing?.images && editing.images.length >= 5}
               >
                 <Button 
                   icon={<UploadOutlined />}
