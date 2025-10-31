@@ -64,8 +64,13 @@ export default function Branches() {
     formData.append('file', file)
     
     try {
-      await apiPost(`/content/branches/${branchId}/upload-cover`, formData)
+      const updated = await apiPost<Branch>(`/content/branches/${branchId}/upload-cover`, formData)
       message.success(t('branches.image_uploaded') || 'Image uploaded successfully')
+      // حدث الحالة المحلية فوراً لعرض الصورة بدون انتظار إعادة الجلب
+      setEditing((prev) => (prev && prev.id === branchId ? { ...prev, coverImage: updated.coverImage || prev.coverImage } : prev))
+      if (selectedBranch && selectedBranch.id === branchId) {
+        setSelectedBranch({ ...selectedBranch, coverImage: updated.coverImage || selectedBranch.coverImage })
+      }
       qc.invalidateQueries({ queryKey: ['branches'] })
       return false // Prevent default upload
     } catch (error) {
@@ -81,8 +86,13 @@ export default function Branches() {
     })
     
     try {
-      await apiPost(`/content/branches/${branchId}/upload-images`, formData)
+      const updated = await apiPost<Branch>(`/content/branches/${branchId}/upload-images`, formData)
       message.success(t('branches.image_uploaded') || 'Images uploaded successfully')
+      // تحديث فوري للحالة المحلية
+      setEditing((prev) => (prev && prev.id === branchId ? { ...prev, images: updated.images || prev.images } : prev))
+      if (selectedBranch && selectedBranch.id === branchId) {
+        setSelectedBranch({ ...selectedBranch, images: updated.images || selectedBranch.images })
+      }
       qc.invalidateQueries({ queryKey: ['branches'] })
       return false // Prevent default upload
     } catch (error) {
