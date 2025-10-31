@@ -60,6 +60,8 @@ services:
       ADMIN_NAME: Admin
       ADMIN_PHONE: +966500000000
       ADMIN_OVERWRITE: 'true'
+      # Static uploads path (dev container mount)
+      UPLOAD_DEST: /app/apps/api/uploads
       # SMTP Email Configuration
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587

@@ -279,6 +279,44 @@ export class ContentService {
     return updatedHall;
   }
 
+  async uploadHallImages(hallId: string, filenames: string[]): Promise<Hall> {
+    const hall = await this.findHallById(hallId);
+
+    const imageUrls = filenames.map((filename) => `/uploads/halls/${filename}`);
+    hall.images = [...(hall.images || []), ...imageUrls];
+
+    const updatedHall = await this.hallRepository.save(hall);
+
+    // Clear cache
+    await this.redisService.del(`hall:${hallId}`);
+    await this.redisService.del(`halls:branch:${hall.branchId}`);
+    await this.redisService.del('halls:all');
+    await this.redisService.del(`branch:${hall.branchId}`);
+
+    this.logger.log(`Hall images updated: ${hallId}`);
+    return updatedHall;
+  }
+
+  async deleteHallImage(hallId: string, filename: string): Promise<Hall> {
+    const hall = await this.findHallById(hallId);
+
+    const imageUrl = `/uploads/halls/${filename}`;
+    if (hall.images) {
+      hall.images = hall.images.filter((img) => img !== imageUrl);
+    }
+
+    const updatedHall = await this.hallRepository.save(hall);
+
+    // Clear cache
+    await this.redisService.del(`hall:${hallId}`);
+    await this.redisService.del(`halls:branch:${hall.branchId}`);
+    await this.redisService.del('halls:all');
+    await this.redisService.del(`branch:${hall.branchId}`);
+
+    this.logger.log(`Hall image deleted: ${hallId}`);
+    return updatedHall;
+  }
+
   async updateHallStatus(
     id: string,
     status: 'available' | 'maintenance' | 'reserved',

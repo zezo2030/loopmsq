@@ -34,17 +34,15 @@ export class BannerAdminController {
     FileInterceptor('file', {
       storage: diskStorage({
         destination: (req, file, cb) => {
-          const candidates = [
-            join(__dirname, '..', '..', '..', 'uploads', 'banners'),
-            join(__dirname, '..', 'uploads', 'banners'),
-          ];
-          const target = candidates.find((p) => {
-            try {
-              return fs.existsSync(join(p, '..')) || fs.existsSync(p);
-            } catch {
-              return false;
-            }
-          }) || candidates[0];
+          const uploadsRootCandidates = [
+            process.env.UPLOAD_DEST,
+            join(__dirname, '..', '..', '..', 'uploads'),
+            join(__dirname, '..', 'uploads'),
+          ].filter(Boolean) as string[];
+          const uploadsRoot = uploadsRootCandidates.find((p) => {
+            try { return !!p && fs.existsSync(p); } catch { return false; }
+          }) || uploadsRootCandidates[0];
+          const target = join(uploadsRoot, 'banners');
           try { fs.mkdirSync(target, { recursive: true }); } catch {}
           cb(null, target);
         },

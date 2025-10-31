@@ -133,21 +133,17 @@ export class ContentController {
     FileInterceptor('file', {
       storage: diskStorage({
         destination: (req, file, cb) => {
-          // Resolve uploads directory (supports local and Docker paths)
-          const candidates = [
-            join(__dirname, '..', '..', '..', 'uploads', 'branches'),
-            join(__dirname, '..', 'uploads', 'branches'),
-          ];
-          const target = candidates.find((p) => {
-            try {
-              return fs.existsSync(join(p, '..')) || fs.existsSync(p);
-            } catch {
-              return false;
-            }
-          }) || candidates[0];
-          try {
-            fs.mkdirSync(target, { recursive: true });
-          } catch {}
+          // Resolve uploads root with env override, then ensure branches subdir
+          const uploadsRootCandidates = [
+            process.env.UPLOAD_DEST,
+            join(__dirname, '..', '..', '..', 'uploads'),
+            join(__dirname, '..', 'uploads'),
+          ].filter(Boolean) as string[];
+          const uploadsRoot = uploadsRootCandidates.find((p) => {
+            try { return !!p && fs.existsSync(p); } catch { return false; }
+          }) || uploadsRootCandidates[0];
+          const target = join(uploadsRoot, 'branches');
+          try { fs.mkdirSync(target, { recursive: true }); } catch {}
           cb(null, target);
         },
         filename: (req, file, cb) => {
@@ -185,20 +181,16 @@ export class ContentController {
     FilesInterceptor('files', 5, {
       storage: diskStorage({
         destination: (req, file, cb) => {
-          const candidates = [
-            join(__dirname, '..', '..', '..', 'uploads', 'branches'),
-            join(__dirname, '..', 'uploads', 'branches'),
-          ];
-          const target = candidates.find((p) => {
-            try {
-              return fs.existsSync(join(p, '..')) || fs.existsSync(p);
-            } catch {
-              return false;
-            }
-          }) || candidates[0];
-          try {
-            fs.mkdirSync(target, { recursive: true });
-          } catch {}
+          const uploadsRootCandidates = [
+            process.env.UPLOAD_DEST,
+            join(__dirname, '..', '..', '..', 'uploads'),
+            join(__dirname, '..', 'uploads'),
+          ].filter(Boolean) as string[];
+          const uploadsRoot = uploadsRootCandidates.find((p) => {
+            try { return !!p && fs.existsSync(p); } catch { return false; }
+          }) || uploadsRootCandidates[0];
+          const target = join(uploadsRoot, 'branches');
+          try { fs.mkdirSync(target, { recursive: true }); } catch {}
           cb(null, target);
         },
         filename: (req, file, cb) => {
@@ -221,6 +213,74 @@ export class ContentController {
     }
     const filenames = files.map(file => file.filename);
     return this.contentService.uploadBranchImages(id, filenames);
+  }
+
+  @Post('halls/:id/upload-images')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload hall images' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Images uploaded successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Hall not found' })
+  @UseInterceptors(
+    FilesInterceptor('files', 5, {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadsRootCandidates = [
+            process.env.UPLOAD_DEST,
+            join(__dirname, '..', '..', '..', 'uploads'),
+            join(__dirname, '..', 'uploads'),
+          ].filter(Boolean) as string[];
+          const uploadsRoot = uploadsRootCandidates.find((p) => {
+            try { return !!p && fs.existsSync(p); } catch { return false; }
+          }) || uploadsRootCandidates[0];
+          const target = join(uploadsRoot, 'halls');
+          try { fs.mkdirSync(target, { recursive: true }); } catch {}
+          cb(null, target);
+        },
+        filename: (req, file, cb) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `img-${unique}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
+  async uploadHallImages(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() requester: User,
+  ) {
+    // Branch manager may only upload to halls in their own branch
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      const hall = await this.contentService.findHallById(id);
+      if (!requester.branchId || hall.branchId !== requester.branchId) {
+        throw new ForbiddenException('Not allowed');
+      }
+    }
+    const filenames = files.map((file) => file.filename);
+    return this.contentService.uploadHallImages(id, filenames);
+  }
+
+  @Delete('halls/:id/images/:filename')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete an image from a hall' })
+  async deleteHallImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('filename') filename: string,
+    @CurrentUser() requester: User,
+  ) {
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      const hall = await this.contentService.findHallById(id);
+      if (!requester.branchId || hall.branchId !== requester.branchId) {
+        throw new ForbiddenException('Not allowed');
+      }
+    }
+    return this.contentService.deleteHallImage(id, filename);
   }
 
   @Delete('branches/:id/images/:filename')

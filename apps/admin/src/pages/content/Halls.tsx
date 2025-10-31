@@ -1,11 +1,13 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Row, Col, Tag, Dropdown } from 'antd'
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Row, Col, Tag, Dropdown, Upload, Image } from 'antd'
 import { DownOutlined } from '@ant-design/icons'
-import { apiGet, apiPost, apiPut, apiPatch } from '../../api'
+import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../api'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useAdminAuth } from '../../auth'
+import { resolveFileUrl } from '../../shared/url'
 
 type Hall = {
   id: string
@@ -101,6 +103,36 @@ export default function Halls() {
     mutationFn: async ({ id, status }: { id: string; status: NonNullable<Hall['status']> }) => apiPatch(`/content/halls/${id}/status`, { status }),
     onSuccess: () => { message.success(t('halls.status_updated') || 'Status updated'); qc.invalidateQueries({ queryKey: ['halls'] }) },
   })
+
+  const handleImagesUpload = async (fileList: any[], hallId: string) => {
+    const formData = new FormData()
+    fileList.forEach((file) => {
+      formData.append('files', file)
+    })
+    try {
+      const updated = await apiPost<Hall>(`/content/halls/${hallId}/upload-images`, formData)
+      message.success(t('halls.image_uploaded') || 'Images uploaded successfully')
+      setEditing((prev) => (prev && prev.id === hallId ? { ...prev, images: updated.images || prev.images } : prev))
+      qc.invalidateQueries({ queryKey: ['halls'] })
+      return false
+    } catch (e) {
+      message.error(t('halls.image_upload_failed') || 'Failed to upload images')
+      return false
+    }
+  }
+
+  const handleDeleteImage = async (imageUrl: string, hallId: string) => {
+    const filename = imageUrl.split('/').pop()
+    if (!filename) return
+    try {
+      const updated = await apiDelete<Hall>(`/content/halls/${hallId}/images/${filename}`)
+      message.success(t('halls.image_deleted') || 'Image deleted successfully')
+      setEditing((prev) => (prev && prev.id === hallId ? { ...prev, images: updated.images || prev.images } : prev))
+      qc.invalidateQueries({ queryKey: ['halls'] })
+    } catch (e) {
+      message.error(t('halls.image_delete_failed') || 'Failed to delete image')
+    }
+  }
 
   const columns = [
     {
@@ -357,9 +389,46 @@ export default function Halls() {
           <Form.Item name="features" label={t('halls.features') || 'المزايا'}>
             <Select mode="tags" placeholder={t('halls.features_ph') || 'أدخل المزايا'} />
           </Form.Item>
-          <Form.Item name="images" label={t('halls.images') || 'صور (روابط)'}>
-            <Select mode="tags" placeholder={t('halls.images_ph') || 'أدخل روابط الصور'} />
-          </Form.Item>
+          {/* رفع الصور ومعرض الصور (مثل الفروع) */}
+          {editing?.id ? (
+            <div style={{ marginBottom: 16 }}>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Upload
+                  accept="image/*"
+                  multiple
+                  showUploadList={false}
+                  beforeUpload={(file) => {
+                    handleImagesUpload([file], editing.id)
+                    return false
+                  }}
+                >
+                  <Button icon={<UploadOutlined />}>{t('halls.upload_images') || 'رفع صور'}</Button>
+                </Upload>
+                {editing.images && editing.images.length > 0 ? (
+                  <Row gutter={[12, 12]}>
+                    {editing.images.map((img) => (
+                      <Col key={img}>
+                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                          <Image src={resolveFileUrl(img)} width={120} height={120} style={{ objectFit: 'cover', borderRadius: 8 }} />
+                          <Button
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            style={{ position: 'absolute', top: 6, right: 6 }}
+                            onClick={() => handleDeleteImage(img, editing.id)}
+                          />
+                        </div>
+                      </Col>
+                    ))}
+                  </Row>
+                ) : null}
+              </Space>
+            </div>
+          ) : (
+            <Form.Item name="images" label={t('halls.images') || 'صور (روابط)'}>
+              <Select mode="tags" placeholder={t('halls.images_ph') || 'أدخل روابط الصور'} />
+            </Form.Item>
+          )}
           <Form.Item name="description_ar" label={t('halls.description_ar') || 'الوصف (AR)'}>
             <Input.TextArea rows={3} />
           </Form.Item>

@@ -45,6 +45,8 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       PORT: 3000
       API_PREFIX: api/v1
+      # Static uploads path (prod container mount)
+      UPLOAD_DEST: /app/uploads
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_NAME: ${ADMIN_NAME}

@@ -37,29 +37,44 @@ import { SearchModule } from './modules/search/search.module';
 import { AdminConfigModule } from './modules/admin-config/admin-config.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
-// Resolve uploads root dynamically to support local and Docker paths
-const uploadsCandidates = [
-  // Monorepo root uploads (local dev)
+// Resolve uploads root dynamically to support local and Docker paths, with env override
+const defaultUploadsCandidates = [
   join(__dirname, '..', '..', '..', 'uploads'),
-  // Inside api app (Docker volume mounts here)
   join(__dirname, '..', 'uploads'),
 ];
-const uploadsRoot = uploadsCandidates.find((p) => {
-  try {
-    return fs.existsSync(p);
-  } catch {
-    return false;
-  }
-}) || uploadsCandidates[0];
+function resolveUploadsRootFromEnvOrDefault(config?: ConfigService): string {
+  const envPath = config?.get<string>('UPLOAD_DEST');
+  const candidates = envPath ? [envPath, ...defaultUploadsCandidates] : defaultUploadsCandidates;
+  const found = candidates.find((p) => {
+    try {
+      return fs.existsSync(p);
+    } catch {
+      return false;
+    }
+  }) || candidates[0];
+  try { fs.mkdirSync(found, { recursive: true }); } catch {}
+  return found;
+}
 
 @Module({
   imports: [
     // Static files (serve uploads directory at /uploads)
-    ServeStaticModule.forRoot({
-      rootPath: uploadsRoot,
-      serveRoot: '/uploads',
-      serveStaticOptions: {
-        index: false,
+    ServeStaticModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const rootPath = resolveUploadsRootFromEnvOrDefault(config);
+        const indexEnabled = (config.get<string>('STATIC_INDEX') || '').toLowerCase() === 'true';
+        // ServeStaticModule in current version expects an array of options
+        return [
+          {
+            rootPath,
+            serveRoot: '/uploads',
+            serveStaticOptions: {
+              index: indexEnabled,
+            },
+          },
+        ] as any;
       },
     }),
     // i18n

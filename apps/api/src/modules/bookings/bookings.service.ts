@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, LessThanOrEqual, MoreThanOrEqual, IsNull } from 'typeorm';
+import { Repository, DataSource, LessThanOrEqual, MoreThanOrEqual, IsNull, Between } from 'typeorm';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { Payment } from '../../database/entities/payment.entity';
@@ -370,9 +370,9 @@ export class BookingsService {
   }> {
     const where: any = { branchId };
     if (from && to) {
-      where.createdAt = ({} as any);
-      (where.createdAt as any).$gte = new Date(from) as any;
-      (where.createdAt as any).$lte = new Date(to) as any;
+      const fromDate = new Date(from);
+      const toDate = new Date(to);
+      where.createdAt = Between(fromDate, toDate) as any;
     }
     if (status) {
       where.status = status as any;
@@ -446,9 +446,9 @@ export class BookingsService {
     if (filters?.branchId) where.branchId = filters.branchId;
     if (filters?.hallId) where.hallId = filters.hallId;
     if (filters?.from && filters?.to) {
-      where.startTime = ({} as any);
-      (where.startTime as any).$gte = new Date(filters.from) as any;
-      (where.startTime as any).$lte = new Date(filters.to) as any;
+      const fromDate = new Date(filters.from);
+      const toDate = new Date(filters.to);
+      where.startTime = Between(fromDate, toDate) as any;
     }
 
     const [bookings, total] = await this.bookingRepository.findAndCount({

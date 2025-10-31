@@ -57,20 +57,26 @@ async function bootstrap() {
   // Global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Static files serving (resolve uploads dir dynamically)
+  // Static files serving (resolve uploads dir dynamically with env override)
   const expressInstance = app.getHttpAdapter().getInstance();
-  const uploadsCandidates = [
+  const defaultCandidates = [
     join(__dirname, '..', '..', '..', 'uploads'),
     join(__dirname, '..', 'uploads'),
   ];
-  const uploadsRoot = uploadsCandidates.find((p) => {
+  const envUploads = configService.get<string>('UPLOAD_DEST');
+  const candidates = envUploads ? [envUploads, ...defaultCandidates] : defaultCandidates;
+  const uploadsRoot = candidates.find((p) => {
     try {
       return fs.existsSync(p);
     } catch {
       return false;
     }
-  }) || uploadsCandidates[0];
-  expressInstance.use('/uploads', express.static(uploadsRoot, { index: false, redirect: false }));
+  }) || candidates[0];
+  try { fs.mkdirSync(uploadsRoot, { recursive: true }); } catch {}
+  const indexEnabled = (configService.get<string>('STATIC_INDEX') || '').toLowerCase() === 'true';
+  expressInstance.use('/uploads', (express as any).static(uploadsRoot, { index: indexEnabled, redirect: false }));
+  const loggerInfo = new Logger('Static');
+  loggerInfo.log(`Serving uploads from: ${uploadsRoot} (index=${indexEnabled}) at /uploads`);
 
   // Global throttler guard
   // Note: ThrottlerGuard will be applied via module configuration

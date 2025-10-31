@@ -15,6 +15,8 @@ function serverRootFromApiBase(): string {
 export function resolveFileUrl(path?: string | null): string {
   if (!path) return ''
   if (path.startsWith('http://') || path.startsWith('https://')) return path
+  // Prefer same-origin for uploaded assets to avoid mixed-content/CORS; nginx proxies /uploads to API
+  if (path.startsWith('/uploads/')) return path
   const root = serverRootFromApiBase()
   if (path.startsWith('/')) return `${root}${path}`
   return `${root}/${path}`
