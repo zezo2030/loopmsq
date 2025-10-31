@@ -332,7 +332,14 @@ export default function Branches() {
                 </div>
               ) : (
                 <Upload
-                  beforeUpload={(file) => handleCoverImageUpload(file, editing?.id || '')}
+                  disabled={!editing?.id}
+                  beforeUpload={(file) => {
+                    if (!editing?.id) {
+                      message.error(t('branches.save_first') || 'احفظ الفرع أولاً قبل رفع الصورة')
+                      return Upload.LIST_IGNORE
+                    }
+                    return handleCoverImageUpload(file, editing.id)
+                  }}
                   showUploadList={false}
                   accept="image/*"
                 >
@@ -369,9 +376,14 @@ export default function Branches() {
               )}
               
               <Upload
+                disabled={!editing?.id}
                 beforeUpload={(file) => {
+                  if (!editing?.id) {
+                    message.error(t('branches.save_first') || 'احفظ الفرع أولاً قبل رفع الصور')
+                    return Upload.LIST_IGNORE
+                  }
                   // Upload only the current file to avoid duplicate uploads
-                  handleImagesUpload([file], editing?.id || '')
+                  handleImagesUpload([file], editing.id)
                   return false
                 }}
                 showUploadList={false}
@@ -381,7 +393,7 @@ export default function Branches() {
               >
                 <Button 
                   icon={<UploadOutlined />}
-                  disabled={editing?.images && editing.images.length >= 5}
+                  disabled={!editing?.id || (editing?.images && editing.images.length >= 5)}
                 >
                   {t('branches.upload_images') || 'رفع صور إضافية'}
                 </Button>
