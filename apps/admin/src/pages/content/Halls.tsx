@@ -71,6 +71,28 @@ export default function Halls() {
     staleTime: 0,
   })
 
+  // Load branches for branch selection
+  const { data: branches } = useQuery<any[]>({
+    queryKey: ['branches:min'],
+    queryFn: async () => {
+      const res = await apiGet<any>('/content/branches?includeInactive=true')
+      return Array.isArray(res) ? res : (res.items || res.branches || [])
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Files selected during create (to upload after hall is created)
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+
+  // When opening create modal for branch managers, prefill branchId
+  useEffect(() => {
+    const isBranchManager = (me?.roles || []).includes('branch_manager')
+    if (open && !editing && isBranchManager && me?.branchId) {
+      try { form.setFieldsValue({ branchId: me.branchId }) } catch {}
+    }
+    // No-op for admins; they choose from Select
+  }, [open, editing, me?.branchId])
+
   // Initialize from URL
   useEffect(() => {
     const bf = searchParams.get('branchId') || undefined
@@ -93,7 +115,6 @@ export default function Halls() {
 
   const createHall = useMutation({
     mutationFn: async (payload: Partial<Hall>) => apiPost('/content/halls', payload),
-    onSuccess: () => { message.success(t('halls.created') || 'Hall created'); qc.invalidateQueries({ queryKey: ['halls'] }); setOpen(false) },
   })
   const updateHall = useMutation({
     mutationFn: async ({ id, body }: { id: string; body: Partial<Hall> }) => apiPut(`/content/halls/${id}`, body),
@@ -294,7 +315,7 @@ export default function Halls() {
         <Form
           form={form}
           layout="vertical"
-          onFinish={(values) => {
+          onFinish={async (values) => {
             const body: any = {
               branchId: values.branchId,
               name_ar: values.name_ar,
@@ -316,14 +337,38 @@ export default function Halls() {
             }
             if (!canEdit) { message.error(t('errors.forbidden') || 'Forbidden'); return }
             if (editing) updateHall.mutate({ id: editing.id, body })
-            else createHall.mutate(body)
+            else {
+              try {
+                const created: any = await createHall.mutateAsync(body)
+                if (pendingFiles.length > 0 && created?.id) {
+                  await handleImagesUpload(pendingFiles as any, created.id)
+                }
+                message.success(t('halls.created') || 'Hall created')
+                setPendingFiles([])
+                qc.invalidateQueries({ queryKey: ['halls'] })
+                setOpen(false)
+              } catch (e: any) {
+                message.error(e?.message || (t('errors.failed') || 'Failed'))
+              }
+            }
           }}
         >
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="branchId" label={t('halls.branch_id') || 'معرف الفرع'} rules={[{ required: true }]}>
-                <Input />
-              </Form.Item>
+              {canEdit && (me?.roles || []).includes('admin') ? (
+                <Form.Item name="branchId" label={t('halls.branch') || 'الفرع'} rules={[{ required: true }]}> 
+                  <Select
+                    showSearch
+                    placeholder={t('halls.select_branch') || 'اختر الفرع'}
+                    options={(branches || []).map(b => ({ value: b.id, label: b.name_ar || b.name_en }))}
+                    filterOption={(input, option) => (option?.label as string).toLowerCase().includes((input || '').toLowerCase())}
+                  />
+                </Form.Item>
+              ) : (
+                <Form.Item name="branchId" label={t('halls.branch') || 'الفرع'} rules={[{ required: true }]}> 
+                  <Select disabled options={me?.branchId ? [{ value: me.branchId, label: me.branchId }] : []} />
+                </Form.Item>
+              )}
             </Col>
             <Col span={12}>
               <Form.Item name="capacity" label={t('halls.capacity') || 'السعة'} rules={[{ required: true }]}>
@@ -379,7 +424,7 @@ export default function Halls() {
           </Row>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="isDecorated" label={t('halls.decorated') || 'مزينة'} valuePropName="checked">
+              <Form.Item name="isDecorated" label={t('halls.decorated') || 'مزينة'}>
                 <Select
                   options={[{ label: t('common.yes') || 'Yes', value: true }, { label: t('common.no') || 'No', value: false }]}
                 />
@@ -425,9 +470,24 @@ export default function Halls() {
               </Space>
             </div>
           ) : (
-            <Form.Item name="images" label={t('halls.images') || 'صور (روابط)'}>
-              <Select mode="tags" placeholder={t('halls.images_ph') || 'أدخل روابط الصور'} />
-            </Form.Item>
+            <div style={{ marginBottom: 16 }}>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Upload
+                  accept="image/*"
+                  multiple
+                  showUploadList
+                  beforeUpload={(file) => {
+                    setPendingFiles((prev) => [...prev, file as any])
+                    return false
+                  }}
+                  onRemove={(file) => {
+                    setPendingFiles((prev) => prev.filter((f) => (f as any).uid !== (file as any).uid))
+                  }}
+                >
+                  <Button icon={<UploadOutlined />}>{t('halls.select_images') || 'اختيار صور'}</Button>
+                </Upload>
+              </Space>
+            </div>
           )}
           <Form.Item name="description_ar" label={t('halls.description_ar') || 'الوصف (AR)'}>
             <Input.TextArea rows={3} />

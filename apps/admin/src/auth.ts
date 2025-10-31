@@ -6,6 +6,7 @@ export type MeResponse = {
   name?: string;
   email?: string;
   language?: string;
+  branchId?: string; // optional: موجود لمُدراء الفروع
 };
 
 function getApiBase(): string {

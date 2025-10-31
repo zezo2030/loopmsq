@@ -21,6 +21,11 @@ class PriceConfigDto {
   @IsNumber()
   hourlyRate: number;
 
+  @ApiProperty({ description: 'Price per person', example: 10, required: false })
+  @IsOptional()
+  @IsNumber()
+  pricePerPerson?: number;
+
   @ApiProperty({ description: 'Weekend multiplier', example: 1.5 })
   @IsNumber()
   weekendMultiplier: number;
