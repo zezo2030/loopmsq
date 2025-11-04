@@ -29,9 +29,21 @@ export class TicketsService {
   async getTicketQR(userId: string, ticketId: string) {
     const { ticket, booking } = await this.ensureOwner(userId, ticketId);
     const token = this.qrCodeService.generateQRToken(booking.id, ticket.id);
-    // Store ephemeral mapping for 5 minutes
+    
+    // Generate the hash from the token we're using
+    const qrTokenHash = this.qrCodeService.generateQRTokenHash(token);
+    
+    // Update the ticket's qrTokenHash in database to match the token we're using
+    // This ensures the QR code will work even after Redis cache expires
+    if (ticket.qrTokenHash !== qrTokenHash) {
+      ticket.qrTokenHash = qrTokenHash;
+      await this.ticketRepo.save(ticket);
+    }
+    
+    // Store ephemeral mapping for 5 minutes (for faster lookups)
     const redis = this.redisService.getClient();
-    await redis.setex(`share:qr:${token}`, 300, ticket.qrTokenHash);
+    await redis.setex(`share:qr:${token}`, 300, qrTokenHash);
+    
     const qrDataUrl = await this.qrCodeService.generateQRCode(token);
     return { qr: qrDataUrl, ttlSeconds: 300 };
   }

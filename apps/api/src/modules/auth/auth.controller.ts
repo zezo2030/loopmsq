@@ -77,7 +77,7 @@ export class AuthController {
 
   @Post('staff/login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Admin/Branch Manager login with email and password' })
+  @ApiOperation({ summary: 'Admin/Branch Manager/Staff login with email and password' })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async staffLogin(@Body() staffLoginDto: StaffLoginDto) {

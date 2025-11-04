@@ -26,8 +26,9 @@ export default function Settings() {
         const values: any = {}
         if (sms) {
           values.smsEnabled = sms.enabled
-          values.twilioAccountSid = sms.twilioAccountSid || ''
-          values.twilioFromNumber = sms.twilioFromNumber || ''
+          values.dreamsApiUrl = (sms as any).dreamsApiUrl || ''
+          values.dreamsUser = (sms as any).dreamsUser || ''
+          values.dreamsSender = (sms as any).dreamsSender || ''
         }
         if (otp) {
           values.otpEnabled = otp.enabled
@@ -43,7 +44,7 @@ export default function Settings() {
 
   const onSave = async (values: any) => {
     setLoading(true)
-    try {
+      try {
       // Local analytics
       localStorage.setItem('settings.analyticsEnabled', values.analyticsEnabled ? 'true' : 'false')
       if (values.gtmId !== undefined) localStorage.setItem('settings.gtmId', values.gtmId)
@@ -52,41 +53,34 @@ export default function Settings() {
 
       // Backend configs
       try {
-        // SMS Config - فقط أرسل الحقول التي تم تغييرها أو المطلوبة
-        if (values.smsEnabled !== undefined || values.twilioFromNumber || values.twilioAccountSid || values.twilioAuthToken) {
-          const smsPayload: any = {}
+        // SMS Config - Dreams
+        if (
+          values.smsEnabled !== undefined ||
+          values.dreamsApiUrl ||
+          values.dreamsUser ||
+          values.dreamsSecretKey ||
+          values.dreamsSender
+        ) {
+          const smsPayload: any = { provider: 'dreams' }
 
           if (values.smsEnabled !== undefined) {
             smsPayload.enabled = values.smsEnabled
           }
 
-          if (values.twilioFromNumber) {
-            // تحقق من صحة رقم الهاتف
-            const phoneRegex = /^\+?[0-9]{7,15}$/
-            if (phoneRegex.test(values.twilioFromNumber)) {
-              smsPayload.twilioFromNumber = values.twilioFromNumber
-            } else {
-              message.error(t('settings.invalid_phone_format') || 'Invalid phone number format')
-              return
-            }
+          if (values.dreamsApiUrl) smsPayload.dreamsApiUrl = values.dreamsApiUrl
+          if (values.dreamsUser) smsPayload.dreamsUser = values.dreamsUser
+          if (values.dreamsSender) smsPayload.dreamsSender = values.dreamsSender
+
+          // فقط أضف Secret إذا كان مناسب وليس مخفي
+          if (
+            values.dreamsSecretKey &&
+            values.dreamsSecretKey !== '****' &&
+            String(values.dreamsSecretKey).length >= 6
+          ) {
+            smsPayload.dreamsSecretKey = values.dreamsSecretKey
           }
 
-          // فقط أضف Account SID إذا كان طوله مناسب وليس مخفي
-          if (values.twilioAccountSid &&
-              values.twilioAccountSid !== '****' &&
-              values.twilioAccountSid.length >= 10) {
-            smsPayload.twilioAccountSid = values.twilioAccountSid
-          }
-
-          // فقط أضف Auth Token إذا كان طوله مناسب وليس مخفي
-          if (values.twilioAuthToken &&
-              values.twilioAuthToken !== '****' &&
-              values.twilioAuthToken.length >= 10) {
-            smsPayload.twilioAuthToken = values.twilioAuthToken
-          }
-
-          // فقط أرسل إذا كان هناك بيانات للإرسال
-          if (Object.keys(smsPayload).length > 0) {
+          if (Object.keys(smsPayload).length > 1) {
             await updateSmsConfig(smsPayload)
           }
         }
@@ -118,14 +112,17 @@ export default function Settings() {
       <Form.Item name="smsEnabled" label={t('settings.enable_sms') || 'Enable SMS Service'} valuePropName="checked">
         <Switch />
       </Form.Item>
-      <Form.Item name="twilioAccountSid" label={t('settings.twilio_account_sid') || 'Twilio Account SID'}>
-        <Input.Password placeholder={t('settings.twilio_account_sid_ph') || 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'} />
+      <Form.Item name="dreamsApiUrl" label={t('settings.dreams_api_url') || 'Dreams API URL'}>
+        <Input placeholder={'https://www.dreams.sa/index.php/api/sendsms/'} />
       </Form.Item>
-      <Form.Item name="twilioAuthToken" label={t('settings.twilio_auth_token') || 'Twilio Auth Token'}>
-        <Input.Password placeholder={t('settings.twilio_auth_token_ph') || 'Your Twilio Auth Token'} />
+      <Form.Item name="dreamsUser" label={t('settings.dreams_user') || 'Dreams Username'}>
+        <Input placeholder={t('settings.dreams_user_ph') || 'your_username'} />
       </Form.Item>
-      <Form.Item name="twilioFromNumber" label={t('settings.twilio_from_number') || 'Twilio From Number'}>
-        <Input placeholder={t('settings.twilio_from_number_ph') || '+1234567890'} />
+      <Form.Item name="dreamsSecretKey" label={t('settings.dreams_secret_key') || 'Dreams Secret Key'}>
+        <Input.Password placeholder={t('settings.dreams_secret_key_ph') || '****************'} />
+      </Form.Item>
+      <Form.Item name="dreamsSender" label={t('settings.dreams_sender') || 'Sender'}>
+        <Input placeholder={t('settings.dreams_sender_ph') || 'YourBrandOrNumber'} />
       </Form.Item>
 
       <Divider />
@@ -151,7 +148,7 @@ export default function Settings() {
         <Button onClick={async () => {
           const v = form.getFieldsValue()
           try {
-            await testSms(v.testPhone || v.twilioFromNumber, 'Test message')
+            await testSms(v.testPhone, 'Test message')
             message.success(t('settings.sms_test_success') || 'Test SMS sent')
           } catch (e: any) {
             message.error(e?.message || (t('settings.sms_test_failed') || 'SMS test failed'))

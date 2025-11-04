@@ -44,7 +44,7 @@ export class AuthService {
   ): Promise<{ success: boolean; message: string }> {
     const language = sendOtpDto.language ?? 'ar';
     const lang: 'ar' | 'en' = language === 'en' ? 'en' : 'ar';
-    const email = sendOtpDto.email.toLowerCase();
+    const email = sendOtpDto.email.trim().toLowerCase();
 
     // Read OTP config from Redis
     const otpCfg = ((await this.redisService.get('config:otp')) as any) || {
@@ -59,7 +59,7 @@ export class AuthService {
     }
 
     // Rate limiting check (configurable)
-    const rateLimitKey = `otp_rate:${email}`;
+    const rateLimitKey = `otp_rate_email:${email}`;
     const attempts = await this.redisService.incrementRateLimit(
       rateLimitKey,
       Number(otpCfg.rateTtlSeconds) || 300,
@@ -74,17 +74,17 @@ export class AuthService {
     // Generate OTP
     const otp = this.generateOtp(otpCfg.length || 6);
 
-    // Store OTP in Redis with 5 minutes expiry
+    // Store OTP in Redis with expiry using email as key
     await this.redisService.setOTP(
       email,
       otp,
       Number(otpCfg.expirySeconds) || 300,
     );
 
-    // Enqueue Email OTP
+    // Enqueue EMAIL OTP
     await this.notifications.enqueue({
       type: 'OTP',
-      to: { email: email },
+      to: { email },
       data: { otp },
       lang,
       channels: ['email'],
@@ -92,8 +92,8 @@ export class AuthService {
 
     const message =
       language === 'ar'
-        ? 'تم إرسال رمز التحقق إلى بريدك الإلكتروني'
-        : 'OTP sent to your email';
+        ? 'تم إرسال رمز التحقق عبر البريد الإلكتروني'
+        : 'OTP sent via email';
 
     return {
       success: true,
@@ -105,12 +105,15 @@ export class AuthService {
     dto: RegisterSendOtpDto,
   ): Promise<{ success: boolean; message: string }> {
     const name = (dto.name || '').trim();
-    const email = (dto.email || '').trim().toLowerCase();
+    const email = dto.email.trim().toLowerCase();
     const language = dto.language ?? 'ar';
-    const normalizedPhone = dto.phone ? this.normalizePhone(dto.phone) : null;
 
     if (!name) {
       throw new BadRequestException('Name is required');
+    }
+
+    if (!email) {
+      throw new BadRequestException('Email is required');
     }
 
     // Ensure email not used
@@ -119,15 +122,6 @@ export class AuthService {
     });
     if (existingByEmail) {
       throw new ConflictException('Email already exists');
-    }
-
-    // Ensure phone not used only if phone is provided (using decrypt-compare)
-    if (normalizedPhone) {
-      const existingByPhone =
-        await this.findUserByDecryptedPhone(normalizedPhone);
-      if (existingByPhone) {
-        throw new ConflictException('Phone number already exists');
-      }
     }
 
     // Read OTP config from Redis
@@ -142,8 +136,8 @@ export class AuthService {
       throw new BadRequestException('OTP is disabled by configuration');
     }
 
-    // Rate limiting check (configurable)
-    const rateLimitKey = `otp_register_rate:${email}`;
+    // Rate limiting check using email
+    const rateLimitKey = `otp_register_rate_email:${email}`;
     const attempts = await this.redisService.incrementRateLimit(
       rateLimitKey,
       Number(otpCfg.rateTtlSeconds) || 300,
@@ -170,17 +164,16 @@ export class AuthService {
       {
         name,
         email,
-        phone: normalizedPhone,
         passwordHash,
         language,
       },
       900,
     ); // 15 minutes for registration data
 
-    // Enqueue Email OTP for registration
+    // Enqueue EMAIL OTP for registration
     await this.notifications.enqueue({
       type: 'OTP',
-      to: { email: email },
+      to: { email },
       data: { otp },
       lang: language as 'ar' | 'en',
       channels: ['email'],
@@ -188,8 +181,8 @@ export class AuthService {
 
     const message =
       language === 'ar'
-        ? 'تم إرسال رمز التحقق للتسجيل'
-        : 'Registration OTP sent';
+        ? 'تم إرسال رمز التحقق للتسجيل عبر البريد الإلكتروني'
+        : 'Registration OTP sent via email';
 
     return { success: true, message };
   }
@@ -201,7 +194,7 @@ export class AuthService {
     isNewUser: boolean;
   }> {
     const name = verifyOtpDto.name;
-    const email = verifyOtpDto.email.toLowerCase();
+    const email = verifyOtpDto.email.trim().toLowerCase();
     const normalizedOtp = this.normalizeOtp(verifyOtpDto.otp);
 
     // Verify OTP
@@ -229,7 +222,7 @@ export class AuthService {
       );
     }
 
-    // Find or create user
+    // Find or create user by email
     let user = await this.userRepository.findOne({
       where: { email },
     });
@@ -274,7 +267,7 @@ export class AuthService {
       ...tokens,
       user: {
         id: user.id,
-        email: email,
+        email: user.email,
         name: user.name,
         roles: user.roles,
         language: user.language,
@@ -288,7 +281,7 @@ export class AuthService {
     refreshToken: string;
     user: Partial<User>;
   }> {
-    const email = dto.email.toLowerCase();
+    const email = dto.email.trim().toLowerCase();
     const normalizedOtp = this.normalizeOtp(dto.otp);
 
     // Verify OTP
@@ -320,7 +313,6 @@ export class AuthService {
     const pending = (await this.redisService.get(`reg:${email}`)) as {
       name: string;
       email: string;
-      phone?: string;
       passwordHash: string;
       language?: string;
     } | null;
@@ -330,23 +322,14 @@ export class AuthService {
       );
     }
 
-    const { name, email: pendingEmail, phone, passwordHash, language } = pending;
+    const { name, email: pendingEmail, passwordHash, language } = pending;
 
-    // Final duplicate checks
+    // Final duplicate check
     const existingByEmail = await this.userRepository.findOne({
       where: { email: pendingEmail },
     });
     if (existingByEmail) {
       throw new ConflictException('Email already exists');
-    }
-    
-    // Check phone only if provided
-    if (phone) {
-      const existingByPhone =
-        await this.findUserByDecryptedPhone(phone);
-      if (existingByPhone) {
-        throw new ConflictException('Phone number already exists');
-      }
     }
 
     // Create user
@@ -354,7 +337,6 @@ export class AuthService {
       email: pendingEmail,
       name,
       passwordHash,
-      phone: phone ? this.encryptionService.encrypt(phone) : undefined,
       roles: [UserRole.USER],
       language: language ?? 'ar',
       isActive: true,
@@ -389,7 +371,6 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        phone: user.phone ? this.encryptionService.decrypt(user.phone) : undefined,
         name: user.name,
         roles: user.roles,
         language: user.language,
@@ -404,7 +385,7 @@ export class AuthService {
   }> {
     const { email, password } = staffLoginDto;
 
-    // Find staff user
+    // Find staff user by email
     const user = await this.userRepository.findOne({
       where: {
         email,
@@ -422,10 +403,11 @@ export class AuthService {
       throw new UnauthorizedException('auth.invalid_credentials');
     }
 
-    // Allow only ADMIN or BRANCH_MANAGER to access the web dashboard
+    // Allow only ADMIN, BRANCH_MANAGER, or STAFF to access the staff app
     if (
       !user.roles.includes(UserRole.ADMIN) &&
-      !user.roles.includes(UserRole.BRANCH_MANAGER)
+      !user.roles.includes(UserRole.BRANCH_MANAGER) &&
+      !user.roles.includes(UserRole.STAFF)
     ) {
       throw new UnauthorizedException('auth.access_denied');
     }
@@ -437,11 +419,22 @@ export class AuthService {
     // Generate tokens
     const tokens = await this.generateTokens(user);
 
+    // Decrypt phone for response if available
+    let decryptedPhone: string | undefined;
+    if (user.phone) {
+      try {
+        decryptedPhone = this.encryptionService.decrypt(user.phone);
+      } catch {
+        // ignore decryption errors
+      }
+    }
+
     return {
       ...tokens,
       user: {
         id: user.id,
         email: user.email,
+        phone: decryptedPhone,
         name: user.name,
         roles: user.roles,
         language: user.language,

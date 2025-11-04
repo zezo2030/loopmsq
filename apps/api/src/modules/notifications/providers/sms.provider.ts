@@ -1,14 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Twilio from 'twilio';
+import axios, { AxiosInstance } from 'axios';
 import { RedisService } from '../../../utils/redis.service';
 import { EncryptionService } from '../../../utils/encryption.util';
 
 @Injectable()
 export class SmsProvider {
   private readonly logger = new Logger(SmsProvider.name);
-  private client: Twilio.Twilio | null = null;
-  private fromNumber: string | undefined;
+  private http: AxiosInstance | null = null;
+  private apiUrl: string | undefined;
+  private user: string | undefined;
+  private secretKey: string | undefined;
+  private sender: string | undefined;
   private lastConfigHash: string | null = null;
 
   constructor(
@@ -18,52 +21,67 @@ export class SmsProvider {
   ) {}
 
   private async loadConfig(): Promise<void> {
-    // Prefer Redis config; fallback to env
+    // Read ONLY from environment variables (ignore admin panel/Redis overrides)
     try {
-      const cfg = (await this.redis.get('config:sms')) as {
-        enabled?: boolean;
-        provider?: 'twilio';
-        twilioAccountSid?: string;
-        twilioAuthToken?: string;
-        twilioFromNumber?: string;
-      } | null;
+      const apiUrl = this.configService.get<string>('DREAMS_API_URL');
+      const user = this.configService.get<string>('DREAMS_USER');
+      const secretKey = this.configService.get<string>('DREAMS_SECRET_KEY');
+      const sender = this.configService.get<string>('DREAMS_SENDER');
 
-      const envSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
-      const envToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
-      const envFrom = this.configService.get<string>('TWILIO_FROM_NUMBER');
-
-      const sid = cfg?.twilioAccountSid
-        ? this.encryption.decrypt(cfg.twilioAccountSid)
-        : envSid;
-      const token = cfg?.twilioAuthToken
-        ? this.encryption.decrypt(cfg.twilioAuthToken)
-        : envToken;
-      const from = cfg?.twilioFromNumber || envFrom;
-
-      const hash = [sid || '', token || '', from || ''].join('|');
+      const hash = [apiUrl || '', user || '', secretKey || '', sender || ''].join('|');
       if (this.lastConfigHash !== hash) {
         this.lastConfigHash = hash;
-        if (sid && token) {
-          this.client = Twilio(sid, token);
-          this.fromNumber = from;
+        if (apiUrl && user && secretKey) {
+          this.http = axios.create({
+            baseURL: apiUrl,
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            timeout: 15000,
+          });
+          this.apiUrl = apiUrl;
+          this.user = user;
+          this.secretKey = secretKey;
+          this.sender = sender;
         } else {
-          this.client = null;
-          this.fromNumber = undefined;
+          this.http = null;
+          this.apiUrl = undefined;
+          this.user = undefined;
+          this.secretKey = undefined;
+          this.sender = undefined;
         }
       }
     } catch (e) {
-      this.logger.warn(`Failed to load SMS config: ${String(e)}`);
+      this.logger.warn(`Failed to load SMS config from env: ${String(e)}`);
     }
   }
 
   async send(to: string, body: string): Promise<void> {
     await this.loadConfig();
-    if (this.client && this.fromNumber) {
+    if (this.http && this.user && this.secretKey) {
       try {
-        await this.client.messages.create({ to, from: this.fromNumber, body });
+        // Dreams API expects form data: user, secret_key, to, message, sender
+        const form = new URLSearchParams();
+        form.set('user', this.user);
+        form.set('secret_key', this.secretKey);
+        form.set('to', to);
+        form.set('message', body);
+        if (this.sender) form.set('sender', this.sender);
+
+        const resp = await this.http.post('', form.toString());
+        const data: unknown = resp?.data;
+        const text = typeof data === 'string' ? data : JSON.stringify(data);
+
+        // Success example contains 'Result :1' or 'Result:1'
+        if (/Result\s*:\s*1/i.test(text)) {
+          return;
+        }
+
+        // If error code present, log it
+        this.logger.error(`Dreams send failed response: ${text}`);
         return;
       } catch (e) {
-        this.logger.error(`Twilio send failed: ${String(e)}`);
+        this.logger.error(`Dreams send failed: ${String(e)}`);
       }
     }
     // Fallback to log in non-configured environments

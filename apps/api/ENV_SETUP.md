@@ -1,4 +1,4 @@
-# Environment Configuration for Email OTP
+# Environment Configuration for Email OTP & SMS (Dreams)
 
 ## المشكلة
 عند إرسال OTP عبر البريد الإلكتروني، لا يتم إرسال الرسائل بسبب عدم تكوين إعدادات SMTP.
@@ -43,10 +43,11 @@ SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 SMTP_FROM=noreply@yourdomain.com
 
-# Twilio SMS Configuration (Optional)
-TWILIO_ACCOUNT_SID=your-twilio-account-sid
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_FROM_NUMBER=+1234567890
+# Dreams SMS Configuration (Optional)
+DREAMS_API_URL=https://www.dreams.sa/index.php/api/sendsms/
+DREAMS_USER=your-dreams-username
+DREAMS_SECRET_KEY=your-dreams-secret
+DREAMS_SENDER=YourBrandOrNumber
 
 # Payment Configuration
 PAYMENT_WEBHOOK_SECRET=dev-webhook-secret

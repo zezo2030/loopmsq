@@ -218,6 +218,17 @@ export class BookingsController {
     return this.bookingsService.getStaffScans(user.id);
   }
 
+  @Get('staff/scans/me/stats')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.STAFF)
+  @ApiOperation({ summary: 'Get scan statistics for current staff (today, week, month, total)' })
+  @ApiResponse({ status: 200, description: 'Scan statistics retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  async getMyScanStats(@CurrentUser() user: User) {
+    return this.bookingsService.getStaffScanStats(user.id);
+  }
+
   // Hard delete booking (Admin/Branch Manager)
   @Delete(':id')
   @UseGuards(RolesGuard)

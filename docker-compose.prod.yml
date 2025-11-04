@@ -58,6 +58,11 @@ services:
       SMTP_USER: zezosaad194@gmail.com
       SMTP_PASS: yluw wgiu gogn ohys
       SMTP_FROM: zezosaad194@gmail.com
+      # Dreams SMS Configuration
+      DREAMS_API_URL: ${DREAMS_API_URL}
+      DREAMS_USER: ${DREAMS_USER}
+      DREAMS_SECRET_KEY: ${DREAMS_SECRET_KEY}
+      DREAMS_SENDER: ${DREAMS_SENDER}
       #TAP Configuration
       TAP_SECRET_KEY: ${TAP_SECRET_KEY}
       TAP_PUBLIC_KEY: ${TAP_PUBLIC_KEY}

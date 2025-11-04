@@ -73,9 +73,10 @@ async function safeText(resp: Response): Promise<string | null> {
 // Admin Config APIs
 export type SmsConfigMasked = {
   enabled: boolean
-  provider: 'twilio'
-  twilioAccountSid?: string // masked '****'
-  twilioFromNumber?: string
+  provider: 'dreams'
+  dreamsApiUrl?: string
+  dreamsUser?: string
+  dreamsSender?: string
 }
 
 export type OtpConfig = {
@@ -90,7 +91,7 @@ export async function getSmsConfig(): Promise<SmsConfigMasked> {
   return apiGet('/admin/config/sms')
 }
 
-export async function updateSmsConfig(body: Partial<{ enabled: boolean; provider: 'twilio'; twilioAccountSid: string; twilioAuthToken: string; twilioFromNumber: string }>): Promise<SmsConfigMasked> {
+export async function updateSmsConfig(body: Partial<{ enabled: boolean; provider: 'dreams'; dreamsApiUrl: string; dreamsUser: string; dreamsSecretKey: string; dreamsSender: string }>): Promise<SmsConfigMasked> {
   return apiPut('/admin/config/sms', body)
 }
 

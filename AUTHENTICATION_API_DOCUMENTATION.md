@@ -21,6 +21,8 @@ Queues Dashboard: http://localhost:3000/api/v1/queues (Development Only)
 - **تسجيل جديد بالبريد الإلكتروني + كلمة المرور**
 - **تسجيل جديد بـ OTP فقط**
 
+> ملاحظة: تم اعتماد OTP عبر الجوال (SMS) باستخدام Dreams API، وإيقاف OTP عبر البريد الإلكتروني.
+
 ---
 
 ## 🚀 Authentication Endpoints
@@ -78,13 +80,15 @@ Content-Type: application/json
 
 ### 2. تسجيل الدخول بـ OTP (بدون كلمة مرور)
 
+> يتم الآن إرسال OTP عبر الجوال (SMS) وليس البريد الإلكتروني.
+
 #### أ) إرسال OTP:
 ```http
 POST http://localhost:3000/api/v1/auth/otp/send
 Content-Type: application/json
 
 {
-  "email": "ahmed@example.com",
+  "phone": "+966501234567",
   "language": "ar"
 }
 ```
@@ -103,7 +107,7 @@ POST http://localhost:3000/api/v1/auth/otp/verify
 Content-Type: application/json
 
 {
-  "email": "ahmed@example.com",
+  "phone": "+966501234567",
   "otp": "123456",
   "name": "أحمد علي"
 }
@@ -116,7 +120,7 @@ Content-Type: application/json
   "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": "123e4567-e89b-12d3-a456-426614174000",
-    "email": "ahmed@example.com",
+    "phone": "+966501234567",
     "name": "أحمد علي",
     "roles": ["USER"],
     "language": "ar"
@@ -136,8 +140,8 @@ Content-Type: application/json
 
 {
   "name": "أحمد علي",
-  "email": "ahmed@example.com",
   "phone": "+966501234567",
+  "email": "ahmed@example.com",
   "password": "StrongPass#2025",
   "language": "ar"
 }
@@ -157,7 +161,7 @@ POST http://localhost:3000/api/v1/auth/register/otp/verify
 Content-Type: application/json
 
 {
-  "email": "ahmed@example.com",
+  "phone": "+966501234567",
   "otp": "123456"
 }
 ```
@@ -169,6 +173,7 @@ Content-Type: application/json
   "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": "123e4567-e89b-12d3-a456-426614174000",
+    "phone": "+966501234567",
     "email": "ahmed@example.com",
     "name": "أحمد علي",
     "roles": ["USER"],
@@ -660,3 +665,27 @@ curl http://localhost:3000/api/v1/health
 ---
 
 هذا الدوكيومنتيشن يغطي جميع جوانب نظام المصادقة مع أمثلة عملية للاستخدام في تطبيق الموبايل.
+
+### أمثلة Frontend (مقتطفات مختصرة)
+
+```js
+// إرسال OTP
+const sendOtp = async (phone) => {
+  const res = await fetch('/api/v1/auth/otp/send', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, language: 'ar' })
+  })
+  if (!res.ok) throw new Error('Failed to send OTP');
+  return res.json();
+}
+
+// تأكيد OTP
+const verifyOtp = async (phone, otp, name) => {
+  const res = await fetch('/api/v1/auth/otp/verify', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, otp, name })
+  })
+  if (!res.ok) throw new Error('Failed to verify OTP');
+  return res.json();
+}
+```

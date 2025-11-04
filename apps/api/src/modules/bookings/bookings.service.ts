@@ -735,6 +735,79 @@ export class BookingsService {
     return { scans };
   }
 
+  async getStaffScanStats(staffId: string): Promise<{
+    today: number;
+    week: number;
+    month: number;
+    total: number;
+    recentScans: Array<{
+      id: string;
+      scannedAt: Date;
+      bookingId: string;
+      branch?: string;
+      hall?: string;
+      holderName?: string;
+    }>;
+  }> {
+    const now = new Date();
+    
+    // Get all scans for this staff
+    const allScans = await this.ticketRepository.find({
+      where: { staffId },
+      order: { scannedAt: 'DESC' },
+      relations: ['booking', 'booking.branch', 'booking.hall'],
+    } as any);
+
+    // Filter scans that have been scanned (scannedAt is not null)
+    const scannedTickets = allScans.filter(ticket => ticket.scannedAt !== null);
+
+    // Calculate today's date boundaries
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    // Calculate week start (7 days ago)
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - 7);
+    weekStart.setHours(0, 0, 0, 0);
+
+    // Calculate month start
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Count scans by period
+    const todayScans = scannedTickets.filter(ticket => {
+      const scanDate = new Date(ticket.scannedAt!);
+      return scanDate >= todayStart && scanDate <= todayEnd;
+    });
+
+    const weekScans = scannedTickets.filter(ticket => {
+      const scanDate = new Date(ticket.scannedAt!);
+      return scanDate >= weekStart;
+    });
+
+    const monthScans = scannedTickets.filter(ticket => {
+      const scanDate = new Date(ticket.scannedAt!);
+      return scanDate >= monthStart;
+    });
+
+    // Get recent scans (last 10)
+    const recentScans = scannedTickets.slice(0, 10).map(ticket => ({
+      id: ticket.id,
+      scannedAt: ticket.scannedAt!,
+      bookingId: ticket.bookingId,
+      branch: ticket.booking?.branch?.name_ar || ticket.booking?.branch?.name_en || undefined,
+      hall: ticket.booking?.hall?.name_ar || ticket.booking?.hall?.name_en || undefined,
+      holderName: ticket.holderName || undefined,
+    }));
+
+    return {
+      today: todayScans.length,
+      week: weekScans.length,
+      month: monthScans.length,
+      total: scannedTickets.length,
+      recentScans,
+    };
+  }
+
   async cancelBooking(
     bookingId: string,
     userIdOrRequesterId: string,

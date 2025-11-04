@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsEmail } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SendOtpDto {
@@ -10,7 +10,7 @@ export class SendOtpDto {
   email: string;
 
   @ApiProperty({
-    description: 'Language preference for email',
+    description: 'Language preference',
     example: 'ar',
     required: false,
   })

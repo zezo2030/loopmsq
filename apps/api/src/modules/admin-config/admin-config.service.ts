@@ -7,10 +7,11 @@ import { NotificationsService } from '../notifications/notifications.service';
 
 type SmsConfig = {
   enabled: boolean;
-  provider: 'twilio';
-  twilioAccountSid?: string; // encrypted at rest
-  twilioAuthToken?: string; // encrypted at rest
-  twilioFromNumber?: string;
+  provider: 'dreams';
+  dreamsApiUrl?: string;
+  dreamsUser?: string;
+  dreamsSecretKey?: string; // encrypted at rest
+  dreamsSender?: string;
 };
 
 type OtpConfig = {
@@ -36,30 +37,28 @@ export class AdminConfigService {
   async getSmsConfig(mask = true): Promise<SmsConfig> {
     const cfg = (await this.redis.get(this.smsKey)) as SmsConfig | null;
     if (!cfg) {
-      return { enabled: false, provider: 'twilio' };
+      return { enabled: false, provider: 'dreams' };
     }
     if (!mask) return cfg;
     const masked: SmsConfig = { ...cfg };
-    if (masked.twilioAccountSid) masked.twilioAccountSid = '****';
-    if (masked.twilioAuthToken) masked.twilioAuthToken = '****';
+    if (masked.dreamsSecretKey) masked.dreamsSecretKey = '****';
     return masked;
   }
 
   async updateSmsConfig(dto: UpdateSmsConfigDto): Promise<SmsConfig> {
     const current = ((await this.redis.get(this.smsKey)) as SmsConfig | null) || {
       enabled: false,
-      provider: 'twilio',
+      provider: 'dreams',
     };
     const next: SmsConfig = { ...current };
 
     if (dto.enabled !== undefined) next.enabled = dto.enabled;
     if (dto.provider) next.provider = dto.provider;
-    if (dto.twilioFromNumber !== undefined)
-      next.twilioFromNumber = dto.twilioFromNumber;
-    if (dto.twilioAccountSid)
-      next.twilioAccountSid = this.encryption.encrypt(dto.twilioAccountSid);
-    if (dto.twilioAuthToken)
-      next.twilioAuthToken = this.encryption.encrypt(dto.twilioAuthToken);
+    if (dto.dreamsApiUrl !== undefined) next.dreamsApiUrl = dto.dreamsApiUrl;
+    if (dto.dreamsUser !== undefined) next.dreamsUser = dto.dreamsUser;
+    if (dto.dreamsSender !== undefined) next.dreamsSender = dto.dreamsSender;
+    if (dto.dreamsSecretKey)
+      next.dreamsSecretKey = this.encryption.encrypt(dto.dreamsSecretKey);
 
     await this.redis.set(this.smsKey, next);
     return this.getSmsConfig(true);

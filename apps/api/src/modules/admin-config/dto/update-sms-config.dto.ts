@@ -1,12 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsBoolean,
-  IsIn,
-  IsOptional,
-  IsString,
-  Matches,
-  MinLength,
-} from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateSmsConfigDto {
   @ApiProperty({ description: 'Enable/disable SMS sending', required: false })
@@ -16,41 +9,35 @@ export class UpdateSmsConfigDto {
 
   @ApiProperty({
     description: 'SMS provider',
-    enum: ['twilio'],
+    enum: ['dreams'],
     required: false,
   })
   @IsOptional()
-  @IsIn(['twilio'])
-  provider?: 'twilio';
+  @IsIn(['dreams'])
+  provider?: 'dreams';
 
-  @ApiProperty({
-    description: 'Twilio Account SID',
-    required: false,
-    example: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  })
+  @ApiProperty({ description: 'Dreams API base URL', required: false, example: 'https://www.dreams.sa/index.php/api/sendsms/' })
   @IsOptional()
   @IsString()
-  @MinLength(10)
-  twilioAccountSid?: string;
+  dreamsApiUrl?: string;
 
-  @ApiProperty({
-    description: 'Twilio Auth Token',
-    required: false,
-  })
+  @ApiProperty({ description: 'Dreams Account Username', required: false })
   @IsOptional()
   @IsString()
-  @MinLength(10)
-  twilioAuthToken?: string;
+  @MinLength(3)
+  dreamsUser?: string;
 
-  @ApiProperty({
-    description: 'Twilio From Number (E.164)',
-    required: false,
-    example: '+1234567890',
-  })
+  @ApiProperty({ description: 'Dreams API Secret Key', required: false })
   @IsOptional()
   @IsString()
-  @Matches(/^\+?[0-9]{7,15}$/)
-  twilioFromNumber?: string;
+  @MinLength(6)
+  dreamsSecretKey?: string;
+
+  @ApiProperty({ description: 'Dreams Sender (name or number)', required: false })
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  dreamsSender?: string;
 }
 
 
