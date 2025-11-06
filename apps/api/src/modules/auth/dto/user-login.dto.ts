@@ -3,11 +3,11 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class UserLoginDto {
   @ApiProperty({
-    description: 'Email address or phone number in international format',
-    example: '+966501234567 or user@example.com',
+    description: 'Phone number in international format',
+    example: '+966501234567',
   })
   @IsString()
-  identifier: string;
+  phone: string;
 
   @ApiProperty({ description: 'Account password', example: 'StrongPass#2025' })
   @IsString()

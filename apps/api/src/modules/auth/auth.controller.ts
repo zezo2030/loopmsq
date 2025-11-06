@@ -21,6 +21,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RegisterSendOtpDto } from './dto/register-send-otp.dto';
 import { RegisterVerifyOtpDto } from './dto/register-verify-otp.dto';
 import { UserLoginDto } from './dto/user-login.dto';
+import { CompleteRegistrationDto } from './dto/complete-registration.dto';
 import { StaffLoginDto } from './dto/staff-login.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
@@ -47,9 +48,10 @@ export class AuthController {
 
   @Post('register/otp/send')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send OTP to register with phone/email/password' })
+  @ApiOperation({ summary: 'Send OTP to register with phone number' })
   @ApiResponse({ status: 200, description: 'OTP sent successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 409, description: 'Phone number already exists' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async registerSendOtp(@Body() dto: RegisterSendOtpDto) {
     return this.authService.registerSendOtp(dto);
@@ -67,12 +69,23 @@ export class AuthController {
 
   @Post('register/otp/verify')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verify OTP and create account' })
-  @ApiResponse({ status: 200, description: 'Registration successful' })
+  @ApiOperation({ summary: 'Verify OTP for registration' })
+  @ApiResponse({ status: 200, description: 'OTP verified, requires completion' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Invalid OTP' })
+  @ApiResponse({ status: 409, description: 'Phone number already registered' })
   async registerVerifyOtp(@Body() dto: RegisterVerifyOtpDto) {
     return this.authService.registerVerifyOtp(dto);
+  }
+
+  @Post('register/complete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Complete registration with name and password' })
+  @ApiResponse({ status: 200, description: 'Registration completed successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request or verification expired' })
+  @ApiResponse({ status: 409, description: 'Phone number already registered' })
+  async completeRegistration(@Body() dto: CompleteRegistrationDto) {
+    return this.authService.completeRegistration(dto);
   }
 
   @Post('staff/login')
@@ -108,7 +121,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'User login with email or phone and password' })
+  @ApiOperation({ summary: 'User login with phone number and password' })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async userLogin(@Body() dto: UserLoginDto) {

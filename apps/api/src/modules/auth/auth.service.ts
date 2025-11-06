@@ -21,6 +21,7 @@ import { UserRole } from '../../common/decorators/roles.decorator';
 import { RegisterSendOtpDto } from './dto/register-send-otp.dto';
 import { RegisterVerifyOtpDto } from './dto/register-verify-otp.dto';
 import { UserLoginDto } from './dto/user-login.dto';
+import { CompleteRegistrationDto } from './dto/complete-registration.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -44,7 +45,7 @@ export class AuthService {
   ): Promise<{ success: boolean; message: string }> {
     const language = sendOtpDto.language ?? 'ar';
     const lang: 'ar' | 'en' = language === 'en' ? 'en' : 'ar';
-    const email = sendOtpDto.email.trim().toLowerCase();
+    const normalizedPhone = this.normalizePhone(sendOtpDto.phone);
 
     // Read OTP config from Redis
     const otpCfg = ((await this.redisService.get('config:otp')) as any) || {
@@ -59,7 +60,7 @@ export class AuthService {
     }
 
     // Rate limiting check (configurable)
-    const rateLimitKey = `otp_rate_email:${email}`;
+    const rateLimitKey = `otp_rate_phone:${normalizedPhone}`;
     const attempts = await this.redisService.incrementRateLimit(
       rateLimitKey,
       Number(otpCfg.rateTtlSeconds) || 300,
@@ -74,26 +75,34 @@ export class AuthService {
     // Generate OTP
     const otp = this.generateOtp(otpCfg.length || 6);
 
-    // Store OTP in Redis with expiry using email as key
+    // Log OTP to console for development/testing
+    this.logger.log(
+      `📱 [OTP] Phone: ${normalizedPhone} | OTP Code: ${otp}`,
+    );
+    console.log(
+      `\n🔐 ========================================\n📱 OTP Code for ${normalizedPhone}\n🔑 Code: ${otp}\n⏰ Expires in: ${otpCfg.expirySeconds || 300} seconds\n========================================\n`,
+    );
+
+    // Store OTP in Redis with expiry using phone as key
     await this.redisService.setOTP(
-      email,
+      normalizedPhone,
       otp,
       Number(otpCfg.expirySeconds) || 300,
     );
 
-    // Enqueue EMAIL OTP
+    // Enqueue SMS OTP
     await this.notifications.enqueue({
       type: 'OTP',
-      to: { email },
+      to: { phone: normalizedPhone },
       data: { otp },
       lang,
-      channels: ['email'],
+      channels: ['sms'],
     });
 
     const message =
       language === 'ar'
-        ? 'تم إرسال رمز التحقق عبر البريد الإلكتروني'
-        : 'OTP sent via email';
+        ? 'تم إرسال رمز التحقق عبر الرسائل النصية'
+        : 'OTP sent via SMS';
 
     return {
       success: true,
@@ -104,24 +113,13 @@ export class AuthService {
   async registerSendOtp(
     dto: RegisterSendOtpDto,
   ): Promise<{ success: boolean; message: string }> {
-    const name = (dto.name || '').trim();
-    const email = dto.email.trim().toLowerCase();
     const language = dto.language ?? 'ar';
+    const normalizedPhone = this.normalizePhone(dto.phone);
 
-    if (!name) {
-      throw new BadRequestException('Name is required');
-    }
-
-    if (!email) {
-      throw new BadRequestException('Email is required');
-    }
-
-    // Ensure email not used
-    const existingByEmail = await this.userRepository.findOne({
-      where: { email },
-    });
-    if (existingByEmail) {
-      throw new ConflictException('Email already exists');
+    // Ensure phone not used
+    const existingUser = await this.findUserByDecryptedPhone(normalizedPhone);
+    if (existingUser) {
+      throw new ConflictException('Phone number already exists');
     }
 
     // Read OTP config from Redis
@@ -136,8 +134,8 @@ export class AuthService {
       throw new BadRequestException('OTP is disabled by configuration');
     }
 
-    // Rate limiting check using email
-    const rateLimitKey = `otp_register_rate_email:${email}`;
+    // Rate limiting check using phone
+    const rateLimitKey = `otp_register_rate_phone:${normalizedPhone}`;
     const attempts = await this.redisService.incrementRateLimit(
       rateLimitKey,
       Number(otpCfg.rateTtlSeconds) || 300,
@@ -151,38 +149,34 @@ export class AuthService {
     // Generate OTP
     const otp = this.generateOtp(otpCfg.length || 6);
 
-    // Store OTP and pending registration data (password hashed)
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    // Log OTP to console for development/testing
+    this.logger.log(
+      `📱 [REGISTER OTP] Phone: ${normalizedPhone} | OTP Code: ${otp}`,
+    );
+    console.log(
+      `\n🔐 ========================================\n📱 REGISTRATION OTP Code for ${normalizedPhone}\n🔑 Code: ${otp}\n⏰ Expires in: ${otpCfg.expirySeconds || 300} seconds\n========================================\n`,
+    );
 
+    // Store OTP in Redis using phone as key
     await this.redisService.setOTP(
-      email,
+      normalizedPhone,
       otp,
       Number(otpCfg.expirySeconds) || 300,
-    ); // OTP expiry
-    await this.redisService.set(
-      `reg:${email}`,
-      {
-        name,
-        email,
-        passwordHash,
-        language,
-      },
-      900,
-    ); // 15 minutes for registration data
+    );
 
-    // Enqueue EMAIL OTP for registration
+    // Enqueue SMS OTP for registration
     await this.notifications.enqueue({
       type: 'OTP',
-      to: { email },
+      to: { phone: normalizedPhone },
       data: { otp },
       lang: language as 'ar' | 'en',
-      channels: ['email'],
+      channels: ['sms'],
     });
 
     const message =
       language === 'ar'
-        ? 'تم إرسال رمز التحقق للتسجيل عبر البريد الإلكتروني'
-        : 'Registration OTP sent via email';
+        ? 'تم إرسال رمز التحقق للتسجيل عبر الرسائل النصية'
+        : 'Registration OTP sent via SMS';
 
     return { success: true, message };
   }
@@ -193,17 +187,16 @@ export class AuthService {
     user: Partial<User>;
     isNewUser: boolean;
   }> {
-    const name = verifyOtpDto.name;
-    const email = verifyOtpDto.email.trim().toLowerCase();
+    const normalizedPhone = this.normalizePhone(verifyOtpDto.phone);
     const normalizedOtp = this.normalizeOtp(verifyOtpDto.otp);
 
     // Verify OTP
     let storedOtp: string | null = null;
     try {
-      storedOtp = await this.redisService.getOTP(email);
+      storedOtp = await this.redisService.getOTP(normalizedPhone);
     } catch (e) {
       this.logger.error(
-        `Redis error while fetching OTP for ${email}: ${String(e)}`,
+        `Redis error while fetching OTP for ${normalizedPhone}: ${String(e)}`,
       );
       throw new BadRequestException(
         'OTP service temporarily unavailable, please try again',
@@ -213,84 +206,88 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Delete OTP after successful verification
-    try {
-      await this.redisService.deleteOTP(email);
-    } catch (e) {
-      this.logger.warn(
-        `Failed to delete OTP for ${email}: ${String(e)}`,
-      );
-    }
+    // Find user by phone
+    const user = await this.findUserByDecryptedPhone(normalizedPhone);
+    const isNewUser = !user;
 
-    // Find or create user by email
-    let user = await this.userRepository.findOne({
-      where: { email },
-    });
-    let isNewUser = false;
-
-    if (!user) {
-      if (!name) {
-        throw new BadRequestException('Name is required for new users');
+    if (user) {
+      // Existing user - login directly
+      // Delete OTP after successful verification
+      try {
+        await this.redisService.deleteOTP(normalizedPhone);
+      } catch (e) {
+        this.logger.warn(
+          `Failed to delete OTP for ${normalizedPhone}: ${String(e)}`,
+        );
       }
 
-      // Create new user
-      user = this.userRepository.create({
-        email,
-        name,
-        roles: [UserRole.USER],
-        isActive: true,
-        lastLoginAt: new Date(),
-      });
-
-      user = await this.userRepository.save(user);
-
-      // Create wallet for new user
-      const wallet = this.walletRepository.create({
-        userId: user.id,
-        balance: 0,
-        loyaltyPoints: 0,
-      });
-      await this.walletRepository.save(wallet);
-
-      isNewUser = true;
-      this.logger.log(`New user registered: ${user.id}`);
-    } else {
       // Update last login
       user.lastLoginAt = new Date();
       await this.userRepository.save(user);
+
+      // Generate tokens
+      const tokens = await this.generateTokens(user);
+
+      let decryptedPhone: string | undefined;
+      if (user.phone) {
+        try {
+          decryptedPhone = this.encryptionService.decrypt(user.phone);
+        } catch {
+          // ignore decryption errors
+        }
+      }
+
+      return {
+        ...tokens,
+        user: {
+          id: user.id,
+          email: user.email,
+          phone: decryptedPhone,
+          name: user.name,
+          roles: user.roles,
+          language: user.language,
+        },
+        isNewUser: false,
+      };
+    } else {
+      // New user - don't create account yet, just mark as verified
+      // Keep OTP in Redis for next step (completeRegistration)
+      // Store phone temporarily for completion step
+      try {
+        await this.redisService.set(
+          `reg_verified:${normalizedPhone}`,
+          { phone: normalizedPhone },
+          900, // 15 minutes
+        );
+      } catch (e) {
+        this.logger.warn(
+          `Failed to store verified phone for ${normalizedPhone}: ${String(e)}`,
+        );
+      }
+
+      return {
+        accessToken: '',
+        refreshToken: '',
+        user: {},
+        isNewUser: true,
+      };
     }
-
-    // Generate tokens
-    const tokens = await this.generateTokens(user);
-
-    return {
-      ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        roles: user.roles,
-        language: user.language,
-      },
-      isNewUser,
-    };
   }
 
   async registerVerifyOtp(dto: RegisterVerifyOtpDto): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    user: Partial<User>;
+    requiresCompletion: boolean;
+    message: string;
   }> {
-    const email = dto.email.trim().toLowerCase();
+    const normalizedPhone = this.normalizePhone(dto.phone);
     const normalizedOtp = this.normalizeOtp(dto.otp);
 
     // Verify OTP
     let storedOtp: string | null = null;
     try {
-      storedOtp = await this.redisService.getOTP(email);
+      storedOtp = await this.redisService.getOTP(normalizedPhone);
     } catch (e) {
       this.logger.error(
-        `Redis error while fetching OTP for ${email}: ${String(e)}`,
+        `Redis error while fetching OTP for ${normalizedPhone}: ${String(e)}`,
       );
       throw new BadRequestException(
         'OTP service temporarily unavailable, please try again',
@@ -300,81 +297,32 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Delete OTP after successful verification
+    // Check if user already exists
+    const existingUser = await this.findUserByDecryptedPhone(normalizedPhone);
+    if (existingUser) {
+      throw new ConflictException(
+        'Phone number already registered. Please use login instead.',
+      );
+    }
+
+    // Store verified phone for completion step
     try {
-      await this.redisService.deleteOTP(email);
+      await this.redisService.set(
+        `reg_verified:${normalizedPhone}`,
+        { phone: normalizedPhone },
+        900, // 15 minutes
+      );
     } catch (e) {
       this.logger.warn(
-        `Failed to delete OTP for ${email}: ${String(e)}`,
+        `Failed to store verified phone for ${normalizedPhone}: ${String(e)}`,
       );
     }
 
-    // Load pending registration data
-    const pending = (await this.redisService.get(`reg:${email}`)) as {
-      name: string;
-      email: string;
-      passwordHash: string;
-      language?: string;
-    } | null;
-    if (!pending) {
-      throw new BadRequestException(
-        'Registration data expired. Please restart registration.',
-      );
-    }
-
-    const { name, email: pendingEmail, passwordHash, language } = pending;
-
-    // Final duplicate check
-    const existingByEmail = await this.userRepository.findOne({
-      where: { email: pendingEmail },
-    });
-    if (existingByEmail) {
-      throw new ConflictException('Email already exists');
-    }
-
-    // Create user
-    let user = this.userRepository.create({
-      email: pendingEmail,
-      name,
-      passwordHash,
-      roles: [UserRole.USER],
-      language: language ?? 'ar',
-      isActive: true,
-      lastLoginAt: new Date(),
-    });
-    user = await this.userRepository.save(user);
-
-    // Create wallet
-    const wallet = this.walletRepository.create({
-      userId: user.id,
-      balance: 0,
-      loyaltyPoints: 0,
-    });
-    await this.walletRepository.save(wallet);
-
-    // Clean pending registration data
-    try {
-      await this.redisService.del(`reg:${email}`);
-    } catch (e) {
-      this.logger.warn(
-        `Failed to delete registration cache for ${email}: ${String(
-          e,
-        )}`,
-      );
-    }
-
-    // Generate tokens
-    const tokens = await this.generateTokens(user);
+    // Don't delete OTP yet - will be deleted in completeRegistration
 
     return {
-      ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        roles: user.roles,
-        language: user.language,
-      },
+      requiresCompletion: true,
+      message: 'OTP verified. Please complete registration.',
     };
   }
 
@@ -520,35 +468,16 @@ export class AuthService {
     refreshToken: string;
     user: Partial<User>;
   }> {
-    const identifier = (dto.identifier || '').trim().toLowerCase();
-    const isEmail = identifier.includes('@');
+    const normalizedPhone = this.normalizePhone(dto.phone);
 
-    let user: User | null = null;
-    let decryptedPhone: string | undefined;
+    // Find user by phone
+    const user = await this.findUserByDecryptedPhone(normalizedPhone);
 
-    if (isEmail) {
-      user = await this.userRepository.findOne({
-        where: { email: identifier, isActive: true },
-      });
-      if (user?.phone) {
-        try {
-          decryptedPhone = this.encryptionService.decrypt(user.phone);
-        } catch {
-          // ignore decryption errors
-        }
-      }
-    } else {
-      const normalizedPhone = this.normalizePhone(identifier);
-      user = await this.findUserByDecryptedPhone(normalizedPhone);
-      if (user && user.isActive === true) {
-        decryptedPhone = normalizedPhone;
-      }
-    }
-
-    if (!user || !user.passwordHash) {
+    if (!user || !user.isActive || !user.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Verify password
     const isPasswordValid = await bcrypt.compare(
       dto.password,
       user.passwordHash,
@@ -557,10 +486,22 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Update last login
     user.lastLoginAt = new Date();
     await this.userRepository.save(user);
 
+    // Generate tokens
     const tokens = await this.generateTokens(user);
+
+    // Decrypt phone for response
+    let decryptedPhone: string | undefined;
+    if (user.phone) {
+      try {
+        decryptedPhone = this.encryptionService.decrypt(user.phone);
+      } catch {
+        // ignore decryption errors
+      }
+    }
 
     return {
       ...tokens,
@@ -568,6 +509,82 @@ export class AuthService {
         id: user.id,
         email: user.email,
         phone: decryptedPhone,
+        name: user.name,
+        roles: user.roles,
+        language: user.language,
+      },
+    };
+  }
+
+  async completeRegistration(dto: CompleteRegistrationDto): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: Partial<User>;
+  }> {
+    const normalizedPhone = this.normalizePhone(dto.phone);
+    const language = dto.language ?? 'ar';
+
+    // Verify that phone was verified in previous step
+    const verified = (await this.redisService.get(
+      `reg_verified:${normalizedPhone}`,
+    )) as { phone: string } | null;
+    if (!verified) {
+      throw new BadRequestException(
+        'Phone verification expired. Please restart registration.',
+      );
+    }
+
+    // Check if user already exists
+    const existingUser = await this.findUserByDecryptedPhone(normalizedPhone);
+    if (existingUser) {
+      throw new ConflictException('Phone number already registered');
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    // Create user (without email)
+    let user = this.userRepository.create({
+      phone: this.encryptionService.encrypt(normalizedPhone),
+      name: dto.name.trim(),
+      passwordHash,
+      roles: [UserRole.USER],
+      language,
+      isActive: true,
+      lastLoginAt: new Date(),
+    });
+    user = await this.userRepository.save(user);
+
+    // Create wallet
+    const wallet = this.walletRepository.create({
+      userId: user.id,
+      balance: 0,
+      loyaltyPoints: 0,
+    });
+    await this.walletRepository.save(wallet);
+
+    // Clean up Redis data
+    try {
+      await this.redisService.del(`reg_verified:${normalizedPhone}`);
+      await this.redisService.deleteOTP(normalizedPhone);
+    } catch (e) {
+      this.logger.warn(
+        `Failed to clean up registration data for ${normalizedPhone}: ${String(
+          e,
+        )}`,
+      );
+    }
+
+    // Generate tokens
+    const tokens = await this.generateTokens(user);
+
+    this.logger.log(`New user registered: ${user.id}`);
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        phone: normalizedPhone,
         name: user.name,
         roles: user.roles,
         language: user.language,

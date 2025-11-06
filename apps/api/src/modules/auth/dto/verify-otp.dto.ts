@@ -1,28 +1,19 @@
-import { IsString, Length, IsOptional, IsEmail } from 'class-validator';
+import { IsString, Length } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class VerifyOtpDto {
   @ApiProperty({
-    description: 'Email address',
-    example: 'user@example.com',
+    description: 'Phone number in international format',
+    example: '+966501234567',
   })
-  @IsEmail()
-  email: string;
+  @IsString()
+  phone: string;
 
   @ApiProperty({
-    description: 'OTP code received via email',
+    description: 'OTP code received via SMS',
     example: '123456',
   })
   @IsString()
   @Length(4, 6)
   otp: string;
-
-  @ApiProperty({
-    description: 'User name for registration',
-    example: 'Ahmed Ali',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  name?: string;
 }
