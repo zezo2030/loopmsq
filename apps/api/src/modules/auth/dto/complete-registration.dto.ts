@@ -28,3 +28,6 @@ export class CompleteRegistrationDto {
   language?: string = 'ar';
 }
 
+
+
+

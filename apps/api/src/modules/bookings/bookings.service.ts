@@ -5,6 +5,7 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, LessThanOrEqual, MoreThanOrEqual, IsNull, Between } from 'typeorm';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
@@ -18,14 +19,17 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingQuoteDto } from './dto/booking-quote.dto';
 import { ScanTicketDto } from './dto/scan-ticket.dto';
 import { ContentService } from '../content/content.service';
+import { CouponsService } from '../coupons/coupons.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { RedisService } from '../../utils/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
+import { getBookingSlotMinutes } from '../../config/booking.config';
 
 @Injectable()
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
+  private readonly slotMinutes: number;
 
   constructor(
     @InjectRepository(Booking)
@@ -37,12 +41,37 @@ export class BookingsService {
     @InjectRepository(Offer)
     private offerRepository: Repository<Offer>,
     private contentService: ContentService,
+    private couponsService: CouponsService,
     private qrCodeService: QRCodeService,
     private redisService: RedisService,
     private dataSource: DataSource,
     private notifications: NotificationsService,
+    private configService: ConfigService,
     private realtime?: RealtimeGateway,
-  ) {}
+  ) {
+    this.slotMinutes = getBookingSlotMinutes(this.configService);
+  }
+
+  private ensureSlotAlignment(start: Date) {
+    const timestamp = start.getTime();
+    if (Number.isNaN(timestamp)) {
+      throw new BadRequestException('Invalid start time');
+    }
+
+    const seconds = start.getUTCSeconds();
+    const millis = start.getUTCMilliseconds();
+    const minutes = start.getUTCMinutes();
+
+    if (
+      seconds !== 0 ||
+      millis !== 0 ||
+      minutes % this.slotMinutes !== 0
+    ) {
+      throw new BadRequestException(
+        `Start time must align with ${this.slotMinutes}-minute slots (e.g. 17:00, 18:00).`,
+      );
+    }
+  }
 
   async getQuote(quoteDto: BookingQuoteDto): Promise<{
     hallId: string;
@@ -73,6 +102,8 @@ export class BookingsService {
         throw new BadRequestException('Cannot book in the past');
       }
 
+      this.ensureSlotAlignment(requestedStart);
+
       // Find available hall if not specified
       let selectedHall: Hall;
       this.logger.log(`Looking for specific hall: ${hallId}`);
@@ -90,6 +121,7 @@ export class BookingsService {
         selectedHall.id,
         new Date(startTime),
         durationHours,
+        persons,
       );
       this.logger.log(`Hall availability: ${isAvailable}`);
 
@@ -134,6 +166,8 @@ export class BookingsService {
         discount = await this.calculateCouponDiscount(
           couponCode,
           Math.max(0, subtotalBeforeDiscounts - offerDiscount),
+          branchId,
+          selectedHall.id,
         );
         this.logger.log(`Discount applied: ${discount}`);
       }
@@ -194,6 +228,7 @@ export class BookingsService {
     if (startForCreate.getTime() <= nowForCreate.getTime()) {
       throw new BadRequestException('Cannot book in the past');
     }
+    this.ensureSlotAlignment(startForCreate);
 
     // Get quote first to validate and calculate pricing
     const quote = await this.getQuote({
@@ -968,22 +1003,29 @@ export class BookingsService {
   private async calculateCouponDiscount(
     couponCode: string,
     totalAmount: number,
+    branchId?: string,
+    hallId?: string,
   ): Promise<number> {
-    // Mock implementation - in real app, fetch from database
-    const coupons = {
-      SAVE20: { type: 'percentage', value: 20, minAmount: 100 },
-      FLAT50: { type: 'fixed', value: 50, minAmount: 200 },
-    };
+    try {
+      const preview = await this.couponsService.preview(couponCode, totalAmount, {
+        branchId,
+        hallId,
+      });
 
-    const coupon = coupons[couponCode];
-    if (!coupon || totalAmount < coupon.minAmount) {
+      if (!preview.valid) {
+        this.logger.warn(
+          `Coupon ${couponCode} is invalid for amount ${totalAmount}. Reason: ${preview.reason}`,
+        );
+        return 0;
+      }
+
+      return Number(preview.discountAmount) || 0;
+    } catch (error) {
+      this.logger.error(
+        `Failed to calculate coupon discount for ${couponCode}: ${error?.message || error}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       return 0;
-    }
-
-    if (coupon.type === 'percentage') {
-      return (totalAmount * coupon.value) / 100;
-    } else {
-      return coupon.value;
     }
   }
 

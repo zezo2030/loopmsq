@@ -13,6 +13,7 @@ import {
   ParseIntPipe,
   ParseBoolPipe,
   ForbiddenException,
+  BadRequestException,
   UploadedFile,
   UploadedFiles,
   UseInterceptors,
@@ -402,6 +403,64 @@ export class ContentController {
   }
 
   // Utility endpoints
+  @Get('halls/:id/slots')
+  @ApiOperation({ summary: 'List available booking slots for a hall' })
+  @ApiQuery({ name: 'date', type: String, description: 'ISO date string (required)' })
+  @ApiQuery({ name: 'durationHours', type: Number, required: false })
+  @ApiQuery({ name: 'slotMinutes', type: Number, required: false })
+  @ApiQuery({ name: 'persons', type: Number, required: false })
+  @ApiResponse({ status: 200, description: 'Slots generated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters' })
+  async getHallSlots(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('date') date: string,
+    @Query('durationHours') durationHours?: string,
+    @Query('slotMinutes') slotMinutes?: string,
+    @Query('persons') persons?: string,
+  ) {
+    if (!date) {
+      throw new BadRequestException('date query parameter is required');
+    }
+
+    const parsedDate = new Date(date);
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException('Invalid date format');
+    }
+
+    const duration =
+      durationHours !== undefined ? Number.parseInt(durationHours, 10) : 1;
+    const durationToUse =
+      Number.isFinite(duration) && duration > 0 ? duration : 1;
+
+    const slotMinutesCandidate =
+      slotMinutes !== undefined ? Number.parseInt(slotMinutes, 10) : undefined;
+    const slotMinutesOverride =
+      slotMinutesCandidate && slotMinutesCandidate > 0
+        ? slotMinutesCandidate
+        : undefined;
+
+    const effectiveSlotMinutes =
+      slotMinutesOverride ?? this.contentService.getSlotDurationMinutes();
+
+    const slots = await this.contentService.getHallSlots(
+      id,
+      parsedDate,
+      durationToUse,
+      slotMinutesOverride,
+      persons !== undefined ? Number.parseInt(persons, 10) : undefined,
+    );
+
+    return {
+      slotMinutes: effectiveSlotMinutes,
+      slots: slots.map((slot) => ({
+        start: slot.start.toISOString(),
+        end: slot.end.toISOString(),
+        available: slot.available,
+        consecutiveSlots: slot.consecutiveSlots,
+      })),
+    };
+  }
+
   @Get('halls/:id/availability')
   @ApiOperation({ summary: 'Check hall availability' })
   @ApiQuery({ name: 'startTime', type: String, description: 'ISO date string' })

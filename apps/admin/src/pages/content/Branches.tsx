@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAdminAuth } from '../../auth'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image, Tabs } from 'antd'
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image, Tabs, Row, Col } from 'antd'
 import { resolveFileUrl } from '../../shared/url'
 import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../api'
@@ -24,6 +24,8 @@ type Branch = {
   status?: 'active' | 'inactive' | 'maintenance'
   coverImage?: string | null
   images?: string[]
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export default function Branches() {
@@ -152,7 +154,9 @@ export default function Branches() {
             contactPhone: r.contactPhone,
             amenities: r.amenities,
             status: r.status,
-            workingHours: r.workingHours || {}
+            workingHours: r.workingHours || {},
+            latitude: r.latitude,
+            longitude: r.longitude
           }); setEditing(r) }}>
             {t('common.view_details') || 'View Details'}
           </Button>
@@ -166,7 +170,9 @@ export default function Branches() {
             contactPhone: r.contactPhone,
             amenities: r.amenities,
             status: r.status,
-            workingHours: r.workingHours || {}
+            workingHours: r.workingHours || {},
+            latitude: r.latitude,
+            longitude: r.longitude
           }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
           <Select
             value={r.status}
@@ -204,7 +210,9 @@ export default function Branches() {
                 contactPhone: selectedBranch.contactPhone,
                 amenities: selectedBranch.amenities,
                 status: selectedBranch.status,
-                workingHours: selectedBranch.workingHours || {}
+                workingHours: selectedBranch.workingHours || {},
+                latitude: selectedBranch.latitude,
+                longitude: selectedBranch.longitude
               }); setOpen(true) }}>
                 {t('common.edit') || 'Edit'}
               </Button>
@@ -285,6 +293,8 @@ export default function Branches() {
               contactPhone: values.contactPhone || null,
               amenities: values.amenities?.length ? values.amenities : undefined,
               status: values.status || 'active',
+              latitude: values.latitude ? Number(values.latitude) : null,
+              longitude: values.longitude ? Number(values.longitude) : null,
             }
             if (values.workingHours) {
               payload.workingHours = values.workingHours
@@ -303,6 +313,39 @@ export default function Branches() {
           <Form.Item name="location" label={t('branches.location') || 'الموقع'} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
+          
+          {/* Location Coordinates */}
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item 
+                name="latitude" 
+                label="Latitude (خط العرض)"
+                tooltip="مثال: 24.7136"
+              >
+                <InputNumber 
+                  step={0.00000001} 
+                  precision={8} 
+                  style={{ width: '100%' }}
+                  placeholder="24.7136"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item 
+                name="longitude" 
+                label="Longitude (خط الطول)"
+                tooltip="مثال: 46.6753"
+              >
+                <InputNumber 
+                  step={0.00000001} 
+                  precision={8} 
+                  style={{ width: '100%' }}
+                  placeholder="46.6753"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          
           <Form.Item name="capacity" label={t('branches.capacity') || 'السعة'} rules={[{ required: true }]}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>

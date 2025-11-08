@@ -31,6 +31,7 @@ API_PREFIX=api/v1
 ENCRYPTION_KEY=default-32-character-key-for-dev
 MAX_FILE_SIZE=10485760
 UPLOAD_DEST=./uploads
+BOOKING_SLOT_MINUTES=60
 
 # Rate Limiting
 THROTTLE_TTL=60

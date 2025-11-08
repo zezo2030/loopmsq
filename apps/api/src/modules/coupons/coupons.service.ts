@@ -35,12 +35,25 @@ export class CouponsService {
     return this.repo.delete(id);
   }
 
-  async preview(code: string, amount: number) {
+  async preview(
+    code: string,
+    amount: number,
+    options?: { branchId?: string; hallId?: string },
+  ) {
     const now = new Date();
     const found = await this.repo.findOne({ where: { code } });
     if (!found) {
       return { valid: false, reason: 'NOT_FOUND' };
     }
+
+    if (found.branchId && options?.branchId && found.branchId !== options.branchId) {
+      return { valid: false, reason: 'WRONG_BRANCH' };
+    }
+
+    if (found.hallId && options?.hallId && found.hallId !== options.hallId) {
+      return { valid: false, reason: 'WRONG_HALL' };
+    }
+
     if (!found.isActive) {
       return { valid: false, reason: 'INACTIVE' };
     }

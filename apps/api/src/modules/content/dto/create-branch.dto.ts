@@ -5,6 +5,7 @@ import {
   IsObject,
   IsArray,
   IsEnum,
+  IsNumber,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -97,4 +98,22 @@ export class CreateBranchDto {
   @IsOptional()
   @IsEnum(['active', 'inactive', 'maintenance'])
   status?: 'active' | 'inactive' | 'maintenance';
+
+  @ApiProperty({
+    description: 'Branch latitude coordinate',
+    example: 24.7136,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  latitude?: number;
+
+  @ApiProperty({
+    description: 'Branch longitude coordinate',
+    example: 46.6753,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
 }

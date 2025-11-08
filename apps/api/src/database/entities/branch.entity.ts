@@ -59,6 +59,12 @@ export class Branch {
   @Column({ type: 'json', nullable: true })
   images: string[];
 
+  @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
+  latitude: number | null;
+
+  @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
+  longitude: number | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

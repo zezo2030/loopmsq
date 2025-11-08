@@ -3,20 +3,26 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, IsNull } from 'typeorm';
+import { Repository, In, IsNull, Between } from 'typeorm';
 import { Branch } from '../../database/entities/branch.entity';
 import { Hall } from '../../database/entities/hall.entity';
 import { Addon } from '../../database/entities/addon.entity';
+import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { CreateHallDto } from './dto/create-hall.dto';
 import { RedisService } from '../../utils/redis.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
+import { getBookingSlotMinutes } from '../../config/booking.config';
 
 @Injectable()
 export class ContentService {
   private readonly logger = new Logger(ContentService.name);
+  private readonly slotMinutes: number;
+  private readonly maxBookingDurationHours = 12;
 
   constructor(
     @InjectRepository(Branch)
@@ -25,9 +31,60 @@ export class ContentService {
     private hallRepository: Repository<Hall>,
     @InjectRepository(Addon)
     private addonRepository: Repository<Addon>,
+    @InjectRepository(Booking)
+    private bookingRepository: Repository<Booking>,
     private redisService: RedisService,
+    private configService: ConfigService,
     private realtime: RealtimeGateway,
-  ) {}
+  ) {
+    this.slotMinutes = getBookingSlotMinutes(this.configService);
+  }
+
+  private isSlotAligned(date: Date): boolean {
+    if (Number.isNaN(date.getTime())) {
+      return false;
+    }
+
+    const seconds = date.getUTCSeconds();
+    const millis = date.getUTCMilliseconds();
+    const minutes = date.getUTCMinutes();
+
+    return seconds === 0 && millis === 0 && minutes % this.slotMinutes === 0;
+  }
+
+  private calculateBookingEnd(start: Date, durationHours: number): Date {
+    return new Date(start.getTime() + durationHours * 60 * 60 * 1000);
+  }
+
+  private countConsecutiveSlots(
+    slotStart: Date,
+    closeAt: Date,
+    bookings: { start: Date; end: Date }[],
+    intervalMs: number,
+  ): number {
+    let count = 0;
+    let cursor = new Date(slotStart);
+
+    while (cursor.getTime() + intervalMs <= closeAt.getTime()) {
+      const cursorEnd = new Date(cursor.getTime() + intervalMs);
+      const overlaps = bookings.some(
+        (booking) => booking.start < cursorEnd && booking.end > cursor,
+      );
+
+      if (overlaps) {
+        break;
+      }
+
+      count += 1;
+      cursor = cursorEnd;
+    }
+
+    return count;
+  }
+
+  getSlotDurationMinutes(): number {
+    return this.slotMinutes;
+  }
 
   // Branch Management
   async createBranch(createBranchDto: CreateBranchDto): Promise<Branch> {
@@ -368,9 +425,23 @@ export class ContentService {
     hallId: string,
     startTime: Date,
     durationHours: number,
+    persons?: number,
   ): Promise<boolean> {
     try {
       this.logger.log(`Checking availability for hall: ${hallId}, startTime: ${startTime}, duration: ${durationHours} hours`);
+
+      if (Number.isNaN(startTime.getTime())) {
+        this.logger.warn(`Invalid start time provided for hall availability: ${startTime}`);
+        return false;
+      }
+
+      if (!this.isSlotAligned(startTime)) {
+        this.logger.log(
+          `Requested start ${startTime.toISOString()} is not aligned with ${this.slotMinutes}-minute slots`,
+        );
+        return false;
+      }
+
       // Working hours enforcement based on branch workingHours
       const hall = await this.findHallById(hallId);
       const branch = hall.branch;
@@ -402,7 +473,7 @@ export class ContentService {
           openAt.setHours(oH || 0, oM || 0, 0, 0);
           const closeAt = new Date(startTime);
           closeAt.setHours(cH || 0, cM || 0, 0, 0);
-          const endTime = new Date(startTime.getTime() + durationHours * 60 * 60 * 1000);
+          const endTime = this.calculateBookingEnd(startTime, durationHours);
           if (startTime < openAt || endTime > closeAt) {
             this.logger.log(`Requested time ${startTime.toISOString()} - ${endTime.toISOString()} is outside working hours ${openAt.toISOString()} - ${closeAt.toISOString()}`);
             return false;
@@ -410,13 +481,234 @@ export class ContentService {
         }
       }
 
-      // TODO: Check against existing bookings calendar
+      const requestEnd = this.calculateBookingEnd(startTime, durationHours);
+      const statuses = [BookingStatus.PENDING, BookingStatus.CONFIRMED];
+      const bufferMs = this.maxBookingDurationHours * 60 * 60 * 1000;
+      const searchStart = new Date(startTime.getTime() - bufferMs);
+      const searchEnd = new Date(requestEnd.getTime() + bufferMs);
+
+      const existingBookings = await this.bookingRepository.find({
+        where: {
+          hallId,
+          status: In(statuses),
+          startTime: Between(searchStart, searchEnd),
+        },
+        select: ['id', 'startTime', 'durationHours', 'status'],
+      });
+
+      let hasOverlap = false;
+      let totalOverlappingPersons = 0;
+      existingBookings.forEach((booking) => {
+        const bookingEnd = this.calculateBookingEnd(
+          booking.startTime,
+          booking.durationHours,
+        );
+        const overlaps =
+          booking.startTime < requestEnd && bookingEnd > startTime;
+
+        if (overlaps) {
+          this.logger.log(
+            `Overlap detected with booking ${booking.id}: ${booking.startTime.toISOString()} - ${bookingEnd.toISOString()}`,
+          );
+          hasOverlap = true;
+          // Sum persons for a conservative capacity check
+          totalOverlappingPersons += (booking as any).persons ?? 0;
+        }
+      });
+
+      // Capacity-aware: only block if capacity would be exceeded
+      if (hasOverlap) {
+        const hall = await this.findHallById(hallId);
+        const reqPersons = Math.max(1, persons ?? 1);
+        const remaining = (hall.capacity ?? 0) - totalOverlappingPersons;
+        if (remaining < reqPersons) {
+          return false;
+        }
+      }
+
       this.logger.log(`Hall availability check passed (within working hours) for hall: ${hallId}`);
       return true;
     } catch (error) {
       this.logger.error(`Error checking hall availability: ${error.message}`, error.stack);
       // Return true as fallback to allow booking
       return true;
+    }
+  }
+
+  async getHallSlots(
+    hallId: string,
+    date: Date,
+    durationHours: number = 1,
+    slotMinutesOverride?: number,
+    persons?: number,
+  ): Promise<
+    {
+      start: Date;
+      end: Date;
+      available: boolean;
+      consecutiveSlots: number;
+    }[]
+  > {
+    try {
+      const hall = await this.findHallById(hallId);
+      const branch = hall.branch;
+
+      const targetDate = new Date(date);
+      if (Number.isNaN(targetDate.getTime())) {
+        throw new BadRequestException('Invalid date');
+      }
+      targetDate.setHours(0, 0, 0, 0);
+
+      const slotMinutesToUse =
+        slotMinutesOverride && slotMinutesOverride > 0
+          ? slotMinutesOverride
+          : this.slotMinutes;
+      const intervalMs = slotMinutesToUse * 60 * 1000;
+      const normalizedDurationHours =
+        Number.isFinite(durationHours) && durationHours > 0
+          ? durationHours
+          : 1;
+      const requiredSlots = Math.max(
+        1,
+        Math.ceil((normalizedDurationHours * 60) / slotMinutesToUse),
+      );
+
+      const workingHours = branch?.workingHours || {};
+      const day = targetDate.getDay();
+      const dayKeys = [
+        String(day),
+        ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][day],
+        ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][day],
+      ];
+      let dayCfg: any;
+      for (const key of dayKeys) {
+        if (workingHours && workingHours[key]) {
+          dayCfg = workingHours[key];
+          break;
+        }
+      }
+
+      if (!dayCfg) {
+        this.logger.warn(`No working hours configured for date ${targetDate.toISOString()} on branch ${branch?.id}`);
+        return [];
+      }
+      if (dayCfg.closed === true) {
+        this.logger.log(`Branch closed on ${targetDate.toISOString()} (day ${day})`);
+        return [];
+      }
+
+      const openStr: string | undefined = dayCfg.open;
+      const closeStr: string | undefined = dayCfg.close;
+      if (!openStr || !closeStr) {
+        this.logger.warn(`Incomplete working hours for branch ${branch?.id} on day ${day}`);
+        return [];
+      }
+
+      const [oH, oM] = openStr.split(':').map((v: string) => parseInt(v, 10));
+      const [cH, cM] = closeStr.split(':').map((v: string) => parseInt(v, 10));
+      const openAt = new Date(targetDate);
+      openAt.setHours(oH || 0, oM || 0, 0, 0);
+      const closeAt = new Date(targetDate);
+      closeAt.setHours(cH || 0, cM || 0, 0, 0);
+
+      if (openAt >= closeAt) {
+        this.logger.warn(`Invalid working hours window for branch ${branch?.id} on ${targetDate.toISOString()}`);
+        return [];
+      }
+
+      const alignedOpen = new Date(openAt);
+      alignedOpen.setSeconds(0, 0);
+      const openRemainder =
+        (alignedOpen.getHours() * 60 + alignedOpen.getMinutes()) %
+        slotMinutesToUse;
+      if (openRemainder !== 0) {
+        alignedOpen.setMinutes(alignedOpen.getMinutes() + (slotMinutesToUse - openRemainder));
+      }
+
+      const alignedClose = new Date(closeAt);
+      alignedClose.setSeconds(0, 0);
+      const closeRemainder =
+        (alignedClose.getHours() * 60 + alignedClose.getMinutes()) %
+        slotMinutesToUse;
+      if (closeRemainder !== 0) {
+        alignedClose.setMinutes(alignedClose.getMinutes() - closeRemainder);
+      }
+
+      if (alignedOpen >= alignedClose) {
+        this.logger.warn(`Working hours for branch ${branch?.id} do not produce any slots after alignment`);
+        return [];
+      }
+
+      const statuses = [BookingStatus.PENDING, BookingStatus.CONFIRMED];
+      const bufferMs = this.maxBookingDurationHours * 60 * 60 * 1000;
+      const searchStart = new Date(alignedOpen.getTime() - bufferMs);
+      const searchEnd = new Date(alignedClose.getTime() + bufferMs);
+
+      const existingBookings = await this.bookingRepository.find({
+        where: {
+          hallId,
+          status: In(statuses),
+          startTime: Between(searchStart, searchEnd),
+        },
+        select: ['id', 'startTime', 'durationHours', 'persons'],
+      });
+
+      const normalizedBookings = existingBookings.map((booking) => {
+        const bookingStart = new Date(booking.startTime);
+        return {
+          id: booking.id,
+          start: bookingStart,
+          end: this.calculateBookingEnd(bookingStart, booking.durationHours),
+          persons: (booking as any).persons ?? 0,
+        };
+      });
+
+      const reqPersons = Math.max(1, persons ?? 1);
+
+      const canFitAt = (slotStart: Date, slotEnd: Date): boolean => {
+        const overlappingPersons = normalizedBookings
+          .filter((b) => b.start < slotEnd && b.end > slotStart)
+          .reduce((sum, b) => sum + (b.persons || 0), 0);
+        const remaining = (hall.capacity ?? 0) - overlappingPersons;
+        return remaining >= reqPersons;
+      };
+
+      const slots: {
+        start: Date;
+        end: Date;
+        available: boolean;
+        consecutiveSlots: number;
+      }[] = [];
+
+      for (
+        let slotStart = new Date(alignedOpen);
+        slotStart.getTime() + intervalMs <= alignedClose.getTime();
+        slotStart = new Date(slotStart.getTime() + intervalMs)
+      ) {
+        const slotEnd = new Date(slotStart.getTime() + intervalMs);
+        // Count how many consecutive slots from slotStart can fit reqPersons
+        let chain = 0;
+        let cursor = new Date(slotStart);
+        while (cursor.getTime() + intervalMs <= alignedClose.getTime()) {
+          const cursorEnd = new Date(cursor.getTime() + intervalMs);
+          if (!canFitAt(cursor, cursorEnd)) break;
+          chain += 1;
+          cursor = cursorEnd;
+        }
+        const supportsDuration = chain >= requiredSlots;
+
+        slots.push({
+          start: new Date(slotStart),
+          end: slotEnd,
+          available: supportsDuration,
+          consecutiveSlots: chain,
+        });
+      }
+
+      return slots;
+    } catch (error) {
+      this.logger.error(`Error generating slots for hall ${hallId}: ${error.message}`, error.stack);
+      throw error;
     }
   }
 

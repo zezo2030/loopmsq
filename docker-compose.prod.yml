@@ -68,8 +68,8 @@ services:
       TAP_PUBLIC_KEY: ${TAP_PUBLIC_KEY}
       TAP_API_BASE: ${TAP_API_BASE}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET}
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     depends_on:
       - postgres
       - redis
@@ -83,9 +83,9 @@ services:
       dockerfile: apps/admin/Dockerfile
     container_name: booking-console
     environment:
-      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
+      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-/api/v1}
     ports:
-      - "3001:80"
+      - "80:80"
     depends_on:
       - api
     restart: unless-stopped
