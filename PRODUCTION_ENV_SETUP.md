@@ -31,6 +31,9 @@ SMTP_FROM=noreply@yourdomain.com
 
 # Frontend Configuration
 NEXT_PUBLIC_API_BASE=https://yourdomain.com/api/v1
+
+# SSL / Let's Encrypt
+LETSENCRYPT_EMAIL=admin@yourdomain.com
 ```
 
 ### 2. تشغيل الإنتاج:
@@ -40,7 +43,35 @@ NEXT_PUBLIC_API_BASE=https://yourdomain.com/api/v1
 docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
 ```
 
-### 3. إعدادات SMTP للإنتاج:
+> **ملاحظة:** يتم الآن تشغيل خدمات `nginx` و `certbot` مع المنظومة للإشراف على الشهادات وطبقة HTTPS.
+
+### 3. تهيئة شهادة Let's Encrypt لأول مرة:
+
+1. تأكد من أن سجلات الـ DNS تشير إلى خادمك (`kinetic-app.cloud` و `www.kinetic-app.cloud` إذا كنت ستستخدم كلاهما).
+2. شغّل الخدمات بدون الشهادة أولاً:
+
+   ```bash
+   docker-compose -f docker-compose.prod.yml --env-file .env.production up -d nginx
+   ```
+
+3. اطلب الشهادة لأول مرة:
+
+   ```bash
+   docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm \
+     certbot certonly --webroot -w /var/www/certbot \
+     -d kinetic-app.cloud -d www.kinetic-app.cloud \
+     --email "$LETSENCRYPT_EMAIL" --agree-tos --no-eff-email
+   ```
+
+4. بعد نجاح الإصدار، أعد تشغيل الحاويات للتأكد من تحميل الشهادة:
+
+   ```bash
+   docker-compose -f docker-compose.prod.yml --env-file .env.production restart nginx
+   ```
+
+> خدمة `certbot` تعمل بشكل مستمر داخل الـ compose لتجديد الشهادات تلقائيًا (يتم التحقق مرتين يوميًا).
+
+### 4. إعدادات SMTP للإنتاج:
 
 #### Gmail (مثال):
 ```env
@@ -69,7 +100,7 @@ SMTP_PASS=your-sendgrid-api-key
 SMTP_FROM=noreply@yourdomain.com
 ```
 
-### 4. التحقق من التكوين:
+### 5. التحقق من التكوين:
 
 ```bash
 # تحقق من logs
@@ -79,7 +110,7 @@ docker-compose -f docker-compose.prod.yml logs api
 curl https://yourdomain.com/api/v1/auth/email-config
 ```
 
-### 5. نصائح الأمان للإنتاج:
+### 6. نصائح الأمان للإنتاج:
 
 1. **استخدم كلمات مرور قوية**
 2. **لا تشارك ملف .env.production**

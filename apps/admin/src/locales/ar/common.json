@@ -394,6 +394,17 @@
   "branch.description_ar_ph": "أدخل الوصف بالعربية",
   "branch.description_en_ph": "أدخل الوصف بالإنجليزية",
   "users.user_details": "تفاصيل المستخدم",
+  "users.view_and_edit_user_info": "عرض وتعديل بيانات المستخدم",
+  "users.basic_information": "المعلومات الأساسية",
+  "users.roles_permissions": "الأدوار والصلاحيات",
+  "users.user_roles": "أدوار المستخدم",
+  "users.assigned_branch": "الفرع المرتبط",
+  "users.account_information": "معلومات الحساب",
+  "users.user_id": "معرّف المستخدم",
+  "users.created_at": "تاريخ الإنشاء",
+  "users.last_login": "آخر تسجيل دخول",
+  "users.never_logged_in": "لم يسجل الدخول من قبل",
+  "users.last_updated": "آخر تحديث",
   "users.full_name": "الاسم الكامل",
   "users.email_address": "البريد الإلكتروني",
   "users.enter_full_name": "أدخل الاسم الكامل",
@@ -424,6 +435,11 @@
   "users.create_password": "أنشئ كلمة مرور آمنة",
   "users.select_branch": "اختر الفرع",
   "users.select_language": "اختر اللغة",
+  "users.language_ar": "العربية",
+  "users.language_en": "الإنجليزية",
+  "users.updated_successfully": "تم تحديث بيانات المستخدم بنجاح",
+  "users.update_failed": "فشل تحديث بيانات المستخدم",
+  "users.load_user_failed": "فشل تحميل تفاصيل المستخدم",
   "support.tickets": "تذاكر الدعم",
   "support.search_placeholder": "ابحث بالموضوع/المستخدم",
   "support.status": "الحالة",
@@ -499,7 +515,8 @@
   "branches.max_images": "الحد الأقصى 5 صور",
   "branches.select_image": "اختر صورة",
   "branches.drag_drop": "اسحب وأفلت الصور هنا أو انقر للاختيار",
-  "branches.image_preview": "معاينة الصورة"
+  "branches.image_preview": "معاينة الصورة",
+  "common.save_changes": "حفظ التغييرات"
 }
 
 

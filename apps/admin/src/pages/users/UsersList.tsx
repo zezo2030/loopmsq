@@ -176,19 +176,19 @@ export default function UsersList() {
       render: (_: any, record: UserRow) => (
         <Space size="small">
           <Tooltip title={t('common.view_details') || 'View Details'}>
-            <Button 
+            <Button
               type="text"
               size="small"
               icon={<EyeOutlined />}
-              onClick={() => navigate(`/users/${record.id}`)}
+              onClick={() => navigate(`/admin/users/${record.id}`)}
             />
           </Tooltip>
           <Tooltip title={t('users.edit_user') || 'Edit User'}>
-            <Button 
+            <Button
               type="text"
               size="small"
               icon={<EditOutlined />}
-              onClick={() => navigate(`/users/${record.id}`)}
+              onClick={() => navigate(`/admin/users/${record.id}`)}
             />
           </Tooltip>
           {record.isActive ? (
@@ -280,18 +280,18 @@ export default function UsersList() {
             </p>
           </div>
           <Space>
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               className="btn-primary"
               icon={<PlusOutlined />}
-              onClick={() => navigate('/staff/new')}
+              onClick={() => navigate('/admin/staff/new')}
             >
               {t('users.add_staff') || 'Add Staff'}
             </Button>
-            <Button 
+            <Button
               type="default"
               icon={<PlusOutlined />}
-              onClick={() => navigate('/branch-managers/new')}
+              onClick={() => navigate('/admin/branch-managers/new')}
             >
               {t('users.add_manager') || 'Add Manager'}
             </Button>

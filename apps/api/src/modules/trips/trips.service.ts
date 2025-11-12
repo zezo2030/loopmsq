@@ -216,6 +216,35 @@ export class TripsService {
     return { success: true };
   }
 
+  async findUserRequests(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+    status?: string,
+  ): Promise<{
+    requests: SchoolTripRequest[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const where: any = { requesterId: userId };
+    if (status) where.status = status as any;
+
+    const [requests, total] = await this.tripRepo.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    } as any);
+
+    return {
+      requests,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async findAllRequests(
     page: number = 1,
     limit: number = 10,

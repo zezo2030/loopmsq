@@ -179,7 +179,7 @@ export class UsersService {
   async findOne(id: string, requester?: User): Promise<Partial<User>> {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['wallet', 'bookings', 'supportTickets'],
+      relations: ['wallet', 'bookings', 'supportTickets', 'branch'],
     });
 
     if (!user) {
@@ -209,6 +209,8 @@ export class UsersService {
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      branchId: user.branchId,
+      branch: user.branch,
       wallet: user.wallet,
       bookings: user.bookings,
       supportTickets: user.supportTickets,
@@ -232,6 +234,23 @@ export class UsersService {
       if (existingUser) {
         throw new ConflictException('Email already exists');
       }
+    }
+
+    // Check phone uniqueness if phone is being updated
+    if (updateUserDto.phone) {
+      const encryptedPhone = this.encryptionService.encrypt(updateUserDto.phone);
+      if (encryptedPhone !== user.phone) {
+        const existingPhoneUser = await this.userRepository.findOne({
+          where: { phone: encryptedPhone },
+        });
+        if (existingPhoneUser) {
+          throw new ConflictException('Phone number already exists');
+        }
+        // Update phone with encrypted value
+        user.phone = encryptedPhone;
+      }
+      // Remove phone from updateUserDto to avoid double assignment
+      delete updateUserDto.phone;
     }
 
     // Update user

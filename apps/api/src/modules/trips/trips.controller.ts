@@ -33,6 +33,20 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
 
+  @Get('requests')
+  @ApiOperation({ summary: 'Get user\'s trip requests' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  async getMyRequests(
+    @CurrentUser() user: any,
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 20,
+    @Query('status') status?: string,
+  ) {
+    return this.tripsService.findUserRequests(user.id, page, limit, status);
+  }
+
   @Post('requests')
   @ApiOperation({ summary: 'Create school trip request (user)' })
   @ApiResponse({ status: 201, description: 'Request created' })

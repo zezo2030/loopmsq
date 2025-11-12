@@ -394,6 +394,17 @@
   "branch.description_ar_ph": "Enter Arabic description",
   "branch.description_en_ph": "Enter English description",
   "users.user_details": "User Details",
+  "users.view_and_edit_user_info": "View and edit user information",
+  "users.basic_information": "Basic Information",
+  "users.roles_permissions": "Roles & Permissions",
+  "users.user_roles": "User Roles",
+  "users.assigned_branch": "Assigned Branch",
+  "users.account_information": "Account Information",
+  "users.user_id": "User ID",
+  "users.created_at": "Created At",
+  "users.last_login": "Last Login",
+  "users.never_logged_in": "Never logged in",
+  "users.last_updated": "Last Updated",
   "users.full_name": "Full Name",
   "users.email_address": "Email Address",
   "users.enter_full_name": "Enter full name",
@@ -424,6 +435,11 @@
   "users.create_password": "Create a secure password",
   "users.select_branch": "Please select a branch",
   "users.select_language": "Select language",
+  "users.language_ar": "Arabic",
+  "users.language_en": "English",
+  "users.updated_successfully": "User updated successfully",
+  "users.update_failed": "Failed to update user",
+  "users.load_user_failed": "Failed to load user details",
   "support.tickets": "Support Tickets",
   "support.search_placeholder": "Search by subject/user",
   "support.status": "Status",
@@ -499,7 +515,7 @@
   "branches.max_images": "Maximum 5 images",
   "branches.select_image": "Select Image",
   "branches.drag_drop": "Drag and drop images here or click to select",
-  "branches.image_preview": "Image Preview"
+  "branches.image_preview": "Image Preview",
+  "common.save_changes": "Save Changes"
 }
-
 
