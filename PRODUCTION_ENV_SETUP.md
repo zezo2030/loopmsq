@@ -32,44 +32,60 @@ SMTP_FROM=noreply@yourdomain.com
 # Frontend Configuration
 NEXT_PUBLIC_API_BASE=https://yourdomain.com/api/v1
 
-# SSL / Let's Encrypt
+# SSL / Let's Encrypt (للاستخدام على الخادم)
 LETSENCRYPT_EMAIL=admin@yourdomain.com
 ```
 
-### 2. تشغيل الإنتاج:
+### 2. تشغيل الإنتاج (دون Nginx داخل Docker):
 
 ```bash
 # استخدام ملف البيئة للإنتاج
 docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
 ```
 
-> **ملاحظة:** يتم الآن تشغيل خدمات `nginx` و `certbot` مع المنظومة للإشراف على الشهادات وطبقة HTTPS.
+> يقوم ملف الـ compose الآن بفتح المنفذين `3000` (لواجهة الـ API) و `8080` (واجهة الإدارة) لكي يتمكن Nginx المثبت على الخادم من التوجيه إليهما.
 
-### 3. تهيئة شهادة Let's Encrypt لأول مرة:
+### 3. تهيئة Nginx على الخادم الرئيسي:
 
-1. تأكد من أن سجلات الـ DNS تشير إلى خادمك (`kinetic-app.cloud` و `www.kinetic-app.cloud` إذا كنت ستستخدم كلاهما).
-2. شغّل الخدمات بدون الشهادة أولاً:
+1. ثبّت Nginx و Certbot (مثال أوبونتو):
 
    ```bash
-   docker-compose -f docker-compose.prod.yml --env-file .env.production up -d nginx
+   sudo apt update
+   sudo apt install nginx certbot python3-certbot-nginx
    ```
 
-3. اطلب الشهادة لأول مرة:
+2. انسخ الملف `docs/nginx-host.conf.example` إلى الخادم واحفظه في `/etc/nginx/sites-available/kinetic-app.conf`. ثم حدّث أسماء النطاقات إذا لزم الأمر.
+
+3. أنشئ مجلد التحدي لشهادة Let's Encrypt:
 
    ```bash
-   docker-compose -f docker-compose.prod.yml --env-file .env.production run --rm \
-     certbot certonly --webroot -w /var/www/certbot \
+   sudo mkdir -p /var/www/certbot
+   sudo chown www-data:www-data /var/www/certbot
+   ```
+
+4. فعّل الملف:
+
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/kinetic-app.conf /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl reload nginx
+   ```
+
+5. أصدر الشهادة لأول مرة:
+
+   ```bash
+   sudo certbot certonly --webroot -w /var/www/certbot \
      -d kinetic-app.cloud -d www.kinetic-app.cloud \
      --email "$LETSENCRYPT_EMAIL" --agree-tos --no-eff-email
    ```
 
-4. بعد نجاح الإصدار، أعد تشغيل الحاويات للتأكد من تحميل الشهادة:
+6. بعد نجاح الإصدار، أعد تحميل Nginx:
 
    ```bash
-   docker-compose -f docker-compose.prod.yml --env-file .env.production restart nginx
+   sudo systemctl reload nginx
    ```
 
-> خدمة `certbot` تعمل بشكل مستمر داخل الـ compose لتجديد الشهادات تلقائيًا (يتم التحقق مرتين يوميًا).
+> يمكن لـ Certbot إضافة مهمة كرون للتحقق مرتين يوميًا (`/etc/cron.d/certbot`) لتجديد الشهادة تلقائيًا.
 
 ### 4. إعدادات SMTP للإنتاج:
 
