@@ -108,6 +108,15 @@ export default function TripDetail() {
     setLoading(true)
     try {
       const tripData = await apiGet<TripRequest>(`/trips/requests/${id}`)
+      // Ensure requester object exists
+      if (!tripData.requester) {
+        tripData.requester = {
+          id: '',
+          name: undefined,
+          email: undefined,
+          phone: undefined
+        }
+      }
       setTrip(tripData)
     } catch (error) {
       console.error('Failed to load trip:', error)
@@ -284,7 +293,7 @@ export default function TripDetail() {
           <div style={{ textAlign: 'center', padding: '40px' }}>
             <WarningOutlined style={{ fontSize: '48px', color: '#faad14', marginBottom: '16px' }} />
             <h3>لم يتم العثور على الطلب</h3>
-            <Button type="primary" onClick={() => navigate('/trips')}>
+            <Button type="primary" onClick={() => navigate('/admin/trips')}>
               العودة إلى قائمة الرحلات
             </Button>
           </div>
@@ -303,7 +312,7 @@ export default function TripDetail() {
               <Button
                 type="text"
                 icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/trips')}
+                onClick={() => navigate('/admin/trips')}
                 size="large"
               />
               <h1 className="page-title" style={{ margin: 0 }}>
@@ -412,9 +421,11 @@ export default function TripDetail() {
                           <Avatar size={32} icon={<BookOutlined />} style={{ backgroundColor: '#52c41a' }} />
                           <div>
                             <div style={{ fontWeight: '600' }}>{trip.contactPersonName}</div>
-                            <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                              مقدم الطلب: {trip.requester.name}
-                            </div>
+                            {trip.requester?.name && (
+                              <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                                مقدم الطلب: {trip.requester.name}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </Descriptions.Item>

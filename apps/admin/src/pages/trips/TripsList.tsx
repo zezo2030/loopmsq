@@ -343,7 +343,7 @@ export default function TripsList() {
               type="text"
               size="small"
               icon={<EyeOutlined />}
-              onClick={() => navigate(`/trips/${record.id}`)}
+              onClick={() => navigate(`/admin/trips/${record.id}`)}
             />
           </Tooltip>
         </Space>
