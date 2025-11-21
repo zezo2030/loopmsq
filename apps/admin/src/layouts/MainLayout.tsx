@@ -20,6 +20,7 @@ import {
   AppstoreOutlined,
   StarOutlined,
   BarChartOutlined,
+  CustomerServiceOutlined,
 } from '@ant-design/icons'
 import { DollarOutlined, WalletOutlined, RocketOutlined, SettingOutlined } from '@ant-design/icons'
 import '../theme.css'
@@ -39,11 +40,17 @@ export default function MainLayout() {
   
   const getSelectedKeys = () => {
     const path = location.pathname.replace(/^\/admin/, '') || '/'
+    if (path === '/clients') {
+      return ['clients']
+    }
     if (path.startsWith('/users') || path.startsWith('/staff') || path.startsWith('/branch-managers')) {
       return ['users']
     }
     if (path.startsWith('/bookings')) {
-      return ['bookings']
+      if (path === '/bookings/free-ticket') {
+        return ['bookings-free-ticket']
+      }
+      return ['bookings-list']
     }
     if (path.startsWith('/trips')) {
       return ['trips']
@@ -135,6 +142,16 @@ export default function MainLayout() {
           </Link>,
         },
         {
+          key: 'clients',
+          icon: <CustomerServiceOutlined />,
+          label: <Link to="/admin/clients" className="user-dropdown-link">
+            <div className="user-dropdown-item">
+              <span className="dropdown-item-text">{t('users.clients.title') || 'العملاء'}</span>
+              <span className="dropdown-item-desc">{t('users.clients.subtitle') || 'View and manage all clients'}</span>
+            </div>
+          </Link>,
+        },
+        {
           key: 'create-staff',
           icon: <UserAddOutlined />,
           label: <Link to="/admin/staff/new" className="user-dropdown-link">
@@ -159,7 +176,19 @@ export default function MainLayout() {
     {
       key: 'bookings',
       icon: <CalendarOutlined />,
-      label: <Link to="/admin/bookings">{t('menu.bookings')}</Link>,
+      label: t('menu.bookings'),
+      children: [
+        {
+          key: 'bookings-list',
+          icon: <CalendarOutlined />,
+          label: <Link to="/admin/bookings">{t('menu.bookings') || 'الحجوزات'}</Link>,
+        },
+        {
+          key: 'bookings-free-ticket',
+          icon: <GiftOutlined />,
+          label: <Link to="/admin/bookings/free-ticket">إنشاء تذكرة مجانية</Link>,
+        },
+      ],
     },
     {
       key: 'trips',
@@ -336,11 +365,13 @@ function getPageTitle(pathname: string): string {
   // Users Management
   if (path === '/users') return t('page.user_management')
   if (path.startsWith('/users/')) return t('page.user_details')
+  if (path === '/clients') return t('users.clients.title') || 'العملاء'
   if (path === '/staff/new') return t('page.create_staff')
   if (path === '/branch-managers/new') return t('page.create_branch_manager')
   
   // Bookings Management
   if (path === '/bookings') return t('page.bookings_management')
+  if (path === '/bookings/free-ticket') return 'إنشاء تذكرة مجانية'
   if (path.startsWith('/bookings/')) return t('page.booking_details')
   
   // School Trips

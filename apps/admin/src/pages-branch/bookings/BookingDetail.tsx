@@ -22,7 +22,7 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
   const end = start && Number.isFinite(durationHrs)
     ? new Date(start.getTime() + durationHrs * 3600_000)
     : (booking?.endTime ? new Date(booking.endTime) : null)
-  const toArLocale = (d?: Date | null) => (d ? d.toLocaleString('ar-SA') : '-')
+  const toArLocale = (d?: Date | null) => (d ? d.toLocaleString('ar-SA', { calendar: 'gregory' }) : '-')
   const displayName = (o?: any) => o?.name ?? o?.name_ar ?? o?.nameAr ?? o?.name_en ?? o?.nameEn ?? ''
   const formatPhone = (v?: string) => {
     if (!v) return '-'
@@ -70,10 +70,10 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label={t('bookings.created_at') || 'Created At'}>
-            {booking.createdAt ? new Date(booking.createdAt).toLocaleString('ar-SA') : '-'}
+            {booking.createdAt ? new Date(booking.createdAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-'}
           </Descriptions.Item>
           <Descriptions.Item label={t('bookings.updated_at') || 'Updated At'}>
-            {booking.updatedAt ? new Date(booking.updatedAt).toLocaleString('ar-SA') : '-'}
+            {booking.updatedAt ? new Date(booking.updatedAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-'}
           </Descriptions.Item>
         </Descriptions>
       </Card>

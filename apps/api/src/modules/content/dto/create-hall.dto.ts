@@ -119,4 +119,13 @@ export class CreateHallDto {
   @IsOptional()
   @IsArray()
   images?: string[];
+
+  @ApiProperty({
+    description: 'YouTube video URL for the hall',
+    example: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  videoUrl?: string;
 }

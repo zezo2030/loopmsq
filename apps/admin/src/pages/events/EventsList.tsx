@@ -318,12 +318,12 @@ export default function EventsList() {
           </div>
           {record.hall && (
             <div style={{ color: '#8c8c8c', fontSize: '12px', marginBottom: '4px' }}>
-              {record.hall.name}
+              {record.hall?.name || 'غير محدد'}
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', color: '#8c8c8c', fontSize: '12px' }}>
             <CalendarOutlined style={{ marginRight: '6px' }} />
-            {new Date(record.startTime).toLocaleDateString('ar-SA')}
+            {new Date(record.startTime).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
           </div>
           <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
             {new Date(record.startTime).toLocaleTimeString('ar-SA', {
@@ -396,7 +396,7 @@ export default function EventsList() {
       render: (_: any, record: EventRequest) => (
         <div>
           <div style={{ fontWeight: '600', fontSize: '14px' }}>
-            {new Date(record.createdAt).toLocaleDateString('ar-SA')}
+            {new Date(record.createdAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
           </div>
           <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
             {new Date(record.createdAt).toLocaleTimeString('ar-SA', {
@@ -418,7 +418,7 @@ export default function EventsList() {
               type="text"
               size="small"
               icon={<EyeOutlined />}
-              onClick={() => navigate(`/events/${record.id}`)}
+              onClick={() => navigate(`/admin/events/${record.id}`)}
             />
           </Tooltip>
         </Space>

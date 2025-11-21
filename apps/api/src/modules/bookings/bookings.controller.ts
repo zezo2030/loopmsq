@@ -9,6 +9,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
   ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -22,6 +23,8 @@ import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingQuoteDto } from './dto/booking-quote.dto';
 import { ScanTicketDto } from './dto/scan-ticket.dto';
+import { CreateFreeTicketDto } from './dto/create-free-ticket.dto';
+import { CreateFreeTicketAdminDto } from './dto/create-free-ticket-admin.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -251,5 +254,42 @@ export class BookingsController {
       user.branchId,
       isAdmin || isManager,
     );
+  }
+
+  // Create free ticket (Branch Manager only)
+  @Post('free-ticket')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Create free ticket for user (Branch Manager only)' })
+  @ApiResponse({ status: 201, description: 'Free ticket created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User or hall not found' })
+  async createFreeTicket(
+    @CurrentUser() user: User,
+    @Body() dto: CreateFreeTicketDto,
+  ) {
+    if (!user.branchId) {
+      throw new BadRequestException('Branch manager must have a branch assigned');
+    }
+    return this.bookingsService.createFreeTicket(user.id, user.branchId, dto);
+  }
+
+  // Create free ticket (Admin only - can create for any branch)
+  @Post('admin/free-ticket')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create free ticket for user (Admin only - can create for any branch)' })
+  @ApiResponse({ status: 201, description: 'Free ticket created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User, branch or hall not found' })
+  async createFreeTicketAdmin(
+    @CurrentUser() user: User,
+    @Body() dto: CreateFreeTicketAdminDto,
+  ) {
+    return this.bookingsService.createFreeTicketForAdmin(user.id, dto);
   }
 }

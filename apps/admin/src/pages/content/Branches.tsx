@@ -24,6 +24,7 @@ type Branch = {
   status?: 'active' | 'inactive' | 'maintenance'
   coverImage?: string | null
   images?: string[]
+  videoUrl?: string | null
   latitude?: number | null
   longitude?: number | null
 }
@@ -156,7 +157,8 @@ export default function Branches() {
             status: r.status,
             workingHours: r.workingHours || {},
             latitude: r.latitude,
-            longitude: r.longitude
+            longitude: r.longitude,
+            videoUrl: r.videoUrl
           }); setEditing(r) }}>
             {t('common.view_details') || 'View Details'}
           </Button>
@@ -172,7 +174,8 @@ export default function Branches() {
             status: r.status,
             workingHours: r.workingHours || {},
             latitude: r.latitude,
-            longitude: r.longitude
+            longitude: r.longitude,
+            videoUrl: r.videoUrl
           }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
           <Select
             value={r.status}
@@ -212,7 +215,8 @@ export default function Branches() {
                 status: selectedBranch.status,
                 workingHours: selectedBranch.workingHours || {},
                 latitude: selectedBranch.latitude,
-                longitude: selectedBranch.longitude
+                longitude: selectedBranch.longitude,
+                videoUrl: selectedBranch.videoUrl
               }); setOpen(true) }}>
                 {t('common.edit') || 'Edit'}
               </Button>
@@ -295,6 +299,7 @@ export default function Branches() {
               status: values.status || 'active',
               latitude: values.latitude ? Number(values.latitude) : null,
               longitude: values.longitude ? Number(values.longitude) : null,
+              videoUrl: values.videoUrl || null,
             }
             if (values.workingHours) {
               payload.workingHours = values.workingHours
@@ -363,6 +368,13 @@ export default function Branches() {
           </Form.Item>
           <Form.Item name="description_en" label={t('branches.description_en') || 'الوصف (EN)'}>
             <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item 
+            name="videoUrl" 
+            label={t('branches.video_url') || 'رابط فيديو YouTube'} 
+            help={t('branches.video_url_help') || 'أدخل رابط فيديو YouTube (مثال: https://www.youtube.com/watch?v=VIDEO_ID)'}
+          >
+            <Input placeholder="https://www.youtube.com/watch?v=..." />
           </Form.Item>
           
           {/* Cover Image */}

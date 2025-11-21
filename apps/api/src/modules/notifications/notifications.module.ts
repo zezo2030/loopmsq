@@ -27,7 +27,7 @@ import { RedisService } from '../../utils/redis.service';
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService, SmsProcessor, EmailProcessor, PushProcessor, SmsProvider, EmailProvider, PushProvider, EncryptionService, RedisService],
-  exports: [NotificationsService],
+  exports: [NotificationsService, PushProvider],
 })
 export class NotificationsModule {}
 

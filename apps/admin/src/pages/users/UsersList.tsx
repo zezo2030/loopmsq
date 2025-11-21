@@ -167,7 +167,7 @@ export default function UsersList() {
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: (date?: string) => 
-        date ? new Date(date).toLocaleDateString() : '—'
+        date ? new Date(date).toLocaleDateString('ar-SA', { calendar: 'gregory' }) : '—'
     },
     {
       title: t('common.actions') || 'Actions',

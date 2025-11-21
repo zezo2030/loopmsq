@@ -231,6 +231,60 @@ Content-Type: application/json
 }
 ```
 
+#### ج) تحديث الملف الشخصي:
+```http
+PUT http://localhost:3000/api/v1/users/profile
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+
+{
+  "name": "أحمد محمد",
+  "email": "ahmed.new@example.com",
+  "language": "ar"
+}
+```
+
+#### Response (Success - 200):
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "email": "ahmed.new@example.com",
+  "phone": "+966501234567",
+  "name": "أحمد محمد",
+  "roles": ["USER"],
+  "language": "ar",
+  "isActive": true,
+  "updatedAt": "2024-01-15T11:00:00.000Z"
+}
+```
+
+#### د) حذف الحساب:
+```http
+DELETE http://localhost:3000/api/v1/users/profile
+Authorization: Bearer {accessToken}
+```
+
+#### Response (Success - 200):
+```json
+{
+  "message": "Account deleted successfully"
+}
+```
+
+#### Response (Error - 400):
+```json
+{
+  "statusCode": 400,
+  "message": "Cannot delete account with active bookings or support tickets. Please cancel bookings and close tickets first.",
+  "error": "Bad Request"
+}
+```
+
+> **ملاحظة مهمة**: لا يمكن حذف الحساب إذا كان لديك:
+> - حجوزات نشطة
+> - تذاكر دعم مفتوحة
+> - معاملات في المحفظة
+
 ---
 
 ### 5. تسجيل دخول الموظفين (Staff Login)
@@ -427,6 +481,50 @@ const getProfile = async () => {
   return response.json();
 };
 
+// تحديث الملف الشخصي
+const updateProfile = async (profileData) => {
+  const token = await AsyncStorage.getItem('accessToken');
+  
+  const response = await fetch(`${API_BASE}/users/profile`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(profileData),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to update profile');
+  }
+  
+  return response.json();
+};
+
+// حذف الحساب
+const deleteAccount = async () => {
+  const token = await AsyncStorage.getItem('accessToken');
+  
+  const response = await fetch(`${API_BASE}/users/profile`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to delete account');
+  }
+  
+  // حذف الرموز من التخزين المحلي
+  await AsyncStorage.removeItem('accessToken');
+  await AsyncStorage.removeItem('refreshToken');
+  await AsyncStorage.removeItem('userData');
+  
+  return response.json();
+};
+
 // تجديد الرمز
 const refreshToken = async () => {
   const refreshToken = await AsyncStorage.getItem('refreshToken');
@@ -588,6 +686,8 @@ curl http://localhost:3000/api/v1/health
 | تسجيل دخول OTP | POST | `/auth/otp/send` + `/auth/otp/verify` | ❌ |
 | تسجيل جديد | POST | `/auth/register/otp/send` + `/auth/register/otp/verify` | ❌ |
 | ملف شخصي | GET | `/auth/me` | ✅ Bearer Token |
+| تحديث الملف الشخصي | PUT | `/users/profile` | ✅ Bearer Token |
+| حذف الحساب | DELETE | `/users/profile` | ✅ Bearer Token |
 | تجديد رمز | POST | `/auth/refresh` | ❌ |
 | تسجيل دخول موظف | POST | `/auth/staff/login` | ❌ |
 | فحص إعدادات | GET | `/auth/email-config` | ❌ |

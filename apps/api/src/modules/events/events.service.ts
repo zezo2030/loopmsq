@@ -1,17 +1,21 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventRequest, EventRequestStatus } from '../../database/entities/event-request.entity';
 import { CreateEventRequestDto } from './dto/create-event-request.dto';
 import { QuoteEventRequestDto } from './dto/quote-event-request.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ContentService } from '../content/content.service';
 
 @Injectable()
 export class EventsService {
+  private readonly logger = new Logger(EventsService.name);
+
   constructor(
     @InjectRepository(EventRequest)
     private readonly eventRepo: Repository<EventRequest>,
     private readonly notifications: NotificationsService,
+    private readonly contentService: ContentService,
   ) {}
 
   async createRequest(userId: string, dto: CreateEventRequestDto) {
@@ -40,13 +44,86 @@ export class EventsService {
   }
 
   async getRequest(user: any, id: string) {
-    const req = await this.eventRepo.findOne({ where: { id } });
+    const req = await this.eventRepo.findOne({ 
+      where: { id },
+      relations: ['requester'],
+    });
     if (!req) throw new NotFoundException('Request not found');
     const isOwner = req.requesterId === user.id;
     const roles: string[] = user.roles || [];
     const isStaff = roles.includes('staff') || roles.includes('admin');
     if (!isOwner && !isStaff) throw new ForbiddenException('Not allowed');
+
+    // Load branch and hall data
+    if (req.branchId) {
+      try {
+        const branch = await this.contentService.findBranchById(req.branchId);
+        (req as any).branch = branch;
+      } catch (error) {
+        this.logger.error(`Failed to load branch ${req.branchId} for event request ${req.id}`, error);
+      }
+    }
+    if (req.hallId) {
+      try {
+        const hall = await this.contentService.findHallById(req.hallId);
+        (req as any).hall = hall;
+      } catch (error) {
+        this.logger.error(`Failed to load hall ${req.hallId} for event request ${req.id}`, error);
+      }
+    }
+
     return req;
+  }
+
+  async findUserRequests(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    filters?: { status?: string; type?: string },
+  ): Promise<{
+    requests: EventRequest[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const where: any = { requesterId: userId };
+    if (filters?.status) where.status = filters.status as any;
+    if (filters?.type) where.type = filters.type;
+
+    const [requests, total] = await this.eventRepo.findAndCount({
+      where,
+      relations: ['requester'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    // Load branch and hall data for each request
+    for (const request of requests) {
+      if (request.branchId) {
+        try {
+          const branch = await this.contentService.findBranchById(request.branchId);
+          (request as any).branch = branch;
+        } catch (error) {
+          this.logger.error(`Failed to load branch ${request.branchId} for event request ${request.id}`, error);
+        }
+      }
+      if (request.hallId) {
+        try {
+          const hall = await this.contentService.findHallById(request.hallId);
+          (request as any).hall = hall;
+        } catch (error) {
+          this.logger.error(`Failed to load hall ${request.hallId} for event request ${request.id}`, error);
+        }
+      }
+    }
+
+    return {
+      requests,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async quote(id: string, dto: QuoteEventRequestDto) {
@@ -115,10 +192,31 @@ export class EventsService {
 
     const [requests, total] = await this.eventRepo.findAndCount({
       where,
+      relations: ['requester'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     } as any);
+
+    // Load branch and hall data for each request
+    for (const request of requests) {
+      if (request.branchId) {
+        try {
+          const branch = await this.contentService.findBranchById(request.branchId);
+          (request as any).branch = branch;
+        } catch (error) {
+          this.logger.error(`Failed to load branch ${request.branchId} for event request ${request.id}`, error);
+        }
+      }
+      if (request.hallId) {
+        try {
+          const hall = await this.contentService.findHallById(request.hallId);
+          (request as any).hall = hall;
+        } catch (error) {
+          this.logger.error(`Failed to load hall ${request.hallId} for event request ${request.id}`, error);
+        }
+      }
+    }
 
     const pending = await this.eventRepo.count({ where: [{ ...where, status: 'submitted' as any }, { ...where, status: 'under_review' as any }] as any });
     const quoted = await this.eventRepo.count({ where: { ...where, status: 'quoted' as any } });

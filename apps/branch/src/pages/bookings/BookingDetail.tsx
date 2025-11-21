@@ -53,10 +53,10 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label={t('bookings.created_at') || 'Created At'}>
-            {booking.createdAt ? new Date(booking.createdAt).toLocaleString() : '-'}
+            {booking.createdAt ? new Date(booking.createdAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-'}
           </Descriptions.Item>
           <Descriptions.Item label={t('bookings.updated_at') || 'Updated At'}>
-            {booking.updatedAt ? new Date(booking.updatedAt).toLocaleString() : '-'}
+            {booking.updatedAt ? new Date(booking.updatedAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-'}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -115,14 +115,14 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
           <Col xs={24} sm={12}>
             <Statistic
               title={t('bookings.start_time') || 'Start Time'}
-              value={booking.startTime ? new Date(booking.startTime).toLocaleString() : '-'}
+              value={booking.startTime ? new Date(booking.startTime).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-'}
               valueStyle={{ fontSize: '16px' }}
             />
           </Col>
           <Col xs={24} sm={12}>
             <Statistic
               title={t('bookings.end_time') || 'End Time'}
-              value={booking.endTime ? new Date(booking.endTime).toLocaleString() : '-'}
+              value={booking.endTime ? new Date(booking.endTime).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-'}
               valueStyle={{ fontSize: '16px' }}
             />
           </Col>

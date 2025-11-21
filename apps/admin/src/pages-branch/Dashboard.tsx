@@ -209,9 +209,22 @@ export default function Dashboard() {
                         }
                         description={
                           <div>
-                            <div style={{ marginBottom: '4px' }}>{`${item.branch?.name || ''}${item.hall?.name ? ' - ' + item.hall.name : ''}`}</div>
+                            <div style={{ marginBottom: '4px' }}>
+                              {(() => {
+                                const branchName = item.branch?.name || item.branch?.name_ar || item.branch?.nameAr || item.branch?.name_en || item.branch?.nameEn || '';
+                                const hallName = item.hall?.name || item.hall?.name_ar || item.hall?.nameAr || item.hall?.name_en || item.hall?.nameEn || '';
+                                if (branchName && hallName) {
+                                  return `${branchName} - ${hallName}`;
+                                } else if (branchName) {
+                                  return branchName;
+                                } else if (hallName) {
+                                  return hallName;
+                                }
+                                return 'غير محدد';
+                              })()}
+                            </div>
                             <span style={{ color: '#64748b', fontSize: '12px' }}>
-                              {item.startTime ? new Date(item.startTime).toLocaleString() : ''}
+                              {item.startTime ? new Date(item.startTime).toLocaleString('ar-SA', { calendar: 'gregory' }) : ''}
                             </span>
                           </div>
                         }

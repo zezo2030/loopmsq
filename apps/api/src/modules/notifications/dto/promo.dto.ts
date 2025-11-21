@@ -27,11 +27,11 @@ export class PromoDto {
   @IsIn(['ar', 'en'])
   lang?: 'ar' | 'en'
 
-  @ApiPropertyOptional({ type: [String], enum: ['sms', 'push', 'email'] })
+  @ApiPropertyOptional({ type: [String], enum: ['push'], description: 'القنوات - حالياً فقط push مدعوم' })
   @IsOptional()
   @IsArray()
-  @IsIn(['sms', 'push', 'email'], { each: true })
-  channels?: Array<'sms' | 'push' | 'email'>
+  @IsIn(['push'], { each: true })
+  channels?: Array<'push'>
 }
 
 

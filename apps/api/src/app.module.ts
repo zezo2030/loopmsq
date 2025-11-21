@@ -24,6 +24,7 @@ import { TripsModule } from './modules/trips/trips.module';
 import { EventsModule } from './modules/events/events.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
+import { WalletModule } from './modules/wallet/wallet.module';
 import { SupportModule } from './modules/support/support.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { HomeModule } from './modules/home/home.module';
@@ -138,6 +139,7 @@ function resolveUploadsRootFromEnvOrDefault(config?: ConfigService): string {
     EventsModule,
     NotificationsModule,
     LoyaltyModule,
+    WalletModule,
     SupportModule,
     FavoritesModule,
     HomeModule,

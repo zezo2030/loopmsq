@@ -15,6 +15,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { join } from 'path';
 import * as fs from 'fs';
 import * as express from 'express';
+import { PushProvider } from './modules/notifications/providers/push.provider';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -129,6 +130,29 @@ async function bootstrap() {
     logger.log(
       `Swagger documentation: http://localhost:${port}/${apiPrefix}/docs`,
     );
+  }
+
+  // Check Firebase integration status
+  try {
+    const pushProvider = app.get(PushProvider);
+    if (pushProvider && typeof pushProvider.getStatus === 'function') {
+      const status = pushProvider.getStatus();
+      logger.log('═══════════════════════════════════════════════════════════');
+      if (status.initialized) {
+        logger.log(`✅ Firebase Integration Status: ACTIVE`);
+        if (status.projectId) {
+          logger.log(`   Project ID: ${status.projectId}`);
+        }
+      } else {
+        logger.warn(`⚠️  Firebase Integration Status: ${status.error ? 'FAILED' : 'NOT CONFIGURED'}`);
+        if (status.error) {
+          logger.warn(`   Error: ${status.error}`);
+        }
+      }
+      logger.log('═══════════════════════════════════════════════════════════');
+    }
+  } catch (e) {
+    logger.warn('Could not check Firebase status: ' + (e as Error).message);
   }
 }
 bootstrap();

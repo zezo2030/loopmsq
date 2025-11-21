@@ -39,6 +39,7 @@ export default function BranchInfo() {
         workingHours: data.workingHours,
         descriptionAr: data.descriptionAr,
         descriptionEn: data.descriptionEn,
+        videoUrl: data.videoUrl,
       })
     } catch (error) {
       message.error(t('branch.load_failed') || 'Failed to load branch data')
@@ -222,6 +223,14 @@ export default function BranchInfo() {
                       </Form.Item>
                     </Col>
                   </Row>
+
+                  <Form.Item
+                    label={t('branch.video_url') || 'YouTube Video URL'}
+                    name="videoUrl"
+                    help={t('branch.video_url_help') || 'Enter YouTube video URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)'}
+                  >
+                    <Input placeholder="https://www.youtube.com/watch?v=..." />
+                  </Form.Item>
                 </Form>
               </Card>
             </Col>
@@ -259,7 +268,7 @@ export default function BranchInfo() {
                   <div>
                     <Typography.Text strong>{t('branch.last_updated') || 'Last Updated'}:</Typography.Text>
                     <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-                      {branchData?.updatedAt ? new Date(branchData.updatedAt).toLocaleString() : 'N/A'}
+                      {branchData?.updatedAt ? new Date(branchData.updatedAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : 'N/A'}
                     </div>
                   </div>
                 </Space>

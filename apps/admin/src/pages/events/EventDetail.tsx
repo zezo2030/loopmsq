@@ -98,56 +98,24 @@ export default function EventDetail() {
   useEffect(() => {
     if (id) {
       loadEventData()
+    } else {
+      message.error('معرف الحدث غير موجود')
+      navigate('/admin/events')
     }
-  }, [id])
+  }, [id, navigate])
 
   async function loadEventData() {
     setLoading(true)
     try {
-      const eventData = await apiGet<EventRequest>(`/events/requests/${id}`)
+      const eventData = await apiGet<EventRequest>(`/events/admin/${id}`)
       setEvent(eventData)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load event:', error)
-      // Mock data for development
-      setEvent({
-        id: '1',
-        requester: { 
-          id: '1', 
-          name: 'سارة محمد أحمد', 
-          email: 'sara@email.com', 
-          phone: '+966501234567' 
-        },
-        type: 'birthday',
-        decorated: true,
-        branchId: '1',
-        branch: { 
-          id: '1', 
-          name: 'فرع الرياض الرئيسي', 
-          location: 'الرياض',
-          address: 'طريق الملك فهد، حي العليا، الرياض 12345'
-        },
-        hallId: '1',
-        hall: { 
-          id: '1', 
-          name: 'قاعة الماسة الكبرى', 
-          capacity: 100,
-          amenities: ['مكيف هواء', 'نظام صوتي', 'إضاءة ملونة', 'مطبخ صغير', 'منطقة ألعاب']
-        },
-        startTime: '2024-02-20T16:00:00Z',
-        durationHours: 4,
-        persons: 30,
-        addOns: [
-          { id: '1', name: 'تورتة عيد ميلاد مخصصة', price: 300, quantity: 1 },
-          { id: '2', name: 'بالونات ملونة وديكور', price: 150, quantity: 2 },
-          { id: '3', name: 'مصور محترف', price: 500, quantity: 1 },
-          { id: '4', name: 'منسق حفلات', price: 400, quantity: 1 }
-        ],
-        notes: 'حفلة عيد ميلاد للطفلة ليلى البالغة من العمر 8 سنوات. نريد ديكور وردي مع شخصيات الأميرات. يفضل أن تكون التورتة على شكل قلعة أميرة.',
-        status: 'quoted',
-        quotedPrice: 2800,
-        createdAt: '2024-01-25T10:00:00Z',
-        updatedAt: '2024-01-26T14:30:00Z'
-      })
+      const errorMessage = error?.message || 'Failed to load event'
+      console.error('Error details:', errorMessage)
+      // Don't set mock data, let the component handle the error state
+      setEvent(null)
+      message.error(`فشل في تحميل بيانات الطلب: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
@@ -158,7 +126,10 @@ export default function EventDetail() {
 
     setActionLoading(true)
     try {
-      await apiPost(`/events/requests/${event.id}/quote`, values)
+      // API expects { basePrice } only. Map the form's quotedPrice to basePrice
+      await apiPost(`/events/requests/${event.id}/quote`, {
+        basePrice: values.quotedPrice,
+      })
       message.success('تم إرسال العرض بنجاح')
       setQuoteModalVisible(false)
       quoteForm.resetFields()
@@ -271,7 +242,7 @@ export default function EventDetail() {
           <div style={{ textAlign: 'center', padding: '40px' }}>
             <WarningOutlined style={{ fontSize: '48px', color: '#faad14', marginBottom: '16px' }} />
             <h3>لم يتم العثور على الطلب</h3>
-            <Button type="primary" onClick={() => navigate('/events')}>
+            <Button type="primary" onClick={() => navigate('/admin/events')}>
               العودة إلى قائمة الأحداث
             </Button>
           </div>
@@ -290,7 +261,7 @@ export default function EventDetail() {
               <Button
                 type="text"
                 icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/events')}
+                onClick={() => navigate('/admin/events')}
                 size="large"
               />
               <h1 className="page-title" style={{ margin: 0 }}>
@@ -460,7 +431,8 @@ export default function EventDetail() {
                         weekday: 'long',
                         year: 'numeric',
                         month: 'long',
-                        day: 'numeric'
+                        day: 'numeric',
+                        calendar: 'gregory'
                       })}
                     </div>
                     <div style={{ fontSize: '18px', fontWeight: '600', marginTop: '4px' }}>
@@ -589,10 +561,10 @@ export default function EventDetail() {
                     
                     <Descriptions column={1} size="small">
                       <Descriptions.Item label="تاريخ الإنشاء">
-                        {new Date(event.createdAt).toLocaleDateString('ar-SA')}
+                        {new Date(event.createdAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
                       </Descriptions.Item>
                       <Descriptions.Item label="آخر تحديث">
-                        {new Date(event.updatedAt).toLocaleDateString('ar-SA')}
+                        {new Date(event.updatedAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
                       </Descriptions.Item>
                       {event.paymentMethod && (
                         <Descriptions.Item label="طريقة الدفع">

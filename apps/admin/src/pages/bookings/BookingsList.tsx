@@ -338,7 +338,7 @@ export default function BookingsList() {
       render: (_: any, record: BookingRow) => (
         <div>
           <div style={{ fontWeight: '600', fontSize: '14px' }}>
-            {new Date(record.startTime).toLocaleDateString('ar-SA')}
+            {new Date(record.startTime).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
           </div>
           <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
             {new Date(record.startTime).toLocaleTimeString('ar-SA', { 

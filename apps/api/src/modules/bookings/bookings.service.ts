@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -18,6 +19,8 @@ import { Hall } from '../../database/entities/hall.entity';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingQuoteDto } from './dto/booking-quote.dto';
 import { ScanTicketDto } from './dto/scan-ticket.dto';
+import { CreateFreeTicketDto } from './dto/create-free-ticket.dto';
+import { CreateFreeTicketAdminDto } from './dto/create-free-ticket-admin.dto';
 import { ContentService } from '../content/content.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { QRCodeService } from '../../utils/qr-code.service';
@@ -1094,5 +1097,204 @@ export class BookingsService {
     );
 
     return pricing;
+  }
+
+  async createFreeTicket(
+    managerId: string,
+    managerBranchId: string,
+    dto: CreateFreeTicketDto,
+  ): Promise<{ booking: Booking; tickets: Ticket[] }> {
+    // Verify target user exists
+    const targetUser = await this.userRepository.findOne({
+      where: { id: dto.userId },
+    });
+    if (!targetUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    // For branch managers: ensure target user is in the same branch (if they have a branch)
+    // Note: Regular users might not have branchId, so we allow creating tickets for any user
+    // but the booking will be created for the manager's branch
+    
+    const startTime = new Date(dto.startTime);
+    if (startTime.getTime() <= new Date().getTime()) {
+      throw new BadRequestException('Cannot create ticket for past time');
+    }
+    this.ensureSlotAlignment(startTime);
+
+    // If hallId is provided, verify it exists and belongs to manager's branch
+    let hallId = dto.hallId;
+    if (hallId) {
+      try {
+        const hall = await this.contentService.findHallById(hallId);
+        if (hall.branchId !== managerBranchId) {
+          throw new ForbiddenException('Hall does not belong to your branch');
+        }
+      } catch (error) {
+        if (error instanceof ForbiddenException) {
+          throw error;
+        }
+        throw new NotFoundException('Hall not found');
+      }
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Create free booking (totalPrice = 0)
+      const booking = queryRunner.manager.create(Booking, {
+        userId: dto.userId,
+        branchId: managerBranchId,
+        hallId: hallId || null,
+        startTime: startTime,
+        durationHours: dto.durationHours,
+        persons: dto.persons,
+        totalPrice: 0 as any, // Free ticket
+        status: BookingStatus.CONFIRMED, // Directly confirmed for free tickets
+        specialRequests: dto.notes || null,
+      } as Partial<Booking>);
+
+      const savedBooking = await queryRunner.manager.save(booking);
+
+      // Generate tickets immediately
+      const tickets = await this.generateTickets(
+        queryRunner,
+        savedBooking,
+        dto.persons,
+      );
+
+      await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `Free ticket created: booking ${savedBooking.id} with ${tickets.length} tickets by manager ${managerId}`,
+      );
+
+      // Clear cache
+      await this.redisService.del(`user:${dto.userId}:bookings`);
+
+      // Send notification to user
+      await this.notifications.enqueue({
+        type: 'TICKETS_ISSUED',
+        to: { userId: dto.userId },
+        data: { bookingId: savedBooking.id, isFree: true },
+        channels: ['sms', 'push'],
+      });
+
+      // Realtime update
+      this.realtime?.emitBookingUpdated(savedBooking.id, {
+        bookingId: savedBooking.id,
+        status: savedBooking.status,
+      });
+
+      return { booking: savedBooking, tickets };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createFreeTicketForAdmin(
+    adminId: string,
+    dto: CreateFreeTicketAdminDto,
+  ): Promise<{ booking: Booking; tickets: Ticket[] }> {
+    // Verify target user exists
+    const targetUser = await this.userRepository.findOne({
+      where: { id: dto.userId },
+    });
+    if (!targetUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Verify branch exists
+    const branch = await this.contentService.findBranchById(dto.branchId);
+    if (!branch) {
+      throw new NotFoundException('Branch not found');
+    }
+
+    const startTime = new Date(dto.startTime);
+    if (startTime.getTime() <= new Date().getTime()) {
+      throw new BadRequestException('Cannot create ticket for past time');
+    }
+    this.ensureSlotAlignment(startTime);
+
+    // Verify hall exists and belongs to the specified branch
+    if (!dto.hallId) {
+      throw new BadRequestException('Hall ID is required');
+    }
+    
+    let hallId = dto.hallId;
+    try {
+      const hall = await this.contentService.findHallById(hallId);
+      if (hall.branchId !== dto.branchId) {
+        throw new BadRequestException('Hall does not belong to the specified branch');
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new NotFoundException('Hall not found');
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Create free booking (totalPrice = 0)
+      const booking = queryRunner.manager.create(Booking, {
+        userId: dto.userId,
+        branchId: dto.branchId,
+        hallId: hallId,
+        startTime: startTime,
+        durationHours: dto.durationHours,
+        persons: dto.persons,
+        totalPrice: 0 as any, // Free ticket
+        status: BookingStatus.CONFIRMED, // Directly confirmed for free tickets
+        specialRequests: dto.notes || null,
+      } as Partial<Booking>);
+
+      const savedBooking = await queryRunner.manager.save(booking);
+
+      // Generate tickets immediately
+      const tickets = await this.generateTickets(
+        queryRunner,
+        savedBooking,
+        dto.persons,
+      );
+
+      await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `Free ticket created by admin: booking ${savedBooking.id} with ${tickets.length} tickets by admin ${adminId}`,
+      );
+
+      // Clear cache
+      await this.redisService.del(`user:${dto.userId}:bookings`);
+
+      // Send notification to user
+      await this.notifications.enqueue({
+        type: 'TICKETS_ISSUED',
+        to: { userId: dto.userId },
+        data: { bookingId: savedBooking.id, isFree: true },
+        channels: ['sms', 'push'],
+      });
+
+      // Realtime update
+      this.realtime?.emitBookingUpdated(savedBooking.id, {
+        bookingId: savedBooking.id,
+        status: savedBooking.status,
+      });
+
+      return { booking: savedBooking, tickets };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

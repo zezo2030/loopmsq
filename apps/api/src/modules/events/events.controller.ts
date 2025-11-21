@@ -21,6 +21,24 @@ export class EventsController {
     return this.eventsService.createRequest(user.id, dto);
   }
 
+  @Get('requests')
+  @ApiOperation({ summary: 'Get user event requests' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'type', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'Event requests retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getUserRequests(
+    @CurrentUser() user: any,
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+  ) {
+    return this.eventsService.findUserRequests(user.id, page, limit, { status, type });
+  }
+
   // Admin: list all event requests with basic stats
   @Get('admin/all')
   @UseGuards(RolesGuard)
@@ -48,6 +66,15 @@ export class EventsController {
   @Get('requests/:id')
   @ApiOperation({ summary: 'Get event request' })
   getRequest(@CurrentUser() user: any, @Param('id', ParseUUIDPipe) id: string) {
+    return this.eventsService.getRequest(user, id);
+  }
+
+  // Admin: get event request by ID
+  @Get('admin/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @ApiOperation({ summary: 'Get event request by ID (Admin only)' })
+  adminGetRequest(@CurrentUser() user: any, @Param('id', ParseUUIDPipe) id: string) {
     return this.eventsService.getRequest(user, id);
   }
 

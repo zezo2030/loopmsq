@@ -106,8 +106,11 @@ export default function BookingDetail() {
   useEffect(() => {
     if (id) {
       loadBookingData()
+    } else {
+      message.error('معرف الحجز غير موجود')
+      navigate('/admin/bookings')
     }
-  }, [id])
+  }, [id, navigate])
 
   async function loadBookingData() {
     setLoading(true)
@@ -216,7 +219,7 @@ export default function BookingDetail() {
       title: 'تاريخ الاستخدام',
       key: 'usage',
       render: () => (
-        <span>{new Date(booking!.startTime).toLocaleDateString('ar-SA')}</span>
+        <span>{new Date(booking!.startTime).toLocaleDateString('ar-SA', { calendar: 'gregory' })}</span>
       )
     }
   ]
@@ -268,7 +271,7 @@ export default function BookingDetail() {
               />
             </Space>
             <p className="page-subtitle">
-              تم الإنشاء في {new Date(booking.createdAt).toLocaleDateString('ar-SA')}
+              تم الإنشاء في {new Date(booking.createdAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
             </p>
           </div>
           <Space>
@@ -360,7 +363,7 @@ export default function BookingDetail() {
                     <Descriptions column={1} size="small">
                       <Descriptions.Item label="تاريخ ووقت الحجز">
                         <div style={{ fontWeight: '600' }}>
-                          {new Date(booking.startTime).toLocaleDateString('ar-SA')}
+                          {new Date(booking.startTime).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
                         </div>
                         <div style={{ color: '#8c8c8c' }}>
                           {new Date(booking.startTime).toLocaleTimeString('ar-SA', {
@@ -387,7 +390,7 @@ export default function BookingDetail() {
                       </Descriptions.Item>
                       {booking.cancelledAt && (
                         <Descriptions.Item label="تاريخ الإلغاء">
-                          {new Date(booking.cancelledAt).toLocaleString('ar-SA')}
+                          {new Date(booking.cancelledAt).toLocaleString('ar-SA', { calendar: 'gregory' })}
                         </Descriptions.Item>
                       )}
                       {booking.cancellationReason && (

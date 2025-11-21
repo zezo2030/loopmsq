@@ -135,13 +135,13 @@ export default function BookingsList() {
       title: t('bookings.start_time') || 'Start Time',
       dataIndex: 'startTime',
       key: 'startTime',
-      render: (time: string) => time ? new Date(time).toLocaleString() : '-',
+      render: (time: string) => time ? new Date(time).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-',
     },
     {
       title: t('bookings.end_time') || 'End Time',
       dataIndex: 'endTime',
       key: 'endTime',
-      render: (time: string) => time ? new Date(time).toLocaleString() : '-',
+      render: (time: string) => time ? new Date(time).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-',
     },
     {
       title: t('bookings.status') || 'Status',

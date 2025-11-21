@@ -455,7 +455,7 @@ export default function TripDetail() {
                 <Descriptions column={1} size="small">
                   <Descriptions.Item label="التاريخ المفضل">
                     <div style={{ fontWeight: '600' }}>
-                      {new Date(trip.preferredDate).toLocaleDateString('ar-SA')}
+                      {new Date(trip.preferredDate).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
                       {trip.preferredTime && ` - ${trip.preferredTime}`}
                     </div>
                   </Descriptions.Item>

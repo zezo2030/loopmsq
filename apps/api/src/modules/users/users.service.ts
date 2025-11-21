@@ -418,4 +418,39 @@ export class UsersService {
     await this.userRepository.delete(id);
     this.logger.log(`Staff deleted by ${requester.id}: ${id}`);
   }
+
+  async deleteMyAccount(userId: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['bookings', 'supportTickets'],
+    });
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Check if user has active bookings or support tickets
+    if ((user.bookings && user.bookings.length > 0) || (user.supportTickets && user.supportTickets.length > 0)) {
+      throw new BadRequestException('Cannot delete account with active bookings or support tickets. Please cancel bookings and close tickets first.');
+    }
+
+    // Check if wallet has transactions
+    const wallet = await this.walletRepository.findOne({ 
+      where: { userId }, 
+      relations: ['transactions'] as any 
+    });
+    
+    if (wallet && (wallet as any).transactions && (wallet as any).transactions.length > 0) {
+      throw new BadRequestException('Cannot delete account with wallet transactions. Please contact support.');
+    }
+
+    // Delete wallet if exists
+    if (wallet) {
+      await this.walletRepository.delete(wallet.id);
+    }
+
+    // Delete user account
+    await this.userRepository.delete(userId);
+    this.logger.log(`User account deleted by user: ${userId}`);
+  }
 }

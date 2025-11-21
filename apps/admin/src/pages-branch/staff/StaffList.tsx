@@ -142,7 +142,7 @@ export default function StaffList() {
       title: t('staff.joined') || 'Joined',
       dataIndex: 'createdAt',
       key: 'joined',
-      render: (date: string) => date ? new Date(date).toLocaleDateString() : '-',
+      render: (date: string) => date ? new Date(date).toLocaleDateString('ar-SA', { calendar: 'gregory' }) : '-',
     },
     {
       title: t('common.actions') || 'Actions',

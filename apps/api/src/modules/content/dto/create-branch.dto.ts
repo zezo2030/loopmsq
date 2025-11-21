@@ -116,4 +116,13 @@ export class CreateBranchDto {
   @IsOptional()
   @IsNumber()
   longitude?: number;
+
+  @ApiProperty({
+    description: 'YouTube video URL for the branch',
+    example: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  videoUrl?: string;
 }

@@ -280,7 +280,7 @@ export default function TripsList() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', color: '#8c8c8c', fontSize: '12px' }}>
             <CalendarOutlined style={{ marginRight: '6px' }} />
-            {new Date(record.preferredDate).toLocaleDateString('ar-SA')}
+            {new Date(record.preferredDate).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
             {record.preferredTime && ` - ${record.preferredTime}`}
           </div>
           <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
@@ -321,7 +321,7 @@ export default function TripsList() {
       render: (_: any, record: TripRequest) => (
         <div>
           <div style={{ fontWeight: '600', fontSize: '14px' }}>
-            {new Date(record.createdAt).toLocaleDateString('ar-SA')}
+            {new Date(record.createdAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
           </div>
           <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
             {new Date(record.createdAt).toLocaleTimeString('ar-SA', {

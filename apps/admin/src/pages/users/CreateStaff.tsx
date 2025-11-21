@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Button, Form, Input, Select, message, Space, Row, Col } from 'antd'
 import { UserAddOutlined, SaveOutlined } from '@ant-design/icons'
-import { apiPost } from '../../api'
+import { useQuery } from '@tanstack/react-query'
+import { apiGet, apiPost } from '../../api'
 import { useTranslation } from 'react-i18next'
 import '../../theme.css'
 
@@ -9,6 +10,19 @@ export default function CreateStaff() {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
+
+  // Load branches for dropdown
+  const { data: branches, isLoading: branchesLoading } = useQuery<any[]>({
+    queryKey: ['branches', 'for-select'],
+    queryFn: async () => {
+      const res = await apiGet<any>('/content/branches?includeInactive=true')
+      return Array.isArray(res) ? res : (res.items || res.branches || [])
+    },
+  })
+  const branchOptions = (branches || []).map((b: any) => ({
+    label: `${b?.name_ar || b?.name_en} — ${b?.location || ''}`.trim(),
+    value: b.id,
+  }))
 
   async function onFinish(values: any) {
     setLoading(true)
@@ -22,10 +36,10 @@ export default function CreateStaff() {
         language: values.language || 'ar',
         branchId: values.branchId || undefined,
       })
-      message.success('Staff member created successfully!')
+      message.success(t('staff.created') || 'Staff member created successfully!')
       form.resetFields()
     } catch (e: any) {
-      message.error(e?.message || 'Failed to create staff member')
+      message.error(e?.message || t('staff.create_failed') || 'Failed to create staff member')
     } finally {
       setLoading(false)
     }
@@ -38,9 +52,9 @@ export default function CreateStaff() {
           <div>
             <h1 className="page-title">
               <UserAddOutlined style={{ marginRight: '12px' }} />
-              Create Staff Member
+              {t('page.create_staff') || 'Create Staff Member'}
             </h1>
-            <p className="page-subtitle">Add a new staff member to your team</p>
+            <p className="page-subtitle">{t('staff.create_subtitle') || 'Add a new staff member to your team'}</p>
           </div>
         </div>
       </div>
@@ -82,14 +96,14 @@ export default function CreateStaff() {
               <Row gutter={24}>
                 <Col xs={24} md={12}>
                   <Form.Item 
-                    label="Password" 
+                    label={t('users.password') || 'Password'} 
                     name="password" 
                     rules={[
-                      { required: true, message: 'Please enter password' },
-                      { min: 6, message: 'Password must be at least 6 characters' }
+                      { required: true, message: t('users.enter_password') || 'Please enter password' },
+                      { min: 6, message: t('users.password_min_length') || 'Password must be at least 6 characters' }
                     ]}
                   >
-                    <Input.Password placeholder="Create a secure password" size="large" />
+                    <Input.Password placeholder={t('users.create_password') || 'Create a secure password'} size="large" />
                   </Form.Item>
                 </Col>
                 
@@ -106,38 +120,46 @@ export default function CreateStaff() {
               <Row gutter={24}>
                 <Col xs={24} md={8}>
                   <Form.Item 
-                    label="Roles" 
+                    label={t('users.roles') || 'Roles'} 
                     name="roles" 
-                    rules={[{ required: true, message: 'Please select at least one role' }]}
+                    rules={[{ required: true, message: t('users.select_role_required') || 'Please select at least one role' }]}
                   >
                     <Select 
                       mode="multiple" 
-                      placeholder="Select roles"
+                      placeholder={t('users.select_roles') || 'Select roles'}
                       size="large"
                       options={[
-                        { label: 'Staff Member', value: 'staff' },
-                        { label: 'User Access', value: 'user' },
+                        { label: t('roles.staff') || 'Staff Member', value: 'staff' },
+                        { label: t('roles.user') || 'User Access', value: 'user' },
                       ]} 
                     />
                   </Form.Item>
                 </Col>
                 
                 <Col xs={24} md={8}>
-                  <Form.Item label="Language" name="language">
+                  <Form.Item label={t('users.language') || 'Language'} name="language">
                     <Select 
-                      placeholder="Select language"
+                      placeholder={t('users.select_language') || 'Select language'}
                       size="large"
                       options={[
-                        { label: 'Arabic', value: 'ar' },
-                        { label: 'English', value: 'en' },
+                        { label: t('users.language_ar') || 'Arabic', value: 'ar' },
+                        { label: t('users.language_en') || 'English', value: 'en' },
                       ]}
                     />
                   </Form.Item>
                 </Col>
                 
                 <Col xs={24} md={8}>
-                  <Form.Item label="Branch ID" name="branchId">
-                    <Input placeholder="Enter branch ID (optional)" size="large" />
+                  <Form.Item label={t('users.branch') || 'Branch'} name="branchId">
+                    <Select
+                      showSearch
+                      allowClear
+                      size="large"
+                      placeholder={t('users.select_branch_optional') || 'Select branch (optional)'}
+                      loading={branchesLoading}
+                      options={branchOptions}
+                      filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
+                    />
                   </Form.Item>
                 </Col>
               </Row>
@@ -145,7 +167,7 @@ export default function CreateStaff() {
               <Form.Item style={{ marginTop: '32px', textAlign: 'center' }}>
                 <Space size="middle">
                   <Button size="large" onClick={() => form.resetFields()}>
-                    Reset Form
+                    {t('common.reset_form') || 'Reset Form'}
                   </Button>
                   <Button 
                     type="primary" 
@@ -155,7 +177,7 @@ export default function CreateStaff() {
                     icon={<SaveOutlined />}
                     className="btn-primary"
                   >
-                    Create Staff Member
+                    {t('page.create_staff') || 'Create Staff Member'}
                   </Button>
                 </Space>
               </Form.Item>

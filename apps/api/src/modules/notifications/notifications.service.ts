@@ -25,7 +25,8 @@ export interface EnqueueNotification {
     | 'ADMIN_MESSAGE'
     | 'LOYALTY_EARN'
     | 'LOYALTY_REDEEM'
-    | 'RATING_REQUEST';
+    | 'RATING_REQUEST'
+    | 'WALLET_RECHARGED';
   to: { phone?: string; email?: string; userId?: string };
   template?: string;
   data: Record<string, unknown>;
@@ -76,7 +77,10 @@ export class NotificationsService {
     }
 
     if (n.channels.includes('push')) {
-      const tokens = await this.getUserTokens(n.to.userId, resolved.phone);
+      // إذا لم يتم تحديد مستخدم، أرسل لجميع الأجهزة
+      const tokens = n.to.userId 
+        ? await this.getUserTokens(n.to.userId, resolved.phone)
+        : await this.getAllDeviceTokens();
       if (tokens.length) {
         const title = this.renderSubject(n, lang);
         const body = this.renderTemplate(n, 'sms', lang); // concise body for push
@@ -129,6 +133,11 @@ export class NotificationsService {
     return list.map((t) => t.token);
   }
 
+  private async getAllDeviceTokens(): Promise<string[]> {
+    const list = await this.tokenRepo.find();
+    return list.map((t) => t.token);
+  }
+
   private buildPushData(n: EnqueueNotification): Record<string, string> {
     const base = { type: n.type } as Record<string, string>;
     for (const [k, v] of Object.entries(n.data || {})) {
@@ -154,6 +163,8 @@ export class NotificationsService {
         return lang === 'ar' ? 'إلغاء الحجز' : 'Booking Cancelled';
       case 'PAYMENT_SUCCESS':
         return lang === 'ar' ? 'تم الدفع بنجاح' : 'Payment Successful';
+      case 'WALLET_RECHARGED':
+        return lang === 'ar' ? 'شحن المحفظة' : 'Wallet Recharged';
       case 'TICKETS_ISSUED':
         return lang === 'ar' ? 'إصدار التذاكر' : 'Tickets Issued';
       case 'TRIP_STATUS':
@@ -219,6 +230,10 @@ export class NotificationsService {
         return lang === 'ar'
           ? `نود معرفة رأيك بخدمتنا لحجزك رقم ${d.bookingId}. شاركنا تقييمك وملاحظاتك.`
           : `We'd love your feedback on booking ${d.bookingId}. Please rate your experience.`;
+      case 'WALLET_RECHARGED':
+        return lang === 'ar'
+          ? `تم شحن محفظتك بمبلغ ${d.amount} ${d.currency || 'SAR'}. الرصيد الحالي: ${d.balance || 0} ${d.currency || 'SAR'}.`
+          : `Your wallet has been recharged with ${d.amount} ${d.currency || 'SAR'}. Current balance: ${d.balance || 0} ${d.currency || 'SAR'}.`;
       default:
         return String(d.message || (lang === 'ar' ? 'تنبيه' : 'Notification'));
     }

@@ -10,6 +10,11 @@ export {
   TransactionType,
 } from './loyalty-transaction.entity';
 export {
+  WalletTransaction,
+  WalletTransactionType,
+  WalletTransactionStatus,
+} from './wallet-transaction.entity';
+export {
   SchoolTripRequest,
   TripRequestStatus,
 } from './school-trip-request.entity';

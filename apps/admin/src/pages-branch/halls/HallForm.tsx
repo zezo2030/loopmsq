@@ -42,6 +42,7 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
         decorated: hall.isDecorated,
         descriptionAr: hall.description_ar,
         descriptionEn: hall.description_en,
+        videoUrl: hall.videoUrl,
       })
     }
   }, [hall, form])
@@ -87,6 +88,7 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
         description_en: values.descriptionEn || null,
         features: featuresArray && featuresArray.length ? featuresArray : undefined,
         images: imagesArray && imagesArray.length ? imagesArray : undefined,
+        videoUrl: values.videoUrl || null,
       }
 
       
@@ -318,6 +320,14 @@ export default function HallForm({ hall, onSuccess, onCancel }: HallFormProps) {
           </Form.Item>
         </Col>
       </Row>
+
+      <Form.Item
+        label={t('halls.video_url') || 'YouTube Video URL'}
+        name="videoUrl"
+        help={t('halls.video_url_help') || 'Enter YouTube video URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)'}
+      >
+        <Input placeholder="https://www.youtube.com/watch?v=..." />
+      </Form.Item>
 
       {/* Form Actions */}
       <div style={{ textAlign: 'right', marginTop: '24px' }}>

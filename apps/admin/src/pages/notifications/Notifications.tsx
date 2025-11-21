@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Card, Form, Input, Button, Select, Row, Col, Alert, Space } from 'antd'
-import { SendOutlined, BellOutlined, PhoneOutlined, MailOutlined, UserOutlined } from '@ant-design/icons'
+import { SendOutlined, BellOutlined } from '@ant-design/icons'
 import { apiPost } from '../../api'
 import '../../theme.css'
 
@@ -15,14 +15,11 @@ export default function Notifications() {
     setError(null)
     try {
       await apiPost('/notifications/promo', {
-        userId: values.userId || undefined,
-        phone: values.phone || undefined,
-        email: values.email || undefined,
         message: values.message,
         lang: values.lang || 'ar',
-        channels: values.channels?.length ? values.channels : ['sms', 'push'],
+        channels: ['push'], // إرسال فقط عبر Firebase Push
       })
-      setSuccess('تم إرسال الإشعار الترويجي بنجاح')
+      setSuccess('تم إرسال الإشعار لجميع الأجهزة بنجاح')
     } catch (e: any) {
       setError(e?.message || 'فشل إرسال الإشعار')
     } finally {
@@ -39,7 +36,7 @@ export default function Notifications() {
               <BellOutlined style={{ marginRight: '12px' }} />
               إرسال إشعارات ترويجية
             </h1>
-            <p className="page-subtitle">أرسل رسائل ترويجية عبر SMS / Push / Email</p>
+            <p className="page-subtitle">أرسل إشعارات ترويجية عبر Firebase لجميع الأجهزة</p>
           </div>
         </div>
       </div>
@@ -49,25 +46,8 @@ export default function Notifications() {
           <Row gutter={[24, 24]}>
             <Col xs={24} lg={16}>
               <Card className="custom-card">
-                <Form layout="vertical" onFinish={onFinish} initialValues={{ lang: 'ar', channels: ['sms', 'push'] }}>
+                <Form layout="vertical" onFinish={onFinish} initialValues={{ lang: 'ar' }}>
                   <Row gutter={16}>
-                    <Col xs={24} md={12}>
-                      <Form.Item name="userId" label="User ID (اختياري)">
-                        <Input prefix={<UserOutlined />} placeholder="uuid-..." allowClear />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} md={12}>
-                      <Form.Item name="phone" label="الهاتف (اختياري)">
-                        <Input prefix={<PhoneOutlined />} placeholder="+9665..." allowClear />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                  <Row gutter={16}>
-                    <Col xs={24} md={12}>
-                      <Form.Item name="email" label="البريد الإلكتروني (اختياري)">
-                        <Input prefix={<MailOutlined />} placeholder="user@example.com" allowClear />
-                      </Form.Item>
-                    </Col>
                     <Col xs={24} md={12}>
                       <Form.Item name="lang" label="اللغة">
                         <Select
@@ -76,20 +56,6 @@ export default function Notifications() {
                       </Form.Item>
                     </Col>
                   </Row>
-                  <Form.Item
-                    name="channels"
-                    label="القنوات"
-                    rules={[{ required: true, message: 'اختر قناة واحدة على الأقل' }]}
-                  >
-                    <Select
-                      mode="multiple"
-                      options={[
-                        { label: 'SMS', value: 'sms' },
-                        { label: 'Push', value: 'push' },
-                        { label: 'Email', value: 'email' },
-                      ]}
-                    />
-                  </Form.Item>
                   <Form.Item
                     name="message"
                     label="نص الرسالة"
@@ -110,11 +76,11 @@ export default function Notifications() {
             </Col>
             <Col xs={24} lg={8}>
               <Card className="custom-card">
-                <h3 style={{ marginBottom: 8 }}>نصائح</h3>
+                <h3 style={{ marginBottom: 8 }}>معلومات</h3>
                 <ul style={{ paddingInlineStart: 20, lineHeight: 1.8 }}>
-                  <li>يمكنك التوجيه لمستخدم محدد عبر User ID أو رقم الهاتف.</li>
-                  <li>اختر القنوات المناسبة للجمهور المستهدف.</li>
-                  <li>تأكد من الموافقة على رسائل SMS حسب اللوائح.</li>
+                  <li>سيتم إرسال الإشعار لجميع الأجهزة المسجلة عبر Firebase.</li>
+                  <li>الإشعارات ترسل فقط عبر Firebase Push Notifications.</li>
+                  <li>تأكد من أن الرسالة واضحة ومفيدة لجميع المستخدمين.</li>
                 </ul>
               </Card>
             </Col>

@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -144,6 +145,17 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.usersService.update(user.id, updateUserDto);
+  }
+
+  @Delete('profile')
+  @ApiOperation({ summary: 'Delete current user account' })
+  @ApiResponse({ status: 200, description: 'Account deleted successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot delete account with active bookings, tickets, or transactions' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async deleteMyAccount(@CurrentUser() user: User) {
+    await this.usersService.deleteMyAccount(user.id);
+    return { message: 'Account deleted successfully' };
   }
 
   @Put(':id')

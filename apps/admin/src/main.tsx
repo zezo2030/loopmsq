@@ -11,11 +11,13 @@ import BranchLayout from './layouts/BranchLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import UsersList from './pages/users/UsersList'
+import ClientsList from './pages/users/ClientsList'
 import UserDetail from './pages/users/UserDetail'
 import CreateStaff from './pages/users/CreateStaff'
 import CreateBranchManager from './pages/users/CreateBranchManager'
 import BookingsList from './pages/bookings/BookingsList'
 import BookingDetail from './pages/bookings/BookingDetail'
+import CreateFreeTicket from './pages/bookings/CreateFreeTicket'
 import TripsList from './pages/trips/TripsList'
 import TripDetail from './pages/trips/TripDetail'
 import EventsList from './pages/events/EventsList'
@@ -40,6 +42,7 @@ import Settings from './pages/Settings'
 import Analytics from './Analytics'
 import MetaPixel from './MetaPixel'
 import SearchPage from './pages/Search'
+import NotFound from './pages/NotFound'
 import BranchDashboard from './pages-branch/Dashboard'
 import BranchInfo from './pages-branch/branch/BranchInfo'
 import BranchHalls from './pages-branch/halls/HallsList'
@@ -76,11 +79,13 @@ const router = createBrowserRouter([
           // Users Management
           { path: 'users', element: <UsersList /> },
           { path: 'users/:id', element: <UserDetail /> },
+          { path: 'clients', element: <ClientsList /> },
           { path: 'staff/new', element: <CreateStaff /> },
           { path: 'branch-managers/new', element: <CreateBranchManager /> },
       
           // Bookings Management
           { path: 'bookings', element: <BookingsList /> },
+          { path: 'bookings/free-ticket', element: <CreateFreeTicket /> },
           { path: 'bookings/:id', element: <BookingDetail /> },
       
           // School Trips Management
@@ -120,6 +125,7 @@ const router = createBrowserRouter([
           { path: 'reports/overview', element: <ReportsOverview /> },
           { path: 'search', element: <SearchPage /> },
           { path: 'settings', element: <Settings /> },
+          { path: '*', element: <NotFound /> },
         ],
       },
       {
@@ -134,8 +140,10 @@ const router = createBrowserRouter([
           { path: 'bookings', element: <BranchBookings /> },
           { path: 'staff', element: <BranchStaff /> },
           { path: 'reports', element: <BranchReports /> },
+          { path: '*', element: <NotFound /> },
         ],
       },
+      { path: '*', element: <NotFound /> },
     ],
   },
 ])

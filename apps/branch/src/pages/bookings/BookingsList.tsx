@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, Table, Button, Space, Tag, message, DatePicker, Select, Row, Col, Statistic, Modal } from 'antd'
-import { EyeOutlined, CloseOutlined, CalendarOutlined, FilterOutlined } from '@ant-design/icons'
+import { EyeOutlined, CloseOutlined, CalendarOutlined, FilterOutlined, GiftOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiGet, apiPost } from '../../api'
@@ -11,6 +12,7 @@ const { RangePicker } = DatePicker
 const { Option } = Select
 
 export default function BookingsList() {
+  const navigate = useNavigate()
   const { t } = useTranslation()
   const { me } = useBranchAuth()
   const [bookings, setBookings] = useState<any[]>([])
@@ -130,13 +132,13 @@ export default function BookingsList() {
       title: t('bookings.start_time') || 'Start Time',
       dataIndex: 'startTime',
       key: 'startTime',
-      render: (time: string) => time ? new Date(time).toLocaleString() : '-',
+      render: (time: string) => time ? new Date(time).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-',
     },
     {
       title: t('bookings.end_time') || 'End Time',
       dataIndex: 'endTime',
       key: 'endTime',
-      render: (time: string) => time ? new Date(time).toLocaleString() : '-',
+      render: (time: string) => time ? new Date(time).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-',
     },
     {
       title: t('bookings.status') || 'Status',
@@ -213,6 +215,13 @@ export default function BookingsList() {
             <p className="page-subtitle">{t('bookings.subtitle') || 'Manage your branch bookings and reservations'}</p>
           </div>
           <Space>
+            <Button 
+              type="primary"
+              icon={<GiftOutlined />}
+              onClick={() => navigate('/bookings/free-ticket')}
+            >
+              {t('bookings.create_free_ticket') || 'إنشاء تذكرة مجانية'}
+            </Button>
             <Button icon={<CalendarOutlined />}>
               {t('bookings.calendar_view') || 'Calendar View'}
             </Button>

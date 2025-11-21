@@ -25,6 +25,7 @@ import { ReferralsService } from '../referrals/referrals.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { BookingsService } from '../bookings/bookings.service';
 import { TapService } from '../../integrations/tap/tap.service';
+import { WalletService } from '../wallet/wallet.service';
 
 @Injectable()
 export class PaymentsService {
@@ -44,6 +45,7 @@ export class PaymentsService {
     private readonly realtime?: RealtimeGateway,
     private readonly bookings?: BookingsService,
     private readonly tapService?: TapService,
+    private readonly walletService?: WalletService,
   ) {}
 
   async createIntent(userId: string, dto: CreatePaymentIntentDto) {
@@ -73,6 +75,17 @@ export class PaymentsService {
       };
     }
 
+    // If payment method is wallet, check balance
+    if (dto.method === PaymentMethod.WALLET) {
+      if (!this.walletService) {
+        throw new BadRequestException('Wallet service not available');
+      }
+      const walletBalance = await this.walletService.getWalletBalance(userId);
+      if (Number(walletBalance.balance) < Number(booking.totalPrice)) {
+        throw new BadRequestException('Insufficient wallet balance');
+      }
+    }
+
     // Idempotency by key
     const idempotencyKey = `pay:intent:${booking.id}:${dto.method}`;
     const exists = await this.redisService.get(idempotencyKey);
@@ -95,14 +108,22 @@ export class PaymentsService {
 
       const savedPayment = await queryRunner.manager.save(payment);
 
-      // Bypass payments if keys are missing or explicitly enabled
-      const bypass = !this.configService.get<string>('TAP_SECRET_KEY') ||
-        (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() === 'true';
-      if (bypass) {
-        savedPayment.gatewayRef = `bypass_${savedPayment.id}`;
+      // Handle wallet payments differently
+      if (dto.method === PaymentMethod.WALLET) {
+        // For wallet payments, mark as processing immediately
+        // The actual deduction happens in confirmPayment
+        savedPayment.gatewayRef = `wallet_${savedPayment.id}`;
         savedPayment.status = PaymentStatus.PROCESSING;
         await queryRunner.manager.save(savedPayment);
       } else {
+        // Bypass payments if keys are missing or explicitly enabled
+        const bypass = !this.configService.get<string>('TAP_SECRET_KEY') ||
+          (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() === 'true';
+        if (bypass) {
+          savedPayment.gatewayRef = `bypass_${savedPayment.id}`;
+          savedPayment.status = PaymentStatus.PROCESSING;
+          await queryRunner.manager.save(savedPayment);
+        } else {
         // Create Tap charge (immediate capture, 3DS required)
         if (!this.tapService) throw new BadRequestException('Payment gateway not configured');
         const charge = await this.tapService.createCharge({
@@ -119,8 +140,9 @@ export class PaymentsService {
         if (charge.transaction?.authorization_id) {
           savedPayment.transactionId = charge.transaction.authorization_id;
         }
-        savedPayment.status = PaymentStatus.PROCESSING;
-        await queryRunner.manager.save(savedPayment);
+          savedPayment.status = PaymentStatus.PROCESSING;
+          await queryRunner.manager.save(savedPayment);
+        }
       }
 
       await queryRunner.commitTransaction();
@@ -154,15 +176,24 @@ export class PaymentsService {
     if (payment.status === PaymentStatus.COMPLETED)
       return { success: true, paymentId: payment.id };
 
-    const bypass = !this.configService.get<string>('TAP_SECRET_KEY') ||
-      (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() === 'true';
-    if (!bypass) {
+    // Handle wallet payments
+    if (payment.method === PaymentMethod.WALLET) {
+      if (!this.walletService) {
+        throw new BadRequestException('Wallet service not available');
+      }
+      // Deduct from wallet
+      await this.walletService.deductWallet(userId, payment.amount, booking.id);
+    } else {
+      const bypass = !this.configService.get<string>('TAP_SECRET_KEY') ||
+        (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() === 'true';
+      if (!bypass) {
       // Verify with Tap by retrieving the charge status
       if (!this.tapService) throw new BadRequestException('Payment gateway not configured');
       const charge = await this.tapService.retrieveCharge(payment.gatewayRef);
       const succeeded = ['CAPTURED', 'AUTHORIZED', 'SUCCEEDED'].includes((charge.status || '').toUpperCase());
-      if (!succeeded) {
-        throw new BadRequestException('Payment not completed');
+        if (!succeeded) {
+          throw new BadRequestException('Payment not completed');
+        }
       }
     }
 

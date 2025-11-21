@@ -58,6 +58,9 @@ export class Hall {
   @Column({ type: 'json', nullable: true })
   images: string[];
 
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  videoUrl: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -396,7 +396,7 @@ export default function BranchInfo() {
                   <div>
                     <Typography.Text strong>{t('branch.last_updated') || 'Last Updated'}:</Typography.Text>
                     <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-                      {branchData?.updatedAt ? new Date(branchData.updatedAt).toLocaleString() : 'N/A'}
+                      {branchData?.updatedAt ? new Date(branchData.updatedAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : 'N/A'}
                     </div>
                   </div>
                 </Space>

@@ -259,16 +259,16 @@ export default function UserDetail() {
                   </Descriptions.Item>
                   <Descriptions.Item label={t('users.created_at', { defaultValue: 'Created At' })}>
                     <CalendarOutlined style={{ marginRight: '8px' }} />
-                    {userData.createdAt ? new Date(userData.createdAt).toLocaleString() : '—'}
+                    {userData.createdAt ? new Date(userData.createdAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : '—'}
                   </Descriptions.Item>
                   <Descriptions.Item label={t('users.last_login', { defaultValue: 'Last Login' })}>
                     {userData.lastLoginAt
-                      ? new Date(userData.lastLoginAt).toLocaleString()
+                      ? new Date(userData.lastLoginAt).toLocaleString('ar-SA', { calendar: 'gregory' })
                       : t('users.never_logged_in', { defaultValue: 'Never logged in' })}
                   </Descriptions.Item>
                   <Descriptions.Item label={t('users.last_updated', { defaultValue: 'Last Updated' })}>
                     <CalendarOutlined style={{ marginRight: '8px' }} />
-                    {userData.updatedAt ? new Date(userData.updatedAt).toLocaleString() : '—'}
+                    {userData.updatedAt ? new Date(userData.updatedAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : '—'}
                   </Descriptions.Item>
                 </Descriptions>
               </Card>

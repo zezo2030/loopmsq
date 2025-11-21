@@ -6,9 +6,10 @@ import { EventsService } from './events.service';
 import { BookingsModule } from '../bookings/bookings.module';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ContentModule } from '../content/content.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([EventRequest]), BookingsModule, UsersModule, NotificationsModule],
+  imports: [TypeOrmModule.forFeature([EventRequest]), BookingsModule, UsersModule, NotificationsModule, ContentModule],
   controllers: [EventsController],
   providers: [EventsService],
 })

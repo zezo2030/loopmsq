@@ -29,6 +29,7 @@ type Hall = {
   description_en?: string | null
   features?: string[]
   images?: string[]
+  videoUrl?: string | null
   status?: 'available' | 'maintenance' | 'reserved'
 }
 
@@ -267,6 +268,7 @@ export default function Halls() {
               description_en: r.description_en,
               features: r.features,
               images: r.images,
+              videoUrl: r.videoUrl,
             }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
             <Select
               value={r.status}
@@ -334,6 +336,7 @@ export default function Halls() {
               description_en: values.description_en || null,
               features: values.features?.length ? values.features : undefined,
               images: values.images?.length ? values.images : undefined,
+              videoUrl: values.videoUrl || null,
             }
             if (!canEdit) { message.error(t('errors.forbidden') || 'Forbidden'); return }
             if (editing) updateHall.mutate({ id: editing.id, body })
@@ -494,6 +497,13 @@ export default function Halls() {
           </Form.Item>
           <Form.Item name="description_en" label={t('halls.description_en') || 'الوصف (EN)'}>
             <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item 
+            name="videoUrl" 
+            label={t('halls.video_url') || 'رابط فيديو YouTube'} 
+            help={t('halls.video_url_help') || 'أدخل رابط فيديو YouTube (مثال: https://www.youtube.com/watch?v=VIDEO_ID)'}
+          >
+            <Input placeholder="https://www.youtube.com/watch?v=..." />
           </Form.Item>
         </Form>
       </Modal>

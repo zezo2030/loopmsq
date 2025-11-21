@@ -36,10 +36,10 @@ export default function CreateBranchManager() {
         language: values.language || 'ar',
         branchId: values.branchId,
       })
-      message.success('Branch manager created successfully!')
+      message.success(t('users.branch_manager_created') || 'Branch manager created successfully!')
       form.resetFields()
     } catch (e: any) {
-      message.error(e?.message || 'Failed to create branch manager')
+      message.error(e?.message || t('users.branch_manager_create_failed') || 'Failed to create branch manager')
     } finally {
       setLoading(false)
     }
@@ -52,9 +52,9 @@ export default function CreateBranchManager() {
           <div>
             <h1 className="page-title">
               <ShopOutlined style={{ marginRight: '12px' }} />
-              Create Branch Manager
+              {t('page.create_branch_manager') || 'Create Branch Manager'}
             </h1>
-            <p className="page-subtitle">Add a new branch manager to oversee operations</p>
+            <p className="page-subtitle">{t('users.create_branch_manager_subtitle') || 'Add a new branch manager to oversee operations'}</p>
           </div>
         </div>
       </div>
@@ -96,7 +96,7 @@ export default function CreateBranchManager() {
                       { type: 'email', message: t('users.enter_valid_email') || 'Please enter a valid email' }
                     ]}
                   >
-                    <Input type="email" placeholder="manager@company.com" size="large" />
+                    <Input type="email" placeholder={t('users.email_placeholder') || 'manager@company.com'} size="large" />
                   </Form.Item>
                 </Col>
               </Row>
@@ -149,8 +149,8 @@ export default function CreateBranchManager() {
                       placeholder={t('users.select_language') || 'Select language'}
                       size="large"
                       options={[
-                        { label: 'Arabic', value: 'ar' },
-                        { label: 'English', value: 'en' },
+                        { label: t('users.language_ar') || 'Arabic', value: 'ar' },
+                        { label: t('users.language_en') || 'English', value: 'en' },
                       ]}
                     />
                   </Form.Item>
@@ -160,7 +160,7 @@ export default function CreateBranchManager() {
               <Form.Item style={{ marginTop: '32px', textAlign: 'center' }}>
                 <Space size="middle">
                   <Button size="large" onClick={() => form.resetFields()}>
-                    Reset Form
+                    {t('common.reset_form') || 'Reset Form'}
                   </Button>
                   <Button 
                     type="primary" 
@@ -170,7 +170,7 @@ export default function CreateBranchManager() {
                     icon={<SaveOutlined />}
                     className="btn-primary"
                   >
-                    Create Branch Manager
+                    {t('page.create_branch_manager') || 'Create Branch Manager'}
                   </Button>
                 </Space>
               </Form.Item>
