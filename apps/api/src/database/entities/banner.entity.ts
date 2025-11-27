@@ -5,8 +5,8 @@ export class Banner {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 150 })
-  title: string;
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  title: string | null;
 
   @Column({ type: 'text' })
   imageUrl: string;

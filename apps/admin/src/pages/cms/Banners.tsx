@@ -42,12 +42,14 @@ export default function Banners() {
     { title: 'Link', dataIndex: 'link' },
     { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
     { title: 'Schedule', render: (_: any, r: Banner) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
-    { title: 'Actions', render: (_: any, r: Banner) => (
-      <span style={{ display: 'flex', gap: 8 }}>
-        <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue({ ...r, range: [r.startsAt ? dayjs(r.startsAt) : null, r.endsAt ? dayjs(r.endsAt) : null] }); setOpen(true) }}>Edit</Button>
-        <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>Delete</Button>
-      </span>
-    )},
+    {
+      title: 'Actions', render: (_: any, r: Banner) => (
+        <span style={{ display: 'flex', gap: 8 }}>
+          <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue({ ...r, range: [r.startsAt ? dayjs(r.startsAt) : null, r.endsAt ? dayjs(r.endsAt) : null] }); setOpen(true) }}>Edit</Button>
+          <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>Delete</Button>
+        </span>
+      )
+    },
   ]
 
   return (
@@ -78,7 +80,7 @@ export default function Banners() {
         }}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="title" label="Title" rules={[{ required: true }]}>
+          <Form.Item name="title" label="Title">
             <Input />
           </Form.Item>
           <Form.Item label="Image" required>
@@ -105,7 +107,7 @@ export default function Banners() {
               >
                 <Button icon={<UploadOutlined />}>Upload Image</Button>
               </Upload>
-              <Form.Item name="imageUrl" hidden rules={[{ required: true, message: 'Please upload an image' }]}> 
+              <Form.Item name="imageUrl" hidden rules={[{ required: true, message: 'Please upload an image' }]}>
                 <Input />
               </Form.Item>
             </Space>
