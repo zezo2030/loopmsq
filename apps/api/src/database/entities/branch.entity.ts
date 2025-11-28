@@ -5,6 +5,8 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  OneToOne,
+  JoinColumn,
 } from 'typeorm';
 import { Hall } from './hall.entity';
 import { Booking } from './booking.entity';
@@ -72,8 +74,9 @@ export class Branch {
   updatedAt: Date;
 
   // Relations
-  @OneToMany(() => Hall, (hall) => hall.branch)
-  halls: Hall[];
+  @OneToOne(() => Hall, (hall) => hall.branch)
+  @JoinColumn()
+  hall: Hall;
 
   @OneToMany(() => Booking, (booking) => booking.branch)
   bookings: Booking[];

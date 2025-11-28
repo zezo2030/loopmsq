@@ -68,7 +68,7 @@ export class Hall {
   updatedAt: Date;
 
   // Relations
-  @ManyToOne(() => Branch, (branch) => branch.halls)
+  @ManyToOne(() => Branch, (branch) => branch.hall)
   @JoinColumn({ name: 'branchId' })
   branch: Branch;
 }

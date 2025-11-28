@@ -37,8 +37,6 @@ export default function Offers() {
     const res = await apiGet<any>('/content/branches?includeInactive=true')
     return Array.isArray(res) ? res : (res.items || res.branches || [])
   }})
-  const [hallsOptions, setHallsOptions] = useState<any[]>([])
-  const [loadingHalls, setLoadingHalls] = useState(false)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Offer | null>(null)
   const [form] = Form.useForm()
@@ -56,43 +54,40 @@ export default function Offers() {
     onSuccess: () => { message.success('Offer removed'); qc.invalidateQueries({ queryKey: ['offers'] }) },
   })
 
-  // Load halls when modal opens in edit mode with a branchId
+  // Auto-set hall when modal opens (each branch has one hall)
   useEffect(() => {
     if (open && editing && editing.branchId) {
-      const loadHalls = async () => {
-        setLoadingHalls(true)
+      // Auto-set the hall for editing mode
+      const loadHall = async () => {
         try {
           const halls = await apiGet<any[]>(`/content/halls?branchId=${editing.branchId}`)
-          setHallsOptions(halls || [])
+          if (halls && halls.length > 0) {
+            form.setFieldsValue({ hallId: halls[0].id })
+          }
         } catch (error) {
-          console.error('Failed to load halls:', error)
-          message.error('Failed to load halls')
-          setHallsOptions([])
-        } finally {
-          setLoadingHalls(false)
+          console.error('Failed to load hall:', error)
         }
       }
-      loadHalls()
+      loadHall()
     }
-    // Load halls for branch mode when creating new offer
+    // Auto-set hall for branch mode when creating new offer
     if (open && !editing && isBranchMode && enforcedBranchId) {
       (async () => {
-        setLoadingHalls(true)
         try {
           const halls = await apiGet<any[]>(`/content/halls?branchId=${enforcedBranchId}`)
-          setHallsOptions(halls || [])
+          if (halls && halls.length > 0) {
+            form.setFieldsValue({ hallId: halls[0].id })
+          }
         } catch {
-          setHallsOptions([])
-        } finally {
-          setLoadingHalls(false)
+          // Ignore errors - backend will handle it
         }
       })()
     }
-  }, [open, editing, isBranchMode, enforcedBranchId])
+  }, [open, editing, isBranchMode, enforcedBranchId, form])
 
   const columns = [
     { title: 'Branch', dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
-    { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? (hallsOptions.find(h => h.id === v)?.name_en || v) : 'All Halls' },
+    { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? v : 'Auto-linked' },
     { title: 'Title', dataIndex: 'title' },
     { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrlWithBust(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: 'Type', dataIndex: 'discountType' },
@@ -128,7 +123,6 @@ export default function Offers() {
         <Button type="primary" onClick={() => { 
           setEditing(null); 
           form.resetFields(); 
-          setHallsOptions([]);
           setOpen(true);
         }}>New Offer</Button>
       </div>
@@ -140,7 +134,6 @@ export default function Offers() {
         onCancel={() => { 
           setOpen(false); 
           setEditing(null);
-          setHallsOptions([]);
           form.resetFields();
         }}
         onOk={() => {
@@ -170,34 +163,27 @@ export default function Offers() {
                 placeholder="Select branch"
                 options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
                 onChange={async (v) => {
-                  form.setFieldsValue({ hallId: undefined })
+                  // Hall will be automatically linked to branch's single hall on backend
                   if (!v) {
-                    setHallsOptions([])
                     return
                   }
-                  setLoadingHalls(true)
+                  // Optionally load the hall to set it automatically (though backend will handle it)
                   try {
                     const halls = await apiGet<any[]>(`/content/halls?branchId=${v}`)
-                    setHallsOptions(halls || [])
+                    if (halls && halls.length > 0) {
+                      // Auto-set the single hall for this branch
+                      form.setFieldsValue({ hallId: halls[0].id })
+                    }
                   } catch (error) {
-                    console.error('Failed to load halls:', error)
-                    message.error('Failed to load halls')
-                    setHallsOptions([])
-                  } finally {
-                    setLoadingHalls(false)
+                    console.error('Failed to load hall:', error)
                   }
                 }}
               />
             </Form.Item>
           )}
-          <Form.Item name="hallId" label="Hall (optional)">
-            <Select
-              allowClear
-              placeholder="All Halls"
-              loading={loadingHalls}
-              disabled={loadingHalls || (isBranchMode ? !enforcedBranchId : !form.getFieldValue('branchId'))}
-              options={(hallsOptions || []).map(h => ({ value: h.id, label: h.name_en }))}
-            />
+          {/* Hall selection is hidden - automatically linked to branch's single hall */}
+          <Form.Item name="hallId" hidden>
+            <Input />
           </Form.Item>
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>
             <Input />

@@ -88,14 +88,57 @@ export class ContentService {
 
   // Branch Management
   async createBranch(createBranchDto: CreateBranchDto): Promise<Branch> {
-    const branch = this.branchRepository.create(createBranchDto);
+    // Extract hall data from DTO
+    const {
+      hallName_ar,
+      hallName_en,
+      hallPriceConfig,
+      hallCapacity,
+      hallIsDecorated,
+      hallDescription_ar,
+      hallDescription_en,
+      hallFeatures,
+      hallImages,
+      hallVideoUrl,
+      ...branchData
+    } = createBranchDto;
+
+    // Create branch
+    const branch = this.branchRepository.create(branchData);
     const savedBranch = await this.branchRepository.save(branch);
+
+    // Create hall automatically with provided data or defaults
+    const hallData = {
+      branchId: savedBranch.id,
+      name_ar: hallName_ar || `${savedBranch.name_ar} - الصالة`,
+      name_en: hallName_en || `${savedBranch.name_en} - Hall`,
+      priceConfig: hallPriceConfig || {
+        basePrice: 500,
+        hourlyRate: 100,
+        pricePerPerson: 10,
+        weekendMultiplier: 1.5,
+        holidayMultiplier: 2.0,
+        decorationPrice: 200,
+      },
+      capacity: hallCapacity || savedBranch.capacity || 100,
+      isDecorated: hallIsDecorated ?? false,
+      description_ar: hallDescription_ar || savedBranch.description_ar,
+      description_en: hallDescription_en || savedBranch.description_en,
+      features: hallFeatures || [],
+      images: hallImages || [],
+      videoUrl: hallVideoUrl || savedBranch.videoUrl,
+      status: 'available',
+    };
+
+    const hall = this.hallRepository.create(hallData);
+    await this.hallRepository.save(hall);
 
     // Clear cache
     await this.redisService.del('branches:all');
     await this.redisService.del('branches:active');
+    await this.redisService.del(`branch:${savedBranch.id}`);
 
-    this.logger.log(`Branch created: ${savedBranch.id}`);
+    this.logger.log(`Branch created: ${savedBranch.id} with hall: ${hall.id}`);
     return savedBranch;
   }
 
@@ -110,7 +153,7 @@ export class ContentService {
 
     const queryBuilder = this.branchRepository
       .createQueryBuilder('branch')
-      .leftJoinAndSelect('branch.halls', 'halls')
+      .leftJoinAndSelect('branch.hall', 'hall')
       .orderBy('branch.createdAt', 'DESC');
 
     if (!includeInactive) {
@@ -136,7 +179,7 @@ export class ContentService {
 
     const branch = await this.branchRepository.findOne({
       where: { id },
-      relations: ['halls'],
+      relations: ['hall'],
     });
 
     if (!branch) {
@@ -248,6 +291,15 @@ export class ContentService {
     // Verify branch exists
     const branch = await this.findBranchById(createHallDto.branchId);
 
+    // Check if branch already has a hall (OneToOne relationship)
+    const existingHall = await this.hallRepository.findOne({
+      where: { branchId: createHallDto.branchId },
+    });
+
+    if (existingHall) {
+      throw new ConflictException('Branch already has a hall. Use update endpoint instead.');
+    }
+
     const hall = this.hallRepository.create(createHallDto);
     const savedHall = await this.hallRepository.save(hall);
 
@@ -263,6 +315,58 @@ export class ContentService {
       `Hall created: ${savedHall.id} in branch ${createHallDto.branchId}`,
     );
     return savedHall;
+  }
+
+  // Get hall for a specific branch (OneToOne)
+  async getBranchHall(branchId: string): Promise<Hall | null> {
+    const cacheKey = `hall:branch:${branchId}`;
+
+    // Try cache first
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const hall = await this.hallRepository.findOne({
+      where: { branchId },
+      relations: ['branch'],
+    });
+
+    if (hall) {
+      // Cache for 5 minutes
+      await this.redisService.set(cacheKey, hall, 300);
+    }
+
+    return hall;
+  }
+
+  // Update hall for a specific branch
+  async updateBranchHall(
+    branchId: string,
+    updateData: Partial<CreateHallDto>,
+  ): Promise<Hall> {
+    const hall = await this.getBranchHall(branchId);
+
+    if (!hall) {
+      throw new NotFoundException('Hall not found for this branch');
+    }
+
+    // Remove branchId from updateData if present (shouldn't change)
+    const { branchId: _, ...updateFields } = updateData;
+
+    Object.assign(hall, updateFields);
+    const updatedHall = await this.hallRepository.save(hall);
+
+    // Clear caches
+    await this.redisService.del(`hall:branch:${branchId}`);
+    await this.redisService.del(`branch:${branchId}`);
+    await this.redisService.del('branches:all');
+    await this.redisService.del('branches:active');
+    await this.redisService.del(`halls:branch:${branchId}`);
+    await this.redisService.del('halls:all');
+
+    this.logger.log(`Hall updated for branch: ${branchId}`);
+    return updatedHall;
   }
 
   async findAllHalls(branchId?: string): Promise<Hall[]> {

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Switch, Table, message, Upload, Image, Space } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 import { resolveFileUrl } from '../shared/url'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../api'
 import dayjs from 'dayjs'
 
@@ -37,6 +37,13 @@ export default function BranchOffersTab({ branchId }: BranchOffersTabProps) {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Offer | null>(null)
   const [form] = Form.useForm()
+
+  // Auto-set hall when modal opens (each branch has one hall)
+  useEffect(() => {
+    if (open && branchId && halls && halls.length > 0) {
+      form.setFieldsValue({ hallId: halls[0].id })
+    }
+  }, [open, branchId, halls, form])
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<Offer>) => apiPost<Offer>('/admin/offers', { ...body, branchId }),
@@ -105,12 +112,9 @@ export default function BranchOffersTab({ branchId }: BranchOffersTabProps) {
         }}
       >
         <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
-          <Form.Item name="hallId" label="Hall (optional)">
-            <Select
-              allowClear
-              placeholder="All Halls"
-              options={(halls || []).map(h => ({ value: h.id, label: h.name_en }))}
-            />
+          {/* Hall selection is hidden - automatically linked to branch's single hall */}
+          <Form.Item name="hallId" hidden>
+            <Input />
           </Form.Item>
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>
             <Input />

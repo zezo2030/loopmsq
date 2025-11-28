@@ -31,8 +31,6 @@ export default function BranchOffers() {
     enabled: !!me,
   })
 
-  const [hallsOptions, setHallsOptions] = useState<any[]>([])
-  const [loadingHalls, setLoadingHalls] = useState(false)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Offer | null>(null)
   const [form] = Form.useForm()
@@ -50,26 +48,25 @@ export default function BranchOffers() {
     onSuccess: () => { message.success('Offer removed'); qc.invalidateQueries({ queryKey: ['branch:offers'] }) },
   })
 
-  // Load halls of this branch when modal opens (new/edit)
+  // Auto-set hall when modal opens (each branch has one hall)
   useEffect(() => {
     if (!open || !branchId) return
     const load = async () => {
-      setLoadingHalls(true)
       try {
         const halls = await apiGet<any[]>(`/content/halls?branchId=${branchId}`)
-        setHallsOptions(halls || [])
+        if (halls && halls.length > 0) {
+          // Auto-set the single hall for this branch
+          form.setFieldsValue({ hallId: halls[0].id })
+        }
       } catch (e) {
-        message.error('Failed to load halls')
-        setHallsOptions([])
-      } finally {
-        setLoadingHalls(false)
+        // Ignore errors - backend will handle it
       }
     }
     load()
-  }, [open, branchId])
+  }, [open, branchId, form])
 
   const columns = [
-    { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? (hallsOptions.find(h => h.id === v)?.name_en || v) : 'All Halls' },
+    { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? 'Auto-linked' : 'Auto-linked' },
     { title: 'Title', dataIndex: 'title' },
     { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={v} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: 'Type', dataIndex: 'discountType' },
@@ -90,7 +87,7 @@ export default function BranchOffers() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setHallsOptions([]); setOpen(true) }}>New Offer</Button>
+        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>New Offer</Button>
       </div>
 
       <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
@@ -98,7 +95,7 @@ export default function BranchOffers() {
       <Modal
         title={editing ? 'Edit Offer' : 'Create Offer'}
         open={open}
-        onCancel={() => { setOpen(false); setEditing(null); setHallsOptions([]); form.resetFields() }}
+        onCancel={() => { setOpen(false); setEditing(null); form.resetFields() }}
         onOk={() => {
           form.validateFields().then(values => {
             const body: any = {
@@ -121,14 +118,9 @@ export default function BranchOffers() {
         }}
       >
         <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
-          <Form.Item name="hallId" label="Hall (optional)">
-            <Select
-              allowClear
-              placeholder="All Halls"
-              loading={loadingHalls}
-              disabled={loadingHalls || !branchId}
-              options={(hallsOptions || []).map(h => ({ value: h.id, label: h.name_en }))}
-            />
+          {/* Hall selection is hidden - automatically linked to branch's single hall */}
+          <Form.Item name="hallId" hidden>
+            <Input />
           </Form.Item>
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>
             <Input />

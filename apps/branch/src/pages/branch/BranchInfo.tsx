@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Card, Form, Input, Button, message, Row, Col, Select, Switch, Space, Typography, Divider, Upload, Image } from 'antd'
+import { Card, Form, Input, Button, message, Row, Col, Select, Switch, Space, Typography, Divider, Upload, Image, Tabs } from 'antd'
 import { SaveOutlined, EditOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiGet, apiPut, apiPost, apiDelete } from '../../api'
 import { useBranchAuth } from '../../auth'
 import WorkingHoursEditor from '../../components/WorkingHoursEditor'
+import BranchHallTab from '../../components/BranchHallTab'
 
 const { TextArea } = Input
 const { Option } = Select
@@ -17,6 +18,7 @@ export default function BranchInfo() {
   const [loading, setLoading] = useState(false)
   const [branchData, setBranchData] = useState<any>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [activeTab, setActiveTab] = useState('details')
 
   useEffect(() => {
     loadBranchData()
@@ -162,10 +164,12 @@ export default function BranchInfo() {
 
       <div className="page-content">
         <div className="page-content-inner">
-          <Row gutter={[24, 24]}>
-            {/* Branch Details */}
-            <Col xs={24} lg={16}>
-              <Card className="custom-card" title={t('branch.details') || 'Branch Details'}>
+          <Tabs activeKey={activeTab} onChange={setActiveTab} style={{ marginBottom: 24 }}>
+            <Tabs.TabPane key="details" tab={t('branch.details') || 'Branch Details'}>
+              <Row gutter={[24, 24]}>
+                {/* Branch Details */}
+                <Col xs={24} lg={16}>
+                  <Card className="custom-card" title={t('branch.details') || 'Branch Details'}>
                 <Form
                   form={form}
                   layout="vertical"
@@ -403,6 +407,11 @@ export default function BranchInfo() {
               </Card>
             </Col>
           </Row>
+        </Tabs.TabPane>
+        <Tabs.TabPane key="hall" tab={t('halls.title') || 'Hall'}>
+          {me?.branchId && <BranchHallTab branchId={me.branchId} />}
+        </Tabs.TabPane>
+      </Tabs>
         </div>
       </div>
     </div>

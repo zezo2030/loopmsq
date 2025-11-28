@@ -10,7 +10,6 @@ import MainLayout from './layouts/MainLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import BranchInfo from './pages/branch/BranchInfo'
-import HallsList from './pages/halls/HallsList'
 import BookingsList from './pages/bookings/BookingsList'
 import CreateFreeTicket from './pages/bookings/CreateFreeTicket'
 import StaffList from './pages/staff/StaffList'
@@ -31,7 +30,6 @@ const router = createBrowserRouter([
           { index: true, element: <Dashboard /> },
           { path: 'dashboard', element: <Dashboard /> },
           { path: 'branch', element: <BranchInfo /> },
-          { path: 'halls', element: <HallsList /> },
           { path: 'offers', element: <BranchOffers /> },
           { path: 'coupons', element: <BranchCoupons /> },
           { path: 'bookings', element: <BookingsList /> },

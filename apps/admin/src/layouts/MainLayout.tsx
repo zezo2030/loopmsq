@@ -64,9 +64,6 @@ export default function MainLayout() {
   if (path.startsWith('/content/branches')) {
     return ['content-branches']
   }
-  if (path.startsWith('/content/halls')) {
-    return ['content-halls']
-  }
   if (path.startsWith('/feedback/reviews')) {
     return ['feedback-reviews']
   }
@@ -222,7 +219,6 @@ export default function MainLayout() {
       label: t('menu.content'),
       children: [
         { key: 'content-branches', icon: <AppstoreOutlined />, label: <Link to="/admin/content/branches">{t('menu.content.branches')}</Link> },
-        { key: 'content-halls', icon: <AppstoreOutlined />, label: <Link to="/admin/content/halls">{t('menu.content.halls')}</Link> },
         { key: 'content-addons', icon: <AppstoreOutlined />, label: <Link to="/admin/content/addons">{t('menu.content.addons') || 'Add-ons'}</Link> },
       ],
     },
@@ -390,7 +386,6 @@ function getPageTitle(pathname: string): string {
   
   // Content
   if (path === '/content/branches') return t('menu.content.branches')
-  if (path === '/content/halls') return t('menu.content.halls')
   if (path === '/content/addons') return t('addons.title')
   
   if (path === '/settings') return t('settings.title')

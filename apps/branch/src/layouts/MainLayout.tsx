@@ -34,9 +34,6 @@ export default function MainLayout() {
     if (path.startsWith('/branch')) {
       return ['branch']
     }
-    if (path.startsWith('/halls')) {
-      return ['halls']
-    }
   if (path.startsWith('/offers')) {
     return ['offers']
   }
@@ -111,11 +108,6 @@ export default function MainLayout() {
       key: 'branch',
       icon: <AppstoreOutlined />,
       label: <Link to="/branch">{t('menu.branch')}</Link>,
-    },
-    {
-      key: 'halls',
-      icon: <AppstoreOutlined />,
-      label: <Link to="/halls">{t('menu.halls')}</Link>,
     },
     {
       key: 'offers',

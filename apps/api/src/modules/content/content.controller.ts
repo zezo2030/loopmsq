@@ -307,7 +307,39 @@ export class ContentController {
     return this.contentService.deleteBranchImage(id, filename);
   }
 
-  // Hall endpoints
+  // Branch Hall endpoints (OneToOne relationship)
+  @Get('branches/:id/hall')
+  @ApiOperation({ summary: 'Get hall for a specific branch' })
+  @ApiResponse({ status: 200, description: 'Hall retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Hall not found for this branch' })
+  async getBranchHall(@Param('id', ParseUUIDPipe) id: string) {
+    return this.contentService.getBranchHall(id);
+  }
+
+  @Patch('branches/:id/hall')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update hall for a specific branch' })
+  @ApiResponse({ status: 200, description: 'Hall updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Hall not found' })
+  async updateBranchHall(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateData: Partial<CreateHallDto>,
+    @CurrentUser() requester: User,
+  ) {
+    // Branch manager can only update hall in their own branch
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId || requester.branchId !== id) {
+        throw new ForbiddenException('Not allowed');
+      }
+    }
+    return this.contentService.updateBranchHall(id, updateData);
+  }
+
+  // Hall endpoints (kept for backward compatibility, but deprecated)
   @Post('halls')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)

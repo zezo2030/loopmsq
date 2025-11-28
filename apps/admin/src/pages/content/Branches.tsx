@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import WorkingHoursEditor from '../../components/WorkingHoursEditor'
 import BranchOffersTab from '../../components/BranchOffersTab'
 import BranchCouponsTab from '../../components/BranchCouponsTab'
+import BranchHallTab from '../../components/BranchHallTab'
 
 type Branch = {
   id: string
@@ -247,6 +248,11 @@ export default function Branches() {
                     )}
                   </div>
                 ),
+              },
+              {
+                key: 'hall',
+                label: t('halls.title') || 'Hall',
+                children: <BranchHallTab branchId={selectedBranch.id} />,
               },
               {
                 key: 'offers',

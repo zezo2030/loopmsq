@@ -4,12 +4,14 @@ import { Repository } from 'typeorm';
 import { RedisService } from '../../utils/redis.service';
 import { Banner } from '../../database/entities/banner.entity';
 import { Offer } from '../../database/entities/offer.entity';
+import { Hall } from '../../database/entities/hall.entity';
 
 @Injectable()
 export class HomeAdminService {
   constructor(
     @InjectRepository(Banner) private readonly bannerRepo: Repository<Banner>,
     @InjectRepository(Offer) private readonly offerRepo: Repository<Offer>,
+    @InjectRepository(Hall) private readonly hallRepo: Repository<Hall>,
     private readonly redis: RedisService,
   ) {}
 
@@ -47,12 +49,40 @@ export class HomeAdminService {
     if (!dto.branchId) {
       throw new Error('branchId is required');
     }
-    const entity = this.offerRepo.create(dto);
+    
+    // Get the hall for this branch (one-to-one relationship)
+    const hall = await this.hallRepo.findOne({
+      where: { branchId: dto.branchId },
+    });
+    
+    if (!hall) {
+      throw new Error(`No hall found for branch ${dto.branchId}`);
+    }
+    
+    // Automatically link the offer to the branch's hall
+    const entity = this.offerRepo.create({
+      ...dto,
+      hallId: hall.id,
+    });
     const saved = await this.offerRepo.save(entity);
     await this.redis.del('home:v1');
     return saved;
   }
   async updateOffer(id: string, dto: Partial<Offer>) {
+    // If branchId is being updated, automatically link to the branch's hall
+    if (dto.branchId) {
+      const hall = await this.hallRepo.findOne({
+        where: { branchId: dto.branchId },
+      });
+      
+      if (!hall) {
+        throw new Error(`No hall found for branch ${dto.branchId}`);
+      }
+      
+      // Automatically set hallId to the branch's hall
+      dto.hallId = hall.id;
+    }
+    
     const res = await this.offerRepo.update(id, dto);
     await this.redis.del('home:v1');
     return res;
