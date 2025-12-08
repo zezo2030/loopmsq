@@ -24,8 +24,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: booking-redis-dev
-    ports:
-      - "6379:6379"
+    # Port removed for security - Redis is only accessible within Docker network
     volumes:
       - redis_data_dev:/data
     healthcheck:

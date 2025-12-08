@@ -132,48 +132,83 @@ export class ContentService {
     const cacheKey = includeInactive ? 'branches:all' : 'branches:active';
 
     // Try to get from cache first
-    const cached = await this.redisService.get(cacheKey);
-    if (cached) {
-      return cached;
+    try {
+      const cached = await this.redisService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to get branches from cache: ${error.message}`);
+      // Continue to database query if cache fails
     }
 
-    const queryBuilder = this.branchRepository
-      .createQueryBuilder('branch')
-      .orderBy('branch.createdAt', 'DESC');
+    try {
+      const queryBuilder = this.branchRepository
+        .createQueryBuilder('branch')
+        .leftJoinAndSelect('branch.halls', 'halls')
+        .orderBy('branch.createdAt', 'DESC');
 
-    if (!includeInactive) {
-      queryBuilder.where('branch.status = :status', { status: 'active' });
+      if (!includeInactive) {
+        queryBuilder.where('branch.status = :status', { status: 'active' });
+      }
+
+      const branches = await queryBuilder.getMany();
+
+      // Try to cache the result, but don't fail if caching fails
+      try {
+        await this.redisService.set(cacheKey, branches, 300);
+      } catch (error) {
+        this.logger.warn(`Failed to cache branches: ${error.message}`);
+        // Continue even if caching fails
+      }
+
+      return branches;
+    } catch (error) {
+      this.logger.error(`Failed to fetch branches from database: ${error.message}`, error.stack);
+      throw error;
     }
-
-    const branches = await queryBuilder.getMany();
-
-    // Cache for 5 minutes
-    await this.redisService.set(cacheKey, branches, 300);
-
-    return branches;
   }
 
   async findBranchById(id: string): Promise<Branch> {
     const cacheKey = `branch:${id}`;
 
     // Try cache first
-    const cached = await this.redisService.get(cacheKey);
-    if (cached) {
-      return cached;
+    try {
+      const cached = await this.redisService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to get branch from cache: ${error.message}`);
+      // Continue to database query if cache fails
     }
 
-    const branch = await this.branchRepository.findOne({
-      where: { id },
-    });
+    try {
+      const branch = await this.branchRepository.findOne({
+        where: { id },
+        relations: ['halls'],
+      });
 
-    if (!branch) {
-      throw new NotFoundException('Branch not found');
+      if (!branch) {
+        throw new NotFoundException('Branch not found');
+      }
+
+      // Try to cache the result, but don't fail if caching fails
+      try {
+        await this.redisService.set(cacheKey, branch, 600);
+      } catch (error) {
+        this.logger.warn(`Failed to cache branch: ${error.message}`);
+        // Continue even if caching fails
+      }
+
+      return branch;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Failed to fetch branch from database: ${error.message}`, error.stack);
+      throw error;
     }
-
-    // Cache for 10 minutes
-    await this.redisService.set(cacheKey, branch, 600);
-
-    return branch;
   }
 
   async updateBranch(
@@ -321,15 +356,97 @@ export class ContentService {
     return updatedBranch;
   }
 
-  async deleteBranchHallImage(branchId: string, filename: string): Promise<Branch> {
-    const branch = await this.findBranchById(branchId);
+  async findAllHalls(branchId?: string): Promise<Hall[]> {
+    const cacheKey = branchId ? `halls:branch:${branchId}` : 'halls:all';
 
-    const imageUrl = `/uploads/branches/halls/${filename}`;
-    if (branch.hallImages) {
-      branch.hallImages = branch.hallImages.filter((img) => img !== imageUrl);
+    // Try cache first
+    try {
+      const cached = await this.redisService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to get halls from cache: ${error.message}`);
+      // Continue to database query if cache fails
     }
 
-    const updatedBranch = await this.branchRepository.save(branch);
+    try {
+      const queryBuilder = this.hallRepository
+        .createQueryBuilder('hall')
+        .leftJoinAndSelect('hall.branch', 'branch')
+        .orderBy('hall.createdAt', 'DESC');
+
+      if (branchId) {
+        queryBuilder.where('hall.branchId = :branchId', { branchId });
+      }
+
+      const halls = await queryBuilder.getMany();
+
+      // Try to cache the result, but don't fail if caching fails
+      try {
+        await this.redisService.set(cacheKey, halls, 300);
+      } catch (error) {
+        this.logger.warn(`Failed to cache halls: ${error.message}`);
+        // Continue even if caching fails
+      }
+
+      return halls;
+    } catch (error) {
+      this.logger.error(`Failed to fetch halls from database: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async findHallById(id: string): Promise<Hall> {
+    const cacheKey = `hall:${id}`;
+
+    // Try cache first
+    try {
+      const cached = await this.redisService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to get hall from cache: ${error.message}`);
+      // Continue to database query if cache fails
+    }
+
+    try {
+      const hall = await this.hallRepository.findOne({
+        where: { id },
+        relations: ['branch'],
+      });
+
+      if (!hall) {
+        throw new NotFoundException('Hall not found');
+      }
+
+      // Try to cache the result, but don't fail if caching fails
+      try {
+        await this.redisService.set(cacheKey, hall, 600);
+      } catch (error) {
+        this.logger.warn(`Failed to cache hall: ${error.message}`);
+        // Continue even if caching fails
+      }
+
+      return hall;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Failed to fetch hall from database: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async updateHall(
+    id: string,
+    updateData: Partial<CreateHallDto>,
+  ): Promise<Hall> {
+    const hall = await this.findHallById(id);
+
+    Object.assign(hall, updateData);
+    const updatedHall = await this.hallRepository.save(hall);
 
     // Clear cache
     await this.redisService.del(`branch:${branchId}`);

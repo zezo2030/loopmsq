@@ -12,6 +12,7 @@ import { createBullBoard } from '@bull-board/api';
 import { BullAdapter } from '@bull-board/api/bullAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { join } from 'path';
 import * as fs from 'fs';
 import * as express from 'express';
@@ -55,8 +56,10 @@ async function bootstrap() {
     }),
   );
 
-  // Global exception filter
-  app.useGlobalFilters(new HttpExceptionFilter());
+  // Global exception filters
+  // HttpExceptionFilter handles HttpException with i18n support
+  // AllExceptionsFilter handles all other exceptions (database errors, Redis errors, etc.)
+  app.useGlobalFilters(new AllExceptionsFilter(), new HttpExceptionFilter());
 
   // Static files serving (resolve uploads dir dynamically with env override)
   const expressInstance = app.getHttpAdapter().getInstance();
