@@ -27,6 +27,7 @@ import Banners from './pages/cms/Banners'
 import Offers from './pages/cms/Offers'
 import Coupons from './pages/cms/Coupons'
 import Packages from './pages/cms/Packages'
+import Activities from './pages/cms/Activities'
 import PaymentsList from './pages/finance/PaymentsList'
 import PaymentDetail from './pages/finance/PaymentDetail'
 import Loyalty from './pages/marketing/Loyalty'
@@ -44,7 +45,6 @@ import SearchPage from './pages/Search'
 import NotFound from './pages/NotFound'
 import BranchDashboard from './pages-branch/Dashboard'
 import BranchInfo from './pages-branch/branch/BranchInfo'
-import BranchHalls from './pages-branch/halls/HallsList'
 import BranchBookings from './pages-branch/bookings/BookingsList'
 import BranchStaff from './pages-branch/staff/StaffList'
 import BranchReports from './pages-branch/reports/Overview'
@@ -103,6 +103,7 @@ const router = createBrowserRouter([
           { path: 'cms/offers', element: <Offers /> },
           { path: 'cms/coupons', element: <Coupons /> },
           { path: 'cms/packages', element: <Packages /> },
+          { path: 'cms/activities', element: <Activities /> },
 
           // Content
           { path: 'content/branches', element: <Branches /> },
@@ -132,7 +133,6 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <BranchDashboard /> },
           { path: 'branch', element: <BranchInfo /> },
-          { path: 'halls', element: <BranchHalls /> },
           { path: 'offers', element: <Offers /> },
           { path: 'coupons', element: <Coupons /> },
           { path: 'bookings', element: <BranchBookings /> },

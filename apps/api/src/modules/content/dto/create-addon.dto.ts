@@ -26,11 +26,6 @@ export class CreateAddonDto {
   @IsOptional()
   @IsUUID()
   branchId?: string | null;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsUUID()
-  hallId?: string | null;
 }
 
 

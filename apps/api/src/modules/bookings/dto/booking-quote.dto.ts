@@ -38,14 +38,6 @@ export class BookingQuoteDto {
   branchId: string;
 
   @ApiProperty({
-    description: 'Hall ID',
-    example: 'hall-uuid',
-    required: true,
-  })
-  @IsUUID()
-  hallId: string;
-
-  @ApiProperty({
     description: 'Booking start time',
     example: '2024-01-15T14:00:00.000Z',
   })

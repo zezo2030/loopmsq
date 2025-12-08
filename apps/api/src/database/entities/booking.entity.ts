@@ -11,7 +11,6 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Branch } from './branch.entity';
-import { Hall } from './hall.entity';
 import { Ticket } from './ticket.entity';
 import { Payment } from './payment.entity';
 
@@ -35,9 +34,6 @@ export class Booking {
 
   @Column({ type: 'uuid' })
   branchId: string;
-
-  @Column({ type: 'uuid', nullable: true })
-  hallId: string;
 
   @Column({ type: 'timestamp' })
   startTime: Date;
@@ -94,10 +90,6 @@ export class Booking {
   @ManyToOne(() => Branch, (branch) => branch.bookings)
   @JoinColumn({ name: 'branchId' })
   branch: Branch;
-
-  @ManyToOne(() => Hall, { onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'hallId' })
-  hall: Hall;
 
   @OneToMany(() => Ticket, (ticket) => ticket.booking)
   tickets: Ticket[];

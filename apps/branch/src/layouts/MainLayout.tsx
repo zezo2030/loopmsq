@@ -215,7 +215,6 @@ function getPageTitle(pathname: string): string {
   
   if (pathname === '/') return t('page.dashboard_overview')
   if (pathname === '/branch') return t('page.branch_info')
-  if (pathname === '/halls') return t('page.halls_management')
   if (pathname === '/offers') return t('page.offers_management')
   if (pathname === '/coupons') return t('page.coupons_management')
   if (pathname === '/bookings') return t('page.bookings_management')

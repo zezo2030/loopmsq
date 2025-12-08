@@ -33,7 +33,6 @@ import { extname, join } from 'path';
 import * as fs from 'fs';
 import { ContentService } from './content.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
-import { CreateHallDto } from './dto/create-hall.dto';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -70,11 +69,41 @@ export class ContentController {
     return this.contentService.findAllBranches(includeInactiveBool);
   }
 
+  // Compatibility endpoint: /halls redirects to branches (halls are now merged into branches)
+  @Get('halls')
+  @ApiOperation({ summary: 'Get all branches (compatibility endpoint - halls are merged into branches)' })
+  @ApiQuery({ name: 'branchId', required: false, type: String, description: 'Filter by branch ID' })
+  @ApiQuery({ name: 'includeInactive', required: false, type: String, description: 'true|false|1|0' })
+  @ApiResponse({ status: 200, description: 'Branches retrieved successfully' })
+  async findAllHalls(
+    @Query('branchId') branchId?: string,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    const includeInactiveBool = includeInactive === 'true' || includeInactive === '1' || includeInactive === 'yes';
+    const branches = await this.contentService.findAllBranches(includeInactiveBool);
+    
+    // Filter by branchId if provided
+    if (branchId) {
+      return branches.filter((branch) => branch.id === branchId);
+    }
+    
+    return branches;
+  }
+
   @Get('branches/:id')
   @ApiOperation({ summary: 'Get branch by ID' })
   @ApiResponse({ status: 200, description: 'Branch retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Branch not found' })
   async findBranchById(@Param('id', ParseUUIDPipe) id: string) {
+    return this.contentService.findBranchById(id);
+  }
+
+  // Compatibility endpoint: /halls/:id redirects to branches/:id
+  @Get('halls/:id')
+  @ApiOperation({ summary: 'Get branch by ID (compatibility endpoint - halls are merged into branches)' })
+  @ApiResponse({ status: 200, description: 'Branch retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  async findHallById(@Param('id', ParseUUIDPipe) id: string) {
     return this.contentService.findBranchById(id);
   }
 
@@ -216,73 +245,6 @@ export class ContentController {
     return this.contentService.uploadBranchImages(id, filenames);
   }
 
-  @Post('halls/:id/upload-images')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Upload hall images' })
-  @ApiConsumes('multipart/form-data')
-  @ApiResponse({ status: 200, description: 'Images uploaded successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'Hall not found' })
-  @UseInterceptors(
-    FilesInterceptor('files', 5, {
-      storage: diskStorage({
-        destination: (req, file, cb) => {
-          const uploadsRootCandidates = [
-            process.env.UPLOAD_DEST,
-            join(__dirname, '..', '..', '..', 'uploads'),
-            join(__dirname, '..', 'uploads'),
-          ].filter(Boolean) as string[];
-          const uploadsRoot = uploadsRootCandidates.find((p) => {
-            try { return !!p && fs.existsSync(p); } catch { return false; }
-          }) || uploadsRootCandidates[0];
-          const target = join(uploadsRoot, 'halls');
-          try { fs.mkdirSync(target, { recursive: true }); } catch {}
-          cb(null, target);
-        },
-        filename: (req, file, cb) => {
-          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `img-${unique}${extname(file.originalname)}`);
-        },
-      }),
-    }),
-  )
-  async uploadHallImages(
-    @Param('id', ParseUUIDPipe) id: string,
-    @UploadedFiles() files: Express.Multer.File[],
-    @CurrentUser() requester: User,
-  ) {
-    // Branch manager may only upload to halls in their own branch
-    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
-      const hall = await this.contentService.findHallById(id);
-      if (!requester.branchId || hall.branchId !== requester.branchId) {
-        throw new ForbiddenException('Not allowed');
-      }
-    }
-    const filenames = files.map((file) => file.filename);
-    return this.contentService.uploadHallImages(id, filenames);
-  }
-
-  @Delete('halls/:id/images/:filename')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete an image from a hall' })
-  async deleteHallImage(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('filename') filename: string,
-    @CurrentUser() requester: User,
-  ) {
-    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
-      const hall = await this.contentService.findHallById(id);
-      if (!requester.branchId || hall.branchId !== requester.branchId) {
-        throw new ForbiddenException('Not allowed');
-      }
-    }
-    return this.contentService.deleteHallImage(id, filename);
-  }
 
   @Delete('branches/:id/images/:filename')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -307,142 +269,172 @@ export class ContentController {
     return this.contentService.deleteBranchImage(id, filename);
   }
 
-  // Branch Hall endpoints (OneToOne relationship)
-  @Get('branches/:id/hall')
-  @ApiOperation({ summary: 'Get hall for a specific branch' })
-  @ApiResponse({ status: 200, description: 'Hall retrieved successfully' })
-  @ApiResponse({ status: 404, description: 'Hall not found for this branch' })
-  async getBranchHall(@Param('id', ParseUUIDPipe) id: string) {
-    return this.contentService.getBranchHall(id);
-  }
-
-  @Patch('branches/:id/hall')
+  // Branch Hall Management (merged into branch)
+  @Patch('branches/:id/hall-status')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update hall for a specific branch' })
-  @ApiResponse({ status: 200, description: 'Hall updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'Hall not found' })
-  async updateBranchHall(
+  @ApiOperation({ summary: 'Update branch hall status' })
+  @ApiResponse({ status: 200, description: 'Hall status updated successfully' })
+  async updateBranchHallStatus(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateData: Partial<CreateHallDto>,
+    @Body('status') status: 'available' | 'maintenance' | 'reserved',
     @CurrentUser() requester: User,
   ) {
-    // Branch manager can only update hall in their own branch
     if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
       if (!requester.branchId || requester.branchId !== id) {
         throw new ForbiddenException('Not allowed');
       }
     }
-    return this.contentService.updateBranchHall(id, updateData);
+    return this.contentService.updateBranchHallStatus(id, status);
   }
 
-  // Hall endpoints (kept for backward compatibility, but deprecated)
-  @Post('halls')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create new hall (Admin only)' })
-  @ApiResponse({ status: 201, description: 'Hall created successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'Branch not found' })
-  async createHall(@Body() createHallDto: CreateHallDto, @CurrentUser() requester: User) {
-    // Force branchId to requester's branch for branch managers
-    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
-      if (!requester.branchId) {
-        throw new ForbiddenException('Not allowed');
-      }
-      createHallDto.branchId = requester.branchId as any;
-    }
-    return this.contentService.createHall(createHallDto);
-  }
-
-  @Get('halls')
-  @ApiOperation({ summary: 'Get all halls' })
-  @ApiQuery({ name: 'branchId', required: false, type: String })
-  @ApiResponse({ status: 200, description: 'Halls retrieved successfully' })
-  async findAllHalls(@Query('branchId') branchId?: string) {
-    return this.contentService.findAllHalls(branchId);
-  }
-
-  @Get('halls/:id')
-  @ApiOperation({ summary: 'Get hall by ID' })
-  @ApiResponse({ status: 200, description: 'Hall retrieved successfully' })
-  @ApiResponse({ status: 404, description: 'Hall not found' })
-  async findHallById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.contentService.findHallById(id);
-  }
-
-  @Put('halls/:id')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update hall (Admin only)' })
-  @ApiResponse({ status: 200, description: 'Hall updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'Hall not found' })
-  async updateHall(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateData: Partial<CreateHallDto>,
-    @CurrentUser() requester: User,
-  ) {
-    // Branch manager can only update halls in their own branch
-    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
-      const hall = await this.contentService.findHallById(id);
-      if (!requester.branchId || hall.branchId !== requester.branchId) {
-        throw new ForbiddenException('Not allowed');
-      }
-      // Prevent moving hall to another branch
-      if (updateData && (updateData as any).branchId && (updateData as any).branchId !== requester.branchId) {
-        throw new ForbiddenException('Not allowed');
-      }
-    }
-    return this.contentService.updateHall(id, updateData);
-  }
-
-  @Patch('halls/:id/status')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update hall status (Admin/Staff only)' })
-  @ApiResponse({ status: 200, description: 'Hall status updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'Hall not found' })
-  async updateHallStatus(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body('status') status: 'available' | 'maintenance' | 'reserved',
-  ) {
-    return this.contentService.updateHallStatus(id, status);
-  }
-
-  @Delete('halls/:id')
-  @UseGuards(AuthGuard('jwt'))
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete hall (Any authenticated user)' })
-  @ApiResponse({ status: 200, description: 'Hall deleted successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Hall not found' })
-  async deleteHall(
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    await this.contentService.deleteHall(id);
-    return { success: true };
-  }
-
-  // Utility endpoints
-  @Get('halls/:id/slots')
-  @ApiOperation({ summary: 'List available booking slots for a hall' })
+  // Utility endpoints - moved from halls to branches
+  @Get('branches/:id/slots')
+  @ApiOperation({ summary: 'List available booking slots for a branch' })
   @ApiQuery({ name: 'date', type: String, description: 'ISO date string (required)' })
   @ApiQuery({ name: 'durationHours', type: Number, required: false })
   @ApiQuery({ name: 'slotMinutes', type: Number, required: false })
   @ApiQuery({ name: 'persons', type: Number, required: false })
   @ApiResponse({ status: 200, description: 'Slots generated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid query parameters' })
+  async getBranchSlots(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('date') date: string,
+    @Query('durationHours') durationHours?: string,
+    @Query('slotMinutes') slotMinutes?: string,
+    @Query('persons') persons?: string,
+  ) {
+    if (!date) {
+      throw new BadRequestException('date query parameter is required');
+    }
+
+    const parsedDate = new Date(date);
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException('Invalid date format');
+    }
+
+    const duration =
+      durationHours !== undefined ? Number.parseInt(durationHours, 10) : 1;
+    const durationToUse =
+      Number.isFinite(duration) && duration > 0 ? duration : 1;
+
+    const slotMinutesCandidate =
+      slotMinutes !== undefined ? Number.parseInt(slotMinutes, 10) : undefined;
+    const slotMinutesOverride =
+      slotMinutesCandidate && slotMinutesCandidate > 0
+        ? slotMinutesCandidate
+        : undefined;
+
+    const effectiveSlotMinutes =
+      slotMinutesOverride ?? this.contentService.getSlotDurationMinutes();
+
+    const slots = await this.contentService.getBranchSlots(
+      id,
+      parsedDate,
+      durationToUse,
+      slotMinutesOverride,
+      persons !== undefined ? Number.parseInt(persons, 10) : undefined,
+    );
+
+    return {
+      slotMinutes: effectiveSlotMinutes,
+      slots: slots.map((slot) => ({
+        start: slot.start.toISOString(),
+        end: slot.end.toISOString(),
+        available: slot.available,
+        consecutiveSlots: slot.consecutiveSlots,
+      })),
+    };
+  }
+
+  @Get('branches/:id/availability')
+  @ApiOperation({ summary: 'Check branch availability' })
+  @ApiQuery({ name: 'startTime', type: String, description: 'ISO date string' })
+  @ApiQuery({ name: 'durationHours', type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Availability checked successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  async checkBranchAvailability(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('startTime') startTime: string,
+    @Query('durationHours', ParseIntPipe) durationHours: number,
+  ) {
+    try {
+      const startDate = new Date(startTime);
+      const isAvailable = await this.contentService.checkBranchAvailability(
+        id,
+        startDate,
+        durationHours,
+      );
+
+      return { available: isAvailable };
+    } catch (error) {
+      console.error('Error in checkBranchAvailability controller:', error);
+      return { available: true }; // Fallback to allow booking
+    }
+  }
+
+  @Get('branches/:id/pricing')
+  @ApiOperation({ summary: 'Calculate branch pricing' })
+  @ApiQuery({ name: 'startTime', type: String, description: 'ISO date string' })
+  @ApiQuery({ name: 'durationHours', type: Number })
+  @ApiQuery({ name: 'persons', type: Number })
+  @ApiResponse({ status: 200, description: 'Pricing calculated successfully' })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  async calculateBranchPrice(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('startTime') startTime: string,
+    @Query('durationHours', ParseIntPipe) durationHours: number,
+    @Query('persons', ParseIntPipe) persons: number,
+  ) {
+    const startDate = new Date(startTime);
+    return this.contentService.calculateBranchPrice(
+      id,
+      startDate,
+      durationHours,
+      persons,
+    );
+  }
+
+  @Get('branches/:id/addons')
+  @ApiOperation({ summary: 'List available add-ons for a branch' })
+  @ApiResponse({ status: 200, description: 'Add-ons retrieved successfully' })
+  async getBranchAddOns(
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.contentService.getBranchAddOns(id);
+  }
+
+  // Compatibility endpoints: /halls/:id/* redirects to /branches/:id/*
+  @Patch('halls/:id/status')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update branch hall status (compatibility endpoint)' })
+  @ApiResponse({ status: 200, description: 'Hall status updated successfully' })
+  async updateHallStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('status') status: 'available' | 'maintenance' | 'reserved',
+    @CurrentUser() requester: User,
+  ) {
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId || requester.branchId !== id) {
+        throw new ForbiddenException('Not allowed');
+      }
+    }
+    return this.contentService.updateBranchHallStatus(id, status);
+  }
+
+  @Get('halls/:id/slots')
+  @ApiOperation({ summary: 'List available booking slots for a branch (compatibility endpoint)' })
+  @ApiQuery({ name: 'date', type: String, description: 'ISO date string (required)' })
+  @ApiQuery({ name: 'durationHours', type: Number, required: false })
+  @ApiQuery({ name: 'slotMinutes', type: Number, required: false })
+  @ApiQuery({ name: 'persons', type: Number, required: false })
+  @ApiResponse({ status: 200, description: 'Slots generated successfully' })
   async getHallSlots(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('date') date: string,
@@ -474,7 +466,7 @@ export class ContentController {
     const effectiveSlotMinutes =
       slotMinutesOverride ?? this.contentService.getSlotDurationMinutes();
 
-    const slots = await this.contentService.getHallSlots(
+    const slots = await this.contentService.getBranchSlots(
       id,
       parsedDate,
       durationToUse,
@@ -493,15 +485,37 @@ export class ContentController {
     };
   }
 
+  @Get('halls/:id/pricing')
+  @ApiOperation({ summary: 'Calculate branch pricing (compatibility endpoint)' })
+  @ApiQuery({ name: 'startTime', type: String, description: 'ISO date string' })
+  @ApiQuery({ name: 'durationHours', type: Number })
+  @ApiQuery({ name: 'persons', type: Number })
+  @ApiResponse({ status: 200, description: 'Pricing calculated successfully' })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  async calculateHallPrice(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('startTime') startTime: string,
+    @Query('durationHours', ParseIntPipe) durationHours: number,
+    @Query('persons', ParseIntPipe) persons: number,
+  ) {
+    const startDate = new Date(startTime);
+    return this.contentService.calculateBranchPrice(
+      id,
+      startDate,
+      durationHours,
+      persons,
+    );
+  }
+
   @Get('halls/:id/availability')
-  @ApiOperation({ summary: 'Check hall availability' })
+  @ApiOperation({ summary: 'Check branch availability (compatibility endpoint)' })
   @ApiQuery({ name: 'startTime', type: String, description: 'ISO date string' })
   @ApiQuery({ name: 'durationHours', type: Number })
   @ApiResponse({
     status: 200,
     description: 'Availability checked successfully',
   })
-  @ApiResponse({ status: 404, description: 'Hall not found' })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
   async checkHallAvailability(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('startTime') startTime: string,
@@ -509,7 +523,7 @@ export class ContentController {
   ) {
     try {
       const startDate = new Date(startTime);
-      const isAvailable = await this.contentService.checkHallAvailability(
+      const isAvailable = await this.contentService.checkBranchAvailability(
         id,
         startDate,
         durationHours,
@@ -520,37 +534,6 @@ export class ContentController {
       console.error('Error in checkHallAvailability controller:', error);
       return { available: true }; // Fallback to allow booking
     }
-  }
-
-  @Get('halls/:id/pricing')
-  @ApiOperation({ summary: 'Calculate hall pricing' })
-  @ApiQuery({ name: 'startTime', type: String, description: 'ISO date string' })
-  @ApiQuery({ name: 'durationHours', type: Number })
-  @ApiQuery({ name: 'persons', type: Number })
-  @ApiResponse({ status: 200, description: 'Pricing calculated successfully' })
-  @ApiResponse({ status: 404, description: 'Hall not found' })
-  async calculateHallPrice(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query('startTime') startTime: string,
-    @Query('durationHours', ParseIntPipe) durationHours: number,
-    @Query('persons', ParseIntPipe) persons: number,
-  ) {
-    const startDate = new Date(startTime);
-    return this.contentService.calculateHallPrice(
-      id,
-      startDate,
-      durationHours,
-      persons,
-    );
-  }
-
-  @Get('halls/:id/addons')
-  @ApiOperation({ summary: 'List available add-ons for a hall' })
-  @ApiResponse({ status: 200, description: 'Add-ons retrieved successfully' })
-  async getHallAddOns(
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    return this.contentService.getHallAddOns(id);
   }
 
   // Admin: Addons CRUD
@@ -570,11 +553,10 @@ export class ContentController {
   @ApiOperation({ summary: 'List addons (admin)' })
   async listAddons(
     @Query('branchId') branchId?: string,
-    @Query('hallId') hallId?: string,
     @Query('isActive') isActiveParam?: string,
   ) {
     const isActive = isActiveParam === 'true' ? true : isActiveParam === 'false' ? false : undefined;
-    return this.contentService.listAddons({ branchId, hallId, isActive });
+    return this.contentService.listAddons({ branchId, isActive });
   }
 
   @Put('admin/addons/:id')

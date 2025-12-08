@@ -5,10 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
-  OneToOne,
-  JoinColumn,
 } from 'typeorm';
-import { Hall } from './hall.entity';
 import { Booking } from './booking.entity';
 
 @Entity('branches')
@@ -67,6 +64,36 @@ export class Branch {
   @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
   longitude: number | null;
 
+  // Hall-related fields (merged from Hall entity)
+  @Column({ type: 'json', nullable: true })
+  priceConfig: {
+    basePrice: number;
+    hourlyRate: number;
+    pricePerPerson: number;
+    weekendMultiplier: number;
+    holidayMultiplier: number;
+    decorationPrice?: number;
+  };
+
+  @Column({ type: 'boolean', default: false })
+  isDecorated: boolean;
+
+  @Column({ type: 'json', nullable: true })
+  hallFeatures: string[];
+
+  @Column({ type: 'json', nullable: true })
+  hallImages: string[];
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  hallVideoUrl: string;
+
+  @Column({
+    type: 'enum',
+    enum: ['available', 'maintenance', 'reserved'],
+    default: 'available',
+  })
+  hallStatus: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -74,10 +101,6 @@ export class Branch {
   updatedAt: Date;
 
   // Relations
-  @OneToOne(() => Hall, (hall) => hall.branch)
-  @JoinColumn()
-  hall: Hall;
-
   @OneToMany(() => Booking, (booking) => booking.branch)
   bookings: Booking[];
 }

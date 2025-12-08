@@ -37,11 +37,6 @@ export class CreateEventRequestDto {
   @IsUUID()
   branchId: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsUUID()
-  hallId?: string;
-
   @ApiProperty()
   @IsDateString()
   startTime: string;

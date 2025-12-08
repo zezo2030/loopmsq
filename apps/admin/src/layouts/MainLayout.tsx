@@ -18,6 +18,7 @@ import {
   PercentageOutlined,
   TagsOutlined,
   AppstoreOutlined,
+  PlayCircleOutlined,
   StarOutlined,
   BarChartOutlined,
   CustomerServiceOutlined,
@@ -60,6 +61,21 @@ export default function MainLayout() {
     }
   if (path.startsWith('/notifications')) {
     return ['notifications']
+  }
+  if (path.startsWith('/cms/banners')) {
+    return ['cms-banners']
+  }
+  if (path.startsWith('/cms/offers')) {
+    return ['cms-offers']
+  }
+  if (path.startsWith('/cms/coupons')) {
+    return ['cms-coupons']
+  }
+  if (path.startsWith('/cms/packages')) {
+    return ['cms-packages']
+  }
+  if (path.startsWith('/cms/activities')) {
+    return ['cms-activities']
   }
   if (path.startsWith('/content/branches')) {
     return ['content-branches']
@@ -211,6 +227,7 @@ export default function MainLayout() {
         { key: 'cms-offers', icon: <TagsOutlined />, label: <Link to="/admin/cms/offers">{t('cms.offers') || 'Offers'}</Link> },
         { key: 'cms-coupons', icon: <PercentageOutlined />, label: <Link to="/admin/cms/coupons">{t('cms.coupons') || 'Coupons'}</Link> },
         { key: 'cms-packages', icon: <GiftOutlined />, label: <Link to="/admin/cms/packages">{t('cms.packages') || 'Packages'}</Link> },
+        { key: 'cms-activities', icon: <PlayCircleOutlined />, label: <Link to="/admin/cms/activities">{t('cms.activities') || 'Activities'}</Link> },
       ],
     },
     {
@@ -383,6 +400,7 @@ function getPageTitle(pathname: string): string {
   if (path === '/cms/offers') return t('page.cms_offers')
   if (path === '/cms/coupons') return t('page.cms_coupons')
   if (path === '/cms/packages') return t('page.cms_packages')
+  if (path === '/cms/activities') return t('page.cms_activities') || 'Activities'
   
   // Content
   if (path === '/content/branches') return t('menu.content.branches')

@@ -32,9 +32,6 @@ export default function BranchLayout() {
     if (path.startsWith('/branch')) {
       return ['branch']
     }
-    if (path.startsWith('/halls')) {
-      return ['halls']
-    }
     if (path.startsWith('/bookings')) {
       return ['bookings']
     }
@@ -90,11 +87,6 @@ export default function BranchLayout() {
       key: 'branch',
       icon: <AppstoreOutlined />,
       label: <Link to="/branch/branch">{t('menu.branch')}</Link>,
-    },
-    {
-      key: 'halls',
-      icon: <AppstoreOutlined />,
-      label: <Link to="/branch/halls">{t('menu.halls')}</Link>,
     },
     {
       key: 'offers',
@@ -202,7 +194,6 @@ function getPageTitle(pathname: string): string {
   
   if (pathname === '/branch' || pathname === '/branch/') return t('page.dashboard_overview')
   if (pathname.startsWith('/branch/branch')) return t('page.branch_info')
-  if (pathname.startsWith('/branch/halls')) return t('page.halls_management')
   if (pathname.startsWith('/branch/offers')) return t('page.cms_offers')
   if (pathname.startsWith('/branch/coupons')) return t('page.cms_coupons')
   if (pathname.startsWith('/branch/bookings')) return t('page.bookings_management')

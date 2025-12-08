@@ -38,7 +38,7 @@ export class CouponsService {
   async preview(
     code: string,
     amount: number,
-    options?: { branchId?: string; hallId?: string },
+    options?: { branchId?: string; hallId?: string | null },
   ) {
     const now = new Date();
     const found = await this.repo.findOne({ where: { code } });
@@ -50,9 +50,7 @@ export class CouponsService {
       return { valid: false, reason: 'WRONG_BRANCH' };
     }
 
-    if (found.hallId && options?.hallId && found.hallId !== options.hallId) {
-      return { valid: false, reason: 'WRONG_HALL' };
-    }
+    // hallId is no longer used, but keep for backward compatibility
 
     if (!found.isActive) {
       return { valid: false, reason: 'INACTIVE' };

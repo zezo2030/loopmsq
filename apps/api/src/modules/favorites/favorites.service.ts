@@ -32,11 +32,10 @@ export class FavoritesService {
     if (entityType === 'branch') {
       const branch = await this.content.findBranchById(entityId);
       if (!branch) throw new BadRequestException('Branch not found');
-    } else if (entityType === 'hall') {
-      const hall = await this.content.findHallById(entityId);
-      if (!hall) throw new BadRequestException('Hall not found');
     } else {
-      throw new BadRequestException('Invalid entity type');
+      // Hall type is no longer supported, treat as branch
+      const branch = await this.content.findBranchById(entityId);
+      if (!branch) throw new BadRequestException('Branch not found');
     }
   }
 }

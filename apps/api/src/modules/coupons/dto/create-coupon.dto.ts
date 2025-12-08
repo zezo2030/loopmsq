@@ -4,9 +4,6 @@ export class CreateCouponDto {
   @IsUUID()
   branchId: string;
 
-  @IsOptional()
-  @IsUUID()
-  hallId?: string | null;
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)

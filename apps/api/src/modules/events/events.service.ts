@@ -24,7 +24,6 @@ export class EventsService {
       type: dto.type,
       decorated: dto.decorated || false,
       branchId: dto.branchId,
-      hallId: dto.hallId,
       startTime: new Date(dto.startTime),
       durationHours: dto.durationHours,
       persons: dto.persons,
@@ -54,21 +53,13 @@ export class EventsService {
     const isStaff = roles.includes('staff') || roles.includes('admin');
     if (!isOwner && !isStaff) throw new ForbiddenException('Not allowed');
 
-    // Load branch and hall data
+    // Load branch data
     if (req.branchId) {
       try {
         const branch = await this.contentService.findBranchById(req.branchId);
         (req as any).branch = branch;
       } catch (error) {
         this.logger.error(`Failed to load branch ${req.branchId} for event request ${req.id}`, error);
-      }
-    }
-    if (req.hallId) {
-      try {
-        const hall = await this.contentService.findHallById(req.hallId);
-        (req as any).hall = hall;
-      } catch (error) {
-        this.logger.error(`Failed to load hall ${req.hallId} for event request ${req.id}`, error);
       }
     }
 
@@ -106,14 +97,6 @@ export class EventsService {
           (request as any).branch = branch;
         } catch (error) {
           this.logger.error(`Failed to load branch ${request.branchId} for event request ${request.id}`, error);
-        }
-      }
-      if (request.hallId) {
-        try {
-          const hall = await this.contentService.findHallById(request.hallId);
-          (request as any).hall = hall;
-        } catch (error) {
-          this.logger.error(`Failed to load hall ${request.hallId} for event request ${request.id}`, error);
         }
       }
     }
@@ -206,14 +189,6 @@ export class EventsService {
           (request as any).branch = branch;
         } catch (error) {
           this.logger.error(`Failed to load branch ${request.branchId} for event request ${request.id}`, error);
-        }
-      }
-      if (request.hallId) {
-        try {
-          const hall = await this.contentService.findHallById(request.hallId);
-          (request as any).hall = hall;
-        } catch (error) {
-          this.logger.error(`Failed to load hall ${request.hallId} for event request ${request.id}`, error);
         }
       }
     }

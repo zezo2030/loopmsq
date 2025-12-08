@@ -77,10 +77,10 @@ export class CouponsController {
   // Public preview
   @Post('coupons/preview')
   @HttpCode(HttpStatus.OK)
-  preview(@Body() body: { code: string; amount: number; branchId?: string; hallId?: string }) {
+  preview(@Body() body: { code: string; amount: number; branchId?: string; hallId?: string | null }) {
     return this.coupons.preview(body.code, body.amount, {
       branchId: body.branchId,
-      hallId: body.hallId,
+      hallId: null, // No longer used
     });
   }
 }

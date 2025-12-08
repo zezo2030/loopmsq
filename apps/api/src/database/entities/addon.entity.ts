@@ -16,10 +16,6 @@ export class Addon {
   @Index()
   branchId: string | null;
 
-  @Column({ type: 'uuid', nullable: true })
-  @Index()
-  hallId: string | null;
-
   @Column({ type: 'varchar', length: 150 })
   name: string;
 

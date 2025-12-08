@@ -1,6 +1,5 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Branch } from './branch.entity';
-import { Hall } from './hall.entity';
 
 @Entity('offers')
 export class Offer {
@@ -10,9 +9,6 @@ export class Offer {
   // Temporarily nullable to allow migration - will be enforced via validation
   @Column({ type: 'uuid', nullable: true })
   branchId: string | null;
-
-  @Column({ type: 'uuid', nullable: true })
-  hallId: string | null;
 
   @Column({ type: 'varchar', length: 150 })
   title: string;
@@ -48,10 +44,6 @@ export class Offer {
   @ManyToOne(() => Branch, (branch) => branch.bookings)
   @JoinColumn({ name: 'branchId' })
   branch: Branch;
-
-  @ManyToOne(() => Hall, (hall) => hall.id, { nullable: true, onDelete: 'SET NULL' } as any)
-  @JoinColumn({ name: 'hallId' })
-  hall: Hall | null;
 }
 
 

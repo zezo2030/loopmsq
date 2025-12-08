@@ -15,7 +15,6 @@ import { Payment } from '../../database/entities/payment.entity';
 import { User } from '../../database/entities/user.entity';
 import { Offer } from '../../database/entities/offer.entity';
 import { Branch } from '../../database/entities/branch.entity';
-import { Hall } from '../../database/entities/hall.entity';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingQuoteDto } from './dto/booking-quote.dto';
 import { ScanTicketDto } from './dto/scan-ticket.dto';
@@ -77,8 +76,8 @@ export class BookingsService {
   }
 
   async getQuote(quoteDto: BookingQuoteDto): Promise<{
-    hallId: string;
-    hallName: string;
+    branchId: string;
+    branchName: string;
     pricing: any;
     addOns: any[];
     discount: number;
@@ -86,11 +85,10 @@ export class BookingsService {
     available: boolean;
   }> {
     try {
-      this.logger.log(`Getting quote for branch: ${quoteDto.branchId}, hall: ${quoteDto.hallId || 'auto'}`);
+      this.logger.log(`Getting quote for branch: ${quoteDto.branchId}`);
       
       const {
         branchId,
-        hallId,
         startTime,
         durationHours,
         persons,
@@ -107,37 +105,34 @@ export class BookingsService {
 
       this.ensureSlotAlignment(requestedStart);
 
-      // Find available hall if not specified
-      let selectedHall: Hall;
-      this.logger.log(`Looking for specific hall: ${hallId}`);
-      try {
-        selectedHall = await this.contentService.findHallById(hallId);
-        this.logger.log(`Found hall: ${selectedHall.name_en} with capacity: ${selectedHall.capacity}`);
-      } catch (error) {
-        this.logger.error(`Failed to find hall with ID: ${hallId}`, error);
-        throw new BadRequestException(`Hall with ID ${hallId} not found`);
+      // Find branch
+      const branch = await this.contentService.findBranchById(branchId);
+      this.logger.log(`Found branch: ${branch.name_en}`);
+
+      if (!branch.priceConfig) {
+        throw new BadRequestException('Branch does not have pricing configuration');
       }
 
       // Check availability
-      this.logger.log(`Checking availability for hall: ${selectedHall.id}`);
-      const isAvailable = await this.contentService.checkHallAvailability(
-        selectedHall.id,
+      this.logger.log(`Checking availability for branch: ${branch.id}`);
+      const isAvailable = await this.contentService.checkBranchAvailability(
+        branch.id,
         new Date(startTime),
         durationHours,
         persons,
       );
-      this.logger.log(`Hall availability: ${isAvailable}`);
+      this.logger.log(`Branch availability: ${isAvailable}`);
 
       if (!isAvailable) {
         throw new ConflictException(
-          'Selected hall is not available for the specified time',
+          'Selected branch is not available for the specified time',
         );
       }
 
       // Calculate pricing
-      this.logger.log(`Calculating pricing for hall: ${selectedHall.id}`);
-      const pricing = await this.contentService.calculateHallPrice(
-        selectedHall.id,
+      this.logger.log(`Calculating pricing for branch: ${branch.id}`);
+      const pricing = await this.contentService.calculateBranchPrice(
+        branch.id,
         new Date(startTime),
         durationHours,
         persons,
@@ -145,7 +140,7 @@ export class BookingsService {
       this.logger.log(`Pricing calculated: ${JSON.stringify(pricing)}`);
 
       // Calculate add-ons cost (lookup real prices from content service)
-      const availableAddOns = await this.contentService.getHallAddOns(selectedHall.id);
+      const availableAddOns = await this.contentService.getBranchAddOns(branch.id);
       const addOnIdToPrice = new Map(availableAddOns.map((a) => [a.id, a.price]));
 
       const addOnsCost = addOns.reduce((total, addOn) => {
@@ -153,11 +148,11 @@ export class BookingsService {
         return total + addOnPrice * addOn.quantity;
       }, 0);
 
-      // Apply offer discount (branch/hall scoped)
+      // Apply offer discount (branch scoped)
       const subtotalBeforeDiscounts = pricing.totalPrice + addOnsCost;
       const offerDiscount = await this.calculateOfferDiscount(
         branchId,
-        selectedHall.id,
+        null, // No hallId anymore
         subtotalBeforeDiscounts,
         new Date(startTime),
       );
@@ -170,7 +165,7 @@ export class BookingsService {
           couponCode,
           Math.max(0, subtotalBeforeDiscounts - offerDiscount),
           branchId,
-          selectedHall.id,
+          null, // No hallId anymore
         );
         this.logger.log(`Discount applied: ${discount}`);
       }
@@ -178,8 +173,8 @@ export class BookingsService {
       const totalPrice = Math.max(0, subtotalBeforeDiscounts - offerDiscount - discount);
 
       const result = {
-        hallId: selectedHall.id,
-        hallName: selectedHall.name_en,
+        branchId: branch.id,
+        branchName: branch.name_en,
         pricing,
         addOns: addOns.map((addOn) => {
           const price = addOnIdToPrice.get(addOn.id) ?? 0;
@@ -208,7 +203,6 @@ export class BookingsService {
   ): Promise<Booking> {
     const {
       branchId,
-      hallId,
       startTime,
       durationHours,
       persons,
@@ -218,12 +212,7 @@ export class BookingsService {
       contactPhone,
     } = createBookingDto;
 
-    // Validate required fields
-    if (!hallId) {
-      throw new BadRequestException('Hall ID is required');
-    }
-
-    this.logger.log(`Creating booking for hallId: ${hallId}, branchId: ${branchId}`);
+    this.logger.log(`Creating booking for branchId: ${branchId}`);
 
     // Prevent booking in the past
     const nowForCreate = new Date();
@@ -236,7 +225,6 @@ export class BookingsService {
     // Get quote first to validate and calculate pricing
     const quote = await this.getQuote({
       branchId,
-      hallId,
       startTime,
       durationHours,
       persons,
@@ -245,16 +233,10 @@ export class BookingsService {
     });
 
     if (!quote.available) {
-      throw new ConflictException('Selected hall is not available');
+      throw new ConflictException('Selected branch is not available');
     }
 
-    // Validate that hallId is present
-    if (!quote.hallId) {
-      this.logger.error(`Hall ID is missing from quote for booking: branchId=${branchId}, hallId=${hallId}`);
-      throw new BadRequestException('Hall ID is required for booking');
-    }
-
-    this.logger.log(`Creating booking with hallId: ${quote.hallId}`);
+    this.logger.log(`Creating booking with branchId: ${quote.branchId}`);
 
     // Start transaction
     const queryRunner = this.dataSource.createQueryRunner();
@@ -266,7 +248,6 @@ export class BookingsService {
       const booking = queryRunner.manager.create(Booking, {
         userId,
         branchId,
-        hallId: quote.hallId,
         startTime: new Date(startTime),
         durationHours,
         persons,
@@ -279,9 +260,9 @@ export class BookingsService {
         contactPhone,
       });
 
-      this.logger.log(`Booking created with hallId: ${booking.hallId}`);
+      this.logger.log(`Booking created with branchId: ${booking.branchId}`);
       const savedBooking = await queryRunner.manager.save(booking);
-      this.logger.log(`Booking saved with ID: ${savedBooking.id}, hallId: ${savedBooking.hallId}`);
+      this.logger.log(`Booking saved with ID: ${savedBooking.id}, branchId: ${savedBooking.branchId}`);
 
       await queryRunner.commitTransaction();
 
@@ -374,7 +355,7 @@ export class BookingsService {
 
     const [bookings, total] = await this.bookingRepository.findAndCount({
       where: { userId },
-      relations: ['branch', 'hall', 'tickets', 'payments'],
+      relations: ['branch', 'tickets', 'payments'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -420,30 +401,11 @@ export class BookingsService {
 
     const [bookings, total] = await this.bookingRepository.findAndCount({
       where,
-      relations: ['user', 'branch', 'hall', 'tickets', 'payments'],
+      relations: ['user', 'branch', 'tickets', 'payments'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     } as any);
-
-    // Log bookings with missing hall data for debugging and try to fix them
-    const bookingsWithoutHall = bookings.filter(b => !b.hall);
-    if (bookingsWithoutHall.length > 0) {
-      this.logger.warn(`Found ${bookingsWithoutHall.length} bookings without hall data in branch ${branchId}: ${bookingsWithoutHall.map(b => b.id).join(', ')}`);
-      
-      // Try to load hall data manually for each booking
-      for (const booking of bookingsWithoutHall) {
-        if (booking.hallId) {
-          try {
-            const hall = await this.contentService.findHallById(booking.hallId);
-            booking.hall = hall;
-            this.logger.log(`Successfully loaded hall manually for booking ${booking.id}`);
-          } catch (error) {
-            this.logger.error(`Failed to load hall ${booking.hallId} for booking ${booking.id}`, error);
-          }
-        }
-      }
-    }
 
     // Log bookings with missing branch data for debugging and try to fix them
     const bookingsWithoutBranch = bookings.filter(b => !b.branch);
@@ -471,7 +433,7 @@ export class BookingsService {
   async findAllBookings(
     page: number = 1,
     limit: number = 10,
-    filters?: { status?: string; branchId?: string; hallId?: string; from?: string; to?: string },
+    filters?: { status?: string; branchId?: string; from?: string; to?: string },
   ): Promise<{
     bookings: Booking[];
     total: number;
@@ -482,7 +444,6 @@ export class BookingsService {
     const where: any = {};
     if (filters?.status) where.status = filters.status as any;
     if (filters?.branchId) where.branchId = filters.branchId;
-    if (filters?.hallId) where.hallId = filters.hallId;
     if (filters?.from && filters?.to) {
       const fromDate = new Date(filters.from);
       const toDate = new Date(filters.to);
@@ -491,30 +452,11 @@ export class BookingsService {
 
     const [bookings, total] = await this.bookingRepository.findAndCount({
       where,
-      relations: ['user', 'branch', 'hall', 'tickets', 'payments'],
+      relations: ['user', 'branch', 'tickets', 'payments'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     } as any);
-
-    // Log bookings with missing hall data for debugging and try to fix them
-    const bookingsWithoutHall = bookings.filter(b => !b.hall);
-    if (bookingsWithoutHall.length > 0) {
-      this.logger.warn(`Found ${bookingsWithoutHall.length} bookings without hall data: ${bookingsWithoutHall.map(b => b.id).join(', ')}`);
-      
-      // Try to load hall data manually for each booking
-      for (const booking of bookingsWithoutHall) {
-        if (booking.hallId) {
-          try {
-            const hall = await this.contentService.findHallById(booking.hallId);
-            booking.hall = hall;
-            this.logger.log(`Successfully loaded hall manually for booking ${booking.id}`);
-          } catch (error) {
-            this.logger.error(`Failed to load hall ${booking.hallId} for booking ${booking.id}`, error);
-          }
-        }
-      }
-    }
 
     // Log bookings with missing branch data for debugging and try to fix them
     const bookingsWithoutBranch = bookings.filter(b => !b.branch);
@@ -564,26 +506,13 @@ export class BookingsService {
     }
     const booking = await this.bookingRepository.findOne({
       where,
-      relations: ['user', 'branch', 'hall', 'tickets', 'payments'],
+      relations: ['user', 'branch', 'tickets', 'payments'],
     });
 
-    this.logger.log(`Found booking ${id}: hallId=${booking?.hallId}, hasHall=${!!booking?.hall}`);
+    this.logger.log(`Found booking ${id}: branchId=${booking?.branchId}`);
 
     if (!booking) {
       throw new NotFoundException('Booking not found');
-    }
-
-    // Log if hall data is missing and try to load it manually
-    if (!booking.hall && booking.hallId) {
-      this.logger.warn(`Booking ${booking.id} has no hall data despite hallId: ${booking.hallId}`);
-      try {
-        // Try to load hall manually
-        const hall = await this.contentService.findHallById(booking.hallId);
-        booking.hall = hall;
-        this.logger.log(`Successfully loaded hall manually for booking ${booking.id}`);
-      } catch (error) {
-        this.logger.error(`Failed to load hall ${booking.hallId} for booking ${booking.id}`, error);
-      }
     }
 
     if (isRequesterBranchManager && requesterBranchId && booking.branchId !== requesterBranchId) {
@@ -624,7 +553,7 @@ export class BookingsService {
     const qrTokenHash = mappedHash || this.qrCodeService.generateQRTokenHash(qrToken);
     const ticket = await this.ticketRepository.findOne({
       where: { qrTokenHash },
-      relations: ['booking', 'booking.branch', 'booking.hall', 'booking.user'],
+      relations: ['booking', 'booking.branch', 'booking.user'],
     });
 
     if (!ticket) {
@@ -749,7 +678,7 @@ export class BookingsService {
     const qrTokenHash = mappedHash || this.qrCodeService.generateQRTokenHash(token);
     const ticket = await this.ticketRepository.findOne({
       where: { qrTokenHash },
-      relations: ['booking', 'booking.branch', 'booking.hall', 'booking.user'],
+      relations: ['booking', 'booking.branch', 'booking.user'],
     });
 
     if (!ticket) {
@@ -768,7 +697,7 @@ export class BookingsService {
     const scans = await this.ticketRepository.find({
       where: { staffId },
       order: { scannedAt: 'DESC' },
-      relations: ['booking', 'booking.branch', 'booking.hall'],
+      relations: ['booking', 'booking.branch'],
     } as any);
     return { scans };
   }
@@ -783,7 +712,6 @@ export class BookingsService {
       scannedAt: Date;
       bookingId: string;
       branch?: string;
-      hall?: string;
       holderName?: string;
     }>;
   }> {
@@ -793,7 +721,7 @@ export class BookingsService {
     const allScans = await this.ticketRepository.find({
       where: { staffId },
       order: { scannedAt: 'DESC' },
-      relations: ['booking', 'booking.branch', 'booking.hall'],
+      relations: ['booking', 'booking.branch'],
     } as any);
 
     // Filter scans that have been scanned (scannedAt is not null)
@@ -833,7 +761,6 @@ export class BookingsService {
       scannedAt: ticket.scannedAt!,
       bookingId: ticket.bookingId,
       branch: ticket.booking?.branch?.name_ar || ticket.booking?.branch?.name_en || undefined,
-      hall: ticket.booking?.hall?.name_ar || ticket.booking?.hall?.name_en || undefined,
       holderName: ticket.holderName || undefined,
     }));
 
@@ -928,30 +855,7 @@ export class BookingsService {
     }
   }
 
-  private async findAvailableHalls(
-    branchId: string,
-    startTime: Date,
-    durationHours: number,
-    persons: number,
-  ): Promise<Hall[]> {
-    const halls = await this.contentService.findAllHalls(branchId);
-
-    const availableHalls: Hall[] = [];
-    for (const hall of halls) {
-      if (hall.capacity >= persons) {
-        const isAvailable = await this.contentService.checkHallAvailability(
-          hall.id,
-          startTime,
-          durationHours,
-        );
-        if (isAvailable) {
-          availableHalls.push(hall);
-        }
-      }
-    }
-
-    return availableHalls.sort((a, b) => a.capacity - b.capacity); // Sort by capacity ascending
-  }
+  // Removed findAvailableHalls - no longer needed as each branch has one hall merged into it
 
   private async generateTickets(
     queryRunner: any,
@@ -1007,12 +911,12 @@ export class BookingsService {
     couponCode: string,
     totalAmount: number,
     branchId?: string,
-    hallId?: string,
+    hallId?: string | null,
   ): Promise<number> {
     try {
       const preview = await this.couponsService.preview(couponCode, totalAmount, {
         branchId,
-        hallId,
+        hallId: null, // No longer used
       });
 
       if (!preview.valid) {
@@ -1034,21 +938,18 @@ export class BookingsService {
 
   private async calculateOfferDiscount(
     branchId: string,
-    hallId: string,
+    hallId: string | null,
     amount: number,
     at: Date,
   ): Promise<number> {
     try {
+      // Only look for branch-level offers (no hallId)
       const offers = await this.offerRepository.find({
         where: [
           { branchId, hallId: IsNull(), isActive: true, startsAt: IsNull(), endsAt: IsNull() },
-          { branchId, hallId, isActive: true, startsAt: IsNull(), endsAt: IsNull() },
           { branchId, hallId: IsNull(), isActive: true, startsAt: LessThanOrEqual(at), endsAt: IsNull() },
-          { branchId, hallId, isActive: true, startsAt: LessThanOrEqual(at), endsAt: IsNull() },
           { branchId, hallId: IsNull(), isActive: true, startsAt: IsNull(), endsAt: MoreThanOrEqual(at) },
-          { branchId, hallId, isActive: true, startsAt: IsNull(), endsAt: MoreThanOrEqual(at) },
           { branchId, hallId: IsNull(), isActive: true, startsAt: LessThanOrEqual(at), endsAt: MoreThanOrEqual(at) },
-          { branchId, hallId, isActive: true, startsAt: LessThanOrEqual(at), endsAt: MoreThanOrEqual(at) },
         ] as any,
         order: { createdAt: 'DESC' } as any,
       });
@@ -1077,20 +978,20 @@ export class BookingsService {
   }> {
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
-      relations: ['hall'],
+      relations: ['branch'],
     });
 
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
 
-    if (!booking.hallId) {
-      throw new BadRequestException('Booking has no associated hall');
+    if (!booking.branchId) {
+      throw new BadRequestException('Booking has no associated branch');
     }
 
     // Calculate pricing using the same logic as quote calculation
-    const pricing = await this.contentService.calculateHallPrice(
-      booking.hallId,
+    const pricing = await this.contentService.calculateBranchPrice(
+      booking.branchId,
       booking.startTime,
       booking.durationHours,
       booking.persons,
@@ -1122,20 +1023,19 @@ export class BookingsService {
     }
     this.ensureSlotAlignment(startTime);
 
-    // If hallId is provided, verify it exists and belongs to manager's branch
-    let hallId = dto.hallId;
-    if (hallId) {
-      try {
-        const hall = await this.contentService.findHallById(hallId);
-        if (hall.branchId !== managerBranchId) {
-          throw new ForbiddenException('Hall does not belong to your branch');
-        }
-      } catch (error) {
-        if (error instanceof ForbiddenException) {
-          throw error;
-        }
-        throw new NotFoundException('Hall not found');
+    // Use manager's branch ID
+    const branchId = managerBranchId;
+    
+    try {
+      const branch = await this.contentService.findBranchById(branchId);
+      if (branch.id !== managerBranchId) {
+        throw new ForbiddenException('Branch does not belong to your branch');
       }
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new NotFoundException('Branch not found');
     }
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -1147,7 +1047,6 @@ export class BookingsService {
       const booking = queryRunner.manager.create(Booking, {
         userId: dto.userId,
         branchId: managerBranchId,
-        hallId: hallId || null,
         startTime: startTime,
         durationHours: dto.durationHours,
         persons: dto.persons,
@@ -1221,24 +1120,6 @@ export class BookingsService {
     }
     this.ensureSlotAlignment(startTime);
 
-    // Verify hall exists and belongs to the specified branch
-    if (!dto.hallId) {
-      throw new BadRequestException('Hall ID is required');
-    }
-    
-    let hallId = dto.hallId;
-    try {
-      const hall = await this.contentService.findHallById(hallId);
-      if (hall.branchId !== dto.branchId) {
-        throw new BadRequestException('Hall does not belong to the specified branch');
-      }
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new NotFoundException('Hall not found');
-    }
-
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -1248,7 +1129,6 @@ export class BookingsService {
       const booking = queryRunner.manager.create(Booking, {
         userId: dto.userId,
         branchId: dto.branchId,
-        hallId: hallId,
         startTime: startTime,
         durationHours: dto.durationHours,
         persons: dto.persons,

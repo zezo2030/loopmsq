@@ -38,9 +38,6 @@ export class EventRequest {
   @Column({ type: 'boolean', default: false })
   decorated: boolean;
 
-  @Column({ type: 'uuid', nullable: true })
-  hallId: string;
-
   @Column({ type: 'uuid' })
   branchId: string;
 

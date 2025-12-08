@@ -3,7 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContentController } from './content.controller';
 import { ContentService } from './content.service';
 import { Branch } from '../../database/entities/branch.entity';
-import { Hall } from '../../database/entities/hall.entity';
 import { Addon } from '../../database/entities/addon.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { RedisService } from '../../utils/redis.service';
@@ -11,7 +10,7 @@ import { RealtimeModule } from '../../realtime/realtime.module';
 import { SampleDataSeeder } from '../../database/seeders/sample-data.seeder';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Branch, Hall, Addon, Booking]), RealtimeModule],
+  imports: [TypeOrmModule.forFeature([Branch, Addon, Booking]), RealtimeModule],
   controllers: [ContentController],
   providers: [
     ContentService,

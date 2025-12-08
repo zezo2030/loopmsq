@@ -1,17 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RedisService } from '../../utils/redis.service';
 import { Banner } from '../../database/entities/banner.entity';
 import { Offer } from '../../database/entities/offer.entity';
-import { Hall } from '../../database/entities/hall.entity';
+import { Activity } from '../../database/entities/activity.entity';
 
 @Injectable()
 export class HomeAdminService {
   constructor(
     @InjectRepository(Banner) private readonly bannerRepo: Repository<Banner>,
     @InjectRepository(Offer) private readonly offerRepo: Repository<Offer>,
-    @InjectRepository(Hall) private readonly hallRepo: Repository<Hall>,
+    @InjectRepository(Activity) private readonly activityRepo: Repository<Activity>,
     private readonly redis: RedisService,
   ) {}
 
@@ -50,45 +50,80 @@ export class HomeAdminService {
       throw new Error('branchId is required');
     }
     
-    // Get the hall for this branch (one-to-one relationship)
-    const hall = await this.hallRepo.findOne({
-      where: { branchId: dto.branchId },
-    });
-    
-    if (!hall) {
-      throw new Error(`No hall found for branch ${dto.branchId}`);
-    }
-    
-    // Automatically link the offer to the branch's hall
+    // Create offer linked to branch (halls are now merged into branches)
     const entity = this.offerRepo.create({
       ...dto,
-      hallId: hall.id,
     });
     const saved = await this.offerRepo.save(entity);
     await this.redis.del('home:v1');
     return saved;
   }
   async updateOffer(id: string, dto: Partial<Offer>) {
-    // If branchId is being updated, automatically link to the branch's hall
-    if (dto.branchId) {
-      const hall = await this.hallRepo.findOne({
-        where: { branchId: dto.branchId },
-      });
-      
-      if (!hall) {
-        throw new Error(`No hall found for branch ${dto.branchId}`);
-      }
-      
-      // Automatically set hallId to the branch's hall
-      dto.hallId = hall.id;
-    }
-    
+    // Update offer (halls are now merged into branches, no need for hallId)
     const res = await this.offerRepo.update(id, dto);
     await this.redis.del('home:v1');
     return res;
   }
   async deleteOffer(id: string) {
     const res = await this.offerRepo.delete(id);
+    await this.redis.del('home:v1');
+    return res;
+  }
+
+  // Activity
+  listActivities() {
+    return this.activityRepo.find({ order: { createdAt: 'DESC' } as any });
+  }
+
+  async createActivity(dto: Partial<Activity>) {
+    // Validate: must have either imageUrl or videoUrl, but not both
+    if (!dto.imageUrl && !dto.videoUrl) {
+      throw new BadRequestException('Either imageUrl or videoUrl must be provided');
+    }
+    if (dto.imageUrl && dto.videoUrl) {
+      throw new BadRequestException('Cannot have both imageUrl and videoUrl');
+    }
+
+    // Validate YouTube URL format if videoUrl is provided
+    if (dto.videoUrl) {
+      const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+      if (!youtubeRegex.test(dto.videoUrl)) {
+        throw new BadRequestException('Invalid YouTube URL format');
+      }
+    }
+
+    const entity = this.activityRepo.create(dto);
+    const saved = await this.activityRepo.save(entity);
+    await this.redis.del('home:v1');
+    return saved;
+  }
+
+  async updateActivity(id: string, dto: Partial<Activity>) {
+    // Validate: if both are being set, ensure only one is provided
+    if (dto.imageUrl !== undefined && dto.videoUrl !== undefined) {
+      if (dto.imageUrl && dto.videoUrl) {
+        throw new BadRequestException('Cannot have both imageUrl and videoUrl');
+      }
+      if (!dto.imageUrl && !dto.videoUrl) {
+        throw new BadRequestException('Either imageUrl or videoUrl must be provided');
+      }
+    }
+
+    // Validate YouTube URL format if videoUrl is provided
+    if (dto.videoUrl) {
+      const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+      if (!youtubeRegex.test(dto.videoUrl)) {
+        throw new BadRequestException('Invalid YouTube URL format');
+      }
+    }
+
+    const res = await this.activityRepo.update(id, dto);
+    await this.redis.del('home:v1');
+    return res;
+  }
+
+  async deleteActivity(id: string) {
+    const res = await this.activityRepo.delete(id);
     await this.redis.del('home:v1');
     return res;
   }

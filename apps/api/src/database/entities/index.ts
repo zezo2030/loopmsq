@@ -1,6 +1,5 @@
 export { User } from './user.entity';
 export { Branch } from './branch.entity';
-export { Hall } from './hall.entity';
 export { Booking, BookingStatus } from './booking.entity';
 export { Ticket, TicketStatus } from './ticket.entity';
 export { Payment, PaymentStatus, PaymentMethod } from './payment.entity';

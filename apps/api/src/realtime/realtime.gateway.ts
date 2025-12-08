@@ -8,16 +8,29 @@ import { WsJwtGuard } from '../common/guards/ws-jwt.guard';
 export class RealtimeGateway {
   @WebSocketServer() server: Server;
 
+  @SubscribeMessage('join:branch')
+  handleJoinBranch(@MessageBody() branchId: string, @ConnectedSocket() client: Socket) {
+    if (!branchId) return;
+    client.join(`room:branch:${branchId}`);
+  }
+
+  @SubscribeMessage('leave:branch')
+  handleLeaveBranch(@MessageBody() branchId: string, @ConnectedSocket() client: Socket) {
+    if (!branchId) return;
+    client.leave(`room:branch:${branchId}`);
+  }
+
+  // Deprecated: Keep for backward compatibility, but redirect to branch
   @SubscribeMessage('join:hall')
-  handleJoinHall(@MessageBody() hallId: string, @ConnectedSocket() client: Socket) {
-    if (!hallId) return;
-    client.join(`room:hall:${hallId}`);
+  handleJoinHall(@MessageBody() branchId: string, @ConnectedSocket() client: Socket) {
+    if (!branchId) return;
+    client.join(`room:branch:${branchId}`);
   }
 
   @SubscribeMessage('leave:hall')
-  handleLeaveHall(@MessageBody() hallId: string, @ConnectedSocket() client: Socket) {
-    if (!hallId) return;
-    client.leave(`room:hall:${hallId}`);
+  handleLeaveHall(@MessageBody() branchId: string, @ConnectedSocket() client: Socket) {
+    if (!branchId) return;
+    client.leave(`room:branch:${branchId}`);
   }
 
   @SubscribeMessage('join:booking')
@@ -45,8 +58,13 @@ export class RealtimeGateway {
   }
 
   // Emit helpers
-  emitHallUpdated(hallId: string, payload: any) {
-    this.server.to(`room:hall:${hallId}`).emit('hall:updated', payload);
+  emitBranchUpdated(branchId: string, payload: any) {
+    this.server.to(`room:branch:${branchId}`).emit('branch:updated', payload);
+  }
+
+  // Deprecated: Keep for backward compatibility
+  emitHallUpdated(branchId: string, payload: any) {
+    this.server.to(`room:branch:${branchId}`).emit('branch:updated', payload);
   }
 
   emitBookingUpdated(bookingId: string, payload: any) {

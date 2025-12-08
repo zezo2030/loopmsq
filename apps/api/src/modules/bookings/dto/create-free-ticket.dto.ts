@@ -18,15 +18,6 @@ export class CreateFreeTicketDto {
   userId: string;
 
   @ApiProperty({
-    description: 'Hall ID (optional)',
-    example: 'hall-uuid',
-    required: false,
-  })
-  @IsOptional()
-  @IsUUID()
-  hallId?: string;
-
-  @ApiProperty({
     description: 'Booking start time',
     example: '2024-01-15T14:00:00.000Z',
   })

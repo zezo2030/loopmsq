@@ -4,6 +4,7 @@ import { Repository, MoreThanOrEqual, LessThanOrEqual, IsNull } from 'typeorm';
 import { Banner } from '../../database/entities/banner.entity';
 import { Offer } from '../../database/entities/offer.entity';
 import { Branch } from '../../database/entities/branch.entity';
+import { Activity } from '../../database/entities/activity.entity';
 import { RedisService } from '../../utils/redis.service';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class HomeService {
     @InjectRepository(Banner) private readonly bannerRepo: Repository<Banner>,
     @InjectRepository(Offer) private readonly offerRepo: Repository<Offer>,
     @InjectRepository(Branch) private readonly branchRepo: Repository<Branch>,
+    @InjectRepository(Activity) private readonly activityRepo: Repository<Activity>,
     private readonly redis: RedisService,
   ) {}
 
@@ -53,8 +55,15 @@ export class HomeService {
     const filteredOffers = branchId 
       ? offers 
       : offers.filter(o => o.branchId !== null);
+    
+    // Get active activities
+    const activities = await this.activityRepo.find({
+      where: { isActive: true },
+      order: { createdAt: 'DESC' },
+    });
+    
     const featuredBranches = await this.branchRepo.find({ order: { createdAt: 'DESC' }, take: 10 });
-    const payload = { banners, offers: filteredOffers, featuredBranches };
+    const payload = { banners, offers: filteredOffers, featuredBranches, activities };
     await this.redis.set(cacheKey, payload, 120);
     return payload;
   }
