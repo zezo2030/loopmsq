@@ -59,7 +59,10 @@ services:
       SMTP_USER: zezosaad194@gmail.com
       SMTP_PASS: yluw wgiu gogn ohys
       SMTP_FROM: zezosaad194@gmail.com
-      # Dreams SMS Configuration
+      # WhatsApp Business API Configuration
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      # Dreams SMS Configuration (deprecated - kept for fallback)
       DREAMS_API_URL: ${DREAMS_API_URL}
       DREAMS_USER: ${DREAMS_USER}
       DREAMS_SECRET_KEY: ${DREAMS_SECRET_KEY}

@@ -1,18 +1,24 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsUUID, IsObject } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsUUID, IsObject, ValidateIf } from 'class-validator';
 
 export class ConfirmPaymentDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid' })
+  @ValidateIf((o) => !o.eventRequestId)
   @IsUUID()
-  bookingId: string;
+  bookingId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @ValidateIf((o) => !o.bookingId)
+  @IsUUID()
+  eventRequestId?: string;
 
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
   paymentId: string;
 
-  @ApiProperty({ type: 'object', additionalProperties: true })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   @IsObject()
-  gatewayPayload: Record<string, any>;
+  gatewayPayload?: Record<string, any>;
 }
 
 

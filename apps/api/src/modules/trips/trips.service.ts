@@ -29,6 +29,7 @@ export class TripsService {
   async createRequest(userId: string, dto: CreateTripRequestDto) {
     const req = this.tripRepo.create({
       requesterId: userId,
+      branchId: dto.branchId,
       schoolName: dto.schoolName,
       studentsCount: dto.studentsCount,
       accompanyingAdults: dto.accompanyingAdults,

@@ -82,12 +82,18 @@ export class ContentController {
     const includeInactiveBool = includeInactive === 'true' || includeInactive === '1' || includeInactive === 'yes';
     const branches = await this.contentService.findAllBranches(includeInactiveBool);
     
+    // Compatibility Fix: ensure branchId is set to id for mobile app compatibility
+    const branchesWithFix = branches.map(b => ({
+      ...b,
+      branchId: b.id // Add this so mobile app doesn't see null
+    }));
+
     // Filter by branchId if provided
     if (branchId) {
-      return branches.filter((branch) => branch.id === branchId);
+      return branchesWithFix.filter((branch) => branch.id === branchId);
     }
     
-    return branches;
+    return branchesWithFix;
   }
 
   @Get('branches/:id')

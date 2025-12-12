@@ -9,6 +9,7 @@ import {
   Index,
 } from 'typeorm';
 import { Booking } from './booking.entity';
+import { EventRequest } from './event-request.entity';
 
 export enum PaymentStatus {
   PENDING = 'pending',
@@ -22,6 +23,7 @@ export enum PaymentStatus {
 export enum PaymentMethod {
   CREDIT_CARD = 'credit_card',
   DEBIT_CARD = 'debit_card',
+  MADA = 'mada', // مدى - بطاقة مدى السعودية
   WALLET = 'wallet',
   BANK_TRANSFER = 'bank_transfer',
   CASH = 'cash',
@@ -30,15 +32,20 @@ export enum PaymentMethod {
 @Entity('payments')
 @Index(['gatewayRef'])
 @Index(['bookingId'])
+@Index(['eventRequestId'])
 @Index(['bookingId', 'status'])
+@Index(['eventRequestId', 'status'])
 @Index(['transactionId'])
 @Index(['paidAt'])
 export class Payment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', nullable: true })
   bookingId: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  eventRequestId: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   gatewayRef: string;
@@ -83,7 +90,11 @@ export class Payment {
   updatedAt: Date;
 
   // Relations
-  @ManyToOne(() => Booking, (booking) => booking.payments)
+  @ManyToOne(() => Booking, (booking) => booking.payments, { nullable: true })
   @JoinColumn({ name: 'bookingId' })
   booking: Booking;
+
+  @ManyToOne(() => EventRequest, { nullable: true })
+  @JoinColumn({ name: 'eventRequestId' })
+  eventRequest: EventRequest;
 }

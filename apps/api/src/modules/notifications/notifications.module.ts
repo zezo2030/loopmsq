@@ -13,6 +13,8 @@ import { NotificationsController } from './notifications.controller';
 import { DeviceToken } from '../../database/entities/device-token.entity';
 import { PushProvider } from './providers/push.provider';
 import { PushProcessor } from './processors/push.processor';
+import { WhatsAppProvider } from './providers/whatsapp.provider';
+import { WhatsAppProcessor } from './processors/whatsapp.processor';
 import { RedisService } from '../../utils/redis.service';
 
 @Module({
@@ -23,10 +25,11 @@ import { RedisService } from '../../utils/redis.service';
       { name: 'notifications_sms' },
       { name: 'notifications_email' },
       { name: 'notifications_push' },
+      { name: 'notifications_whatsapp' },
     ),
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService, SmsProcessor, EmailProcessor, PushProcessor, SmsProvider, EmailProvider, PushProvider, EncryptionService, RedisService],
+  providers: [NotificationsService, SmsProcessor, EmailProcessor, PushProcessor, WhatsAppProcessor, SmsProvider, EmailProvider, PushProvider, WhatsAppProvider, EncryptionService, RedisService],
   exports: [NotificationsService, PushProvider],
 })
 export class NotificationsModule {}

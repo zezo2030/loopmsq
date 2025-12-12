@@ -494,6 +494,15 @@
   "branches.image_preview": "معاينة الصورة",
   "branches.video_url": "رابط فيديو YouTube",
   "branches.video_url_help": "أدخل رابط فيديو YouTube (مثال: https://www.youtube.com/watch?v=VIDEO_ID)",
+  "branches.pricing_config": "إعدادات التسعير",
+  "branches.base_price": "السعر الأساسي",
+  "branches.base_price_required": "السعر الأساسي مطلوب",
+  "branches.hourly_rate": "السعر بالساعة",
+  "branches.price_per_person": "السعر للشخص الواحد",
+  "branches.decoration_price": "سعر الديكور",
+  "branches.weekend_multiplier": "مضاعف عطلة نهاية الأسبوع",
+  "branches.holiday_multiplier": "مضاعف العطل الرسمية",
+  "common.currency": "ريال",
   "common.save_changes": "حفظ التغييرات"
 }
 

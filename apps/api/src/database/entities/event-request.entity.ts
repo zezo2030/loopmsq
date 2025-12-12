@@ -67,7 +67,11 @@ export class EventRequest {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   quotedPrice: number;
 
-  @Column({ type: 'enum', enum: PaymentMethod, nullable: true })
+  @Column({ 
+    type: 'enum', 
+    enum: ['credit_card', 'debit_card', 'mada', 'wallet', 'bank_transfer', 'cash'],
+    nullable: true 
+  })
   paymentMethod?: PaymentMethod;
 
   @CreateDateColumn()

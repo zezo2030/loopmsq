@@ -17,11 +17,30 @@ import { join } from 'path';
 import * as fs from 'fs';
 import * as express from 'express';
 import { PushProvider } from './modules/notifications/providers/push.provider';
+import { DataSource } from 'typeorm';
+import { logEnumColumnsInfo } from './utils/debug-typeorm-enums';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
+
+  // Debug: Log enum columns info after DataSource initialization
+  try {
+    const dataSource = app.get(DataSource);
+    if (dataSource && dataSource.isInitialized) {
+      await logEnumColumnsInfo(dataSource);
+    } else {
+      // Wait for DataSource to initialize
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const dataSource2 = app.get(DataSource);
+      if (dataSource2 && dataSource2.isInitialized) {
+        await logEnumColumnsInfo(dataSource2);
+      }
+    }
+  } catch (error) {
+    logger.warn('Could not log enum columns info: ' + (error as Error).message);
+  }
 
   // Security (allow cross-origin images for admin preview)
   app.use(helmet({

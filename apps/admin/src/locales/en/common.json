@@ -491,6 +491,15 @@
   "branches.image_preview": "Image Preview",
   "branches.video_url": "YouTube Video URL",
   "branches.video_url_help": "Enter YouTube video URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)",
+  "branches.pricing_config": "Pricing Configuration",
+  "branches.base_price": "Base Price",
+  "branches.base_price_required": "Base price is required",
+  "branches.hourly_rate": "Hourly Rate",
+  "branches.price_per_person": "Price Per Person",
+  "branches.decoration_price": "Decoration Price",
+  "branches.weekend_multiplier": "Weekend Multiplier",
+  "branches.holiday_multiplier": "Holiday Multiplier",
+  "common.currency": "SAR",
   "common.save_changes": "Save Changes"
 }
 

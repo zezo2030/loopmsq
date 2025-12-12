@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { 
-  Card, 
-  Descriptions, 
-  Space, 
-  Button, 
-  Modal, 
-  Form, 
-  Input, 
+import {
+  Card,
+  Descriptions,
+  Space,
+  Button,
+  Modal,
+  Form,
+  Input,
   InputNumber,
-  message, 
+  message,
   Row,
   Col,
   Avatar,
@@ -18,7 +18,7 @@ import {
   Select,
   Alert
 } from 'antd'
-import { 
+import {
   ArrowLeftOutlined,
   BookOutlined,
   TeamOutlined,
@@ -84,17 +84,17 @@ export default function TripDetail() {
   const navigate = useNavigate()
   const [trip, setTrip] = useState<TripRequest | null>(null)
   const [loading, setLoading] = useState(true)
-  
+
   // Modal states
   const [reviewModalVisible, setReviewModalVisible] = useState(false)
-  
+
   const [invoiceModalVisible, setInvoiceModalVisible] = useState(false)
-  
+
   // Forms
   const [reviewForm] = Form.useForm()
-  
+
   const [invoiceForm] = Form.useForm()
-  
+
   // Loading states
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -123,11 +123,11 @@ export default function TripDetail() {
       // Mock data for development
       setTrip({
         id: '1',
-        requester: { 
-          id: '1', 
-          name: 'نورا أحمد المعلمة', 
-          email: 'nora@school.edu.sa', 
-          phone: '+966501234567' 
+        requester: {
+          id: '1',
+          name: 'نورا أحمد المعلمة',
+          email: 'nora@school.edu.sa',
+          phone: '+966501234567'
         },
         schoolName: 'مدرسة النور الأهلية للبنات',
         studentsCount: 45,
@@ -241,7 +241,7 @@ export default function TripDetail() {
     }
   }
 
-  
+
 
   const getStatusText = (status: string) => {
     switch (status) {
@@ -323,10 +323,10 @@ export default function TripDetail() {
                   trip.status === 'approved' || trip.status === 'completed'
                     ? 'success'
                     : trip.status === 'pending' || trip.status === 'under_review' || trip.status === 'invoiced' || trip.status === 'paid'
-                    ? 'processing'
-                    : trip.status === 'rejected' || trip.status === 'cancelled'
-                    ? 'error'
-                    : 'default'
+                      ? 'processing'
+                      : trip.status === 'rejected' || trip.status === 'cancelled'
+                        ? 'error'
+                        : 'default'
                 }
                 text={getStatusText(trip.status)}
               />
@@ -336,7 +336,7 @@ export default function TripDetail() {
             </p>
           </div>
           <Space>
-            {trip.status === 'pending' && (
+            {trip.status === 'under_review' && (
               <Button
                 type="primary"
                 icon={<EditOutlined />}
@@ -486,11 +486,11 @@ export default function TripDetail() {
             {trip.specialRequirements && (
               <Col xs={24}>
                 <Card className="custom-card" title="المتطلبات الخاصة">
-                  <div style={{ 
-                    padding: '16px', 
-                    backgroundColor: '#f6ffed', 
+                  <div style={{
+                    padding: '16px',
+                    backgroundColor: '#f6ffed',
                     border: '1px solid #b7eb8f',
-                    borderRadius: '6px' 
+                    borderRadius: '6px'
                   }}>
                     {trip.specialRequirements}
                   </div>
@@ -504,8 +504,8 @@ export default function TripDetail() {
                 <Card className="custom-card" title="الخدمات الإضافية">
                   <Space direction="vertical" style={{ width: '100%' }}>
                     {trip.addOns.map((addon, index) => (
-                      <div key={index} style={{ 
-                        display: 'flex', 
+                      <div key={index} style={{
+                        display: 'flex',
                         justifyContent: 'space-between',
                         padding: '12px',
                         backgroundColor: '#fafafa',
@@ -530,14 +530,14 @@ export default function TripDetail() {
             {/* Students List */}
             {trip.studentsList && trip.studentsList.length > 0 && (
               <Col xs={24} lg={12}>
-                <Card 
-                  className="custom-card" 
+                <Card
+                  className="custom-card"
                   title={`قائمة الطلاب (${trip.studentsList.length})`}
                   extra={<TeamOutlined />}
                 >
                   <div style={{ maxHeight: '300px', overflow: 'auto' }}>
                     {trip.studentsList.map((student, index) => (
-                      <div key={index} style={{ 
+                      <div key={index} style={{
                         padding: '8px 0',
                         borderBottom: index < trip.studentsList!.length - 1 ? '1px solid #f0f0f0' : 'none'
                       }}>
@@ -570,11 +570,11 @@ export default function TripDetail() {
             {trip.adminNotes && (
               <Col xs={24}>
                 <Card className="custom-card" title="ملاحظات الإدارة">
-                  <div style={{ 
-                    padding: '16px', 
-                    backgroundColor: '#e6f7ff', 
+                  <div style={{
+                    padding: '16px',
+                    backgroundColor: '#e6f7ff',
                     border: '1px solid #91d5ff',
-                    borderRadius: '6px' 
+                    borderRadius: '6px'
                   }}>
                     {trip.adminNotes}
                   </div>
@@ -629,7 +629,7 @@ export default function TripDetail() {
                 إلغاء
               </Button>
               <Space>
-                <Button 
+                <Button
                   danger
                   onClick={() => {
                     Modal.confirm({
@@ -659,9 +659,9 @@ export default function TripDetail() {
                 >
                   رفض الطلب
                 </Button>
-                <Button 
-                  type="primary" 
-                  htmlType="submit" 
+                <Button
+                  type="primary"
+                  htmlType="submit"
                   loading={actionLoading}
                   icon={<CheckOutlined />}
                 >
@@ -718,9 +718,9 @@ export default function TripDetail() {
               <Button onClick={() => setInvoiceModalVisible(false)}>
                 إلغاء
               </Button>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
+              <Button
+                type="primary"
+                htmlType="submit"
                 loading={actionLoading}
                 icon={<FileTextOutlined />}
               >

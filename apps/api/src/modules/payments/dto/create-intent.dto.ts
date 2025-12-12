@@ -1,11 +1,17 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsUUID, ValidateIf } from 'class-validator';
 import { PaymentMethod } from '../../../database/entities/payment.entity';
 
 export class CreatePaymentIntentDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid' })
+  @ValidateIf((o) => !o.eventRequestId)
   @IsUUID()
-  bookingId: string;
+  bookingId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @ValidateIf((o) => !o.bookingId)
+  @IsUUID()
+  eventRequestId?: string;
 
   @ApiProperty({ enum: PaymentMethod })
   @IsEnum(PaymentMethod)

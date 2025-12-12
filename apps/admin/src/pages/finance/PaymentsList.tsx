@@ -97,13 +97,13 @@ export default function PaymentsList() {
       title: t('payments.id') || 'Payment ID',
       dataIndex: 'id',
       key: 'id',
-      render: (id: string) => <Link to={`/finance/payments/${id}`}>{id.slice(0, 8)}...</Link>,
+      render: (id: string) => id ? <Link to={`/finance/payments/${id}`}>{id.slice(0, 8)}...</Link> : '-',
     },
     {
       title: t('payments.booking') || 'Booking',
       dataIndex: 'bookingId',
       key: 'bookingId',
-      render: (bid: string) => <span>{bid.slice(0, 8)}...</span>,
+      render: (bid: string) => bid ? <span>{bid.slice(0, 8)}...</span> : '-',
     },
     {
       title: t('payments.amount') || 'Amount',

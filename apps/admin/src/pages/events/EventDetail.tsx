@@ -17,7 +17,8 @@ import {
   Avatar,
   Badge,
   Steps,
-  Alert
+  Alert,
+  Table
 } from 'antd'
 import { 
   ArrowLeftOutlined,
@@ -31,7 +32,8 @@ import {
   PhoneOutlined,
   MailOutlined,
   EditOutlined,
-  StarOutlined
+  StarOutlined,
+  QrcodeOutlined
 } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
 import '../../theme.css'
@@ -49,9 +51,11 @@ type EventRequest = {
   branchId: string
   branch?: {
     id: string
-    name: string
+    name_ar?: string
+    nameAr?: string
     location?: string
-    address?: string
+    capacity?: number
+    amenities?: string[]
   }
   hallId?: string
   hall?: {
@@ -77,12 +81,20 @@ type EventRequest = {
   updatedAt: string
 }
 
+type Ticket = {
+  id: string
+  status: 'VALID' | 'USED' | 'EXPIRED' | 'CANCELLED'
+  scannedAt?: string
+  staffId?: string
+}
+
 const { Step } = Steps
 
 export default function EventDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [event, setEvent] = useState<EventRequest | null>(null)
+  const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   
   // Modal states
@@ -109,6 +121,19 @@ export default function EventDetail() {
     try {
       const eventData = await apiGet<EventRequest>(`/events/admin/${id}`)
       setEvent(eventData)
+
+      // Load tickets if event is paid or confirmed
+      if (eventData.status === 'paid' || eventData.status === 'confirmed') {
+        try {
+          const ticketsData = await apiGet<Ticket[]>(`/events/requests/${id}/tickets`)
+          setTickets(ticketsData || [])
+        } catch (error) {
+          console.error('Failed to load tickets:', error)
+          setTickets([])
+        }
+      } else {
+        setTickets([])
+      }
     } catch (error: any) {
       console.error('Failed to load event:', error)
       const errorMessage = error?.message || 'Failed to load event'
@@ -226,6 +251,42 @@ export default function EventDetail() {
         return 0
     }
   }
+
+  const ticketColumns = [
+    {
+      title: 'رقم التذكرة',
+      dataIndex: 'id',
+      key: 'id',
+      render: (id: string) => (
+        <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{id}</span>
+      )
+    },
+    {
+      title: 'النوع',
+      key: 'type',
+      render: () => 'عادي',
+    },
+    {
+      title: 'الحالة',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: Ticket['status'], record: Ticket) => {
+        const isUsed = status === 'USED' || !!record.scannedAt
+        return (
+          <Tag color={isUsed ? 'default' : 'success'}>
+            {isUsed ? 'مستخدمة' : 'غير مستخدمة'}
+          </Tag>
+        )
+      }
+    },
+    {
+      title: 'تاريخ الاستخدام',
+      key: 'usage',
+      render: () => (
+        <span>{event ? new Date(event.startTime).toLocaleDateString('ar-SA', { calendar: 'gregory' }) : ''}</span>
+      )
+    }
+  ]
 
   if (loading) {
     return (
@@ -394,25 +455,28 @@ export default function EventDetail() {
             <Col xs={24} lg={12}>
               <Card className="custom-card" title="معلومات المكان" extra={<EnvironmentOutlined />}>
                 <Descriptions column={1} size="small">
-                  <Descriptions.Item label="الفرع">{event.branch?.name}</Descriptions.Item>
-                  <Descriptions.Item label="العنوان">{event.branch?.address}</Descriptions.Item>
-                  <Descriptions.Item label="القاعة">{event.hall?.name || 'غير محدد'}</Descriptions.Item>
-                  {event.hall?.capacity && (
-                    <Descriptions.Item label="سعة القاعة">
+                  <Descriptions.Item label="الفرع">
+                    {event.branch?.name_ar || event.branch?.nameAr || 'غير محدد'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="العنوان">
+                    {event.branch?.location || 'غير محدد'}
+                  </Descriptions.Item>
+                  {event.branch?.capacity && (
+                    <Descriptions.Item label="السعة">
                       <Space>
                         <UserOutlined />
-                        {event.hall.capacity} شخص
+                        {event.branch.capacity} شخص
                       </Space>
                     </Descriptions.Item>
                   )}
                 </Descriptions>
                 
-                {event.hall?.amenities && (
+                {event.branch?.amenities && event.branch.amenities.length > 0 && (
                   <>
                     <Divider />
                     <div style={{ marginBottom: '8px', fontWeight: '600' }}>المرافق المتاحة:</div>
                     <Space wrap>
-                      {event.hall.amenities.map((amenity, index) => (
+                      {event.branch.amenities.map((amenity, index) => (
                         <Tag key={index} color="blue">{amenity}</Tag>
                       ))}
                     </Space>
@@ -576,6 +640,21 @@ export default function EventDetail() {
                       )}
                     </Descriptions>
                   </Space>
+                </Card>
+              </Col>
+            )}
+
+            {/* Tickets */}
+            {tickets.length > 0 && (
+              <Col xs={24}>
+                <Card className="custom-card" title="التذاكر" extra={<QrcodeOutlined />}>
+                  <Table
+                    dataSource={tickets}
+                    columns={ticketColumns}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                  />
                 </Card>
               </Col>
             )}

@@ -27,6 +27,14 @@ type Branch = {
   videoUrl?: string | null
   latitude?: number | null
   longitude?: number | null
+  priceConfig?: {
+    basePrice: number
+    hourlyRate: number
+    pricePerPerson: number
+    weekendMultiplier: number
+    holidayMultiplier: number
+    decorationPrice?: number
+  }
 }
 
 export default function Branches() {
@@ -158,7 +166,13 @@ export default function Branches() {
             workingHours: r.workingHours || {},
             latitude: r.latitude,
             longitude: r.longitude,
-            videoUrl: r.videoUrl
+            videoUrl: r.videoUrl,
+            basePrice: r.priceConfig?.basePrice,
+            hourlyRate: r.priceConfig?.hourlyRate,
+            pricePerPerson: r.priceConfig?.pricePerPerson,
+            weekendMultiplier: r.priceConfig?.weekendMultiplier,
+            holidayMultiplier: r.priceConfig?.holidayMultiplier,
+            decorationPrice: r.priceConfig?.decorationPrice
           }); setEditing(r) }}>
             {t('common.view_details') || 'View Details'}
           </Button>
@@ -175,7 +189,13 @@ export default function Branches() {
             workingHours: r.workingHours || {},
             latitude: r.latitude,
             longitude: r.longitude,
-            videoUrl: r.videoUrl
+            videoUrl: r.videoUrl,
+            basePrice: r.priceConfig?.basePrice,
+            hourlyRate: r.priceConfig?.hourlyRate,
+            pricePerPerson: r.priceConfig?.pricePerPerson,
+            weekendMultiplier: r.priceConfig?.weekendMultiplier,
+            holidayMultiplier: r.priceConfig?.holidayMultiplier,
+            decorationPrice: r.priceConfig?.decorationPrice
           }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
           <Select
             value={r.status}
@@ -216,7 +236,13 @@ export default function Branches() {
                 workingHours: selectedBranch.workingHours || {},
                 latitude: selectedBranch.latitude,
                 longitude: selectedBranch.longitude,
-                videoUrl: selectedBranch.videoUrl
+                videoUrl: selectedBranch.videoUrl,
+                basePrice: selectedBranch.priceConfig?.basePrice,
+                hourlyRate: selectedBranch.priceConfig?.hourlyRate,
+                pricePerPerson: selectedBranch.priceConfig?.pricePerPerson,
+                weekendMultiplier: selectedBranch.priceConfig?.weekendMultiplier,
+                holidayMultiplier: selectedBranch.priceConfig?.holidayMultiplier,
+                decorationPrice: selectedBranch.priceConfig?.decorationPrice
               }); setOpen(true) }}>
                 {t('common.edit') || 'Edit'}
               </Button>
@@ -243,6 +269,21 @@ export default function Branches() {
                       <div style={{ marginTop: 16 }}>
                         <strong>{t('branches.cover_image') || 'صورة الغلاف'}:</strong>
                         <Image src={resolveFileUrl(selectedBranch.coverImage)} width={200} height={150} style={{ marginTop: 8, objectFit: 'cover', borderRadius: 8 }} />
+                      </div>
+                    )}
+                    {selectedBranch.priceConfig && (
+                      <div style={{ marginTop: 16, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
+                        <strong style={{ display: 'block', marginBottom: 8 }}>{t('branches.pricing_config') || 'إعدادات التسعير'}:</strong>
+                        <p><strong>{t('branches.base_price') || 'السعر الأساسي'}:</strong> {selectedBranch.priceConfig.basePrice} {t('common.currency') || 'ريال'}</p>
+                        <p><strong>{t('branches.hourly_rate') || 'السعر بالساعة'}:</strong> {selectedBranch.priceConfig.hourlyRate} {t('common.currency') || 'ريال'}</p>
+                        {selectedBranch.priceConfig.pricePerPerson > 0 && (
+                          <p><strong>{t('branches.price_per_person') || 'السعر للشخص الواحد'}:</strong> {selectedBranch.priceConfig.pricePerPerson} {t('common.currency') || 'ريال'}</p>
+                        )}
+                        {selectedBranch.priceConfig.decorationPrice && (
+                          <p><strong>{t('branches.decoration_price') || 'سعر الديكور'}:</strong> {selectedBranch.priceConfig.decorationPrice} {t('common.currency') || 'ريال'}</p>
+                        )}
+                        <p><strong>{t('branches.weekend_multiplier') || 'مضاعف عطلة نهاية الأسبوع'}:</strong> {selectedBranch.priceConfig.weekendMultiplier}x</p>
+                        <p><strong>{t('branches.holiday_multiplier') || 'مضاعف العطل الرسمية'}:</strong> {selectedBranch.priceConfig.holidayMultiplier}x</p>
                       </div>
                     )}
                   </div>
@@ -303,6 +344,17 @@ export default function Branches() {
             }
             if (values.workingHours) {
               payload.workingHours = values.workingHours
+            }
+            // Add pricing configuration
+            if (values.basePrice || values.hourlyRate || values.pricePerPerson || values.weekendMultiplier || values.holidayMultiplier) {
+              payload.hallPriceConfig = {
+                basePrice: values.basePrice ? Number(values.basePrice) : 500,
+                hourlyRate: values.hourlyRate ? Number(values.hourlyRate) : 100,
+                pricePerPerson: values.pricePerPerson ? Number(values.pricePerPerson) : 10,
+                weekendMultiplier: values.weekendMultiplier ? Number(values.weekendMultiplier) : 1.5,
+                holidayMultiplier: values.holidayMultiplier ? Number(values.holidayMultiplier) : 2.0,
+                decorationPrice: values.decorationPrice ? Number(values.decorationPrice) : undefined,
+              }
             }
             if (!canEdit) { message.error(t('errors.forbidden') || 'Forbidden'); return }
             if (editing) updateBranch.mutate({ id: editing.id, body: payload })
@@ -376,6 +428,74 @@ export default function Branches() {
           >
             <Input placeholder="https://www.youtube.com/watch?v=..." />
           </Form.Item>
+          
+          {/* Pricing Configuration */}
+          <Card title={t('branches.pricing_config') || 'إعدادات التسعير'} style={{ marginBottom: 16 }}>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item 
+                  name="basePrice" 
+                  label={t('branches.base_price') || 'السعر الأساسي'} 
+                  rules={[{ required: true, message: t('branches.base_price_required') || 'السعر الأساسي مطلوب' }]}
+                  tooltip={t('branches.base_price_tooltip') || 'السعر الأساسي للفرع'}
+                >
+                  <InputNumber min={0} step={10} style={{ width: '100%' }} placeholder="500" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item 
+                  name="hourlyRate" 
+                  label={t('branches.hourly_rate') || 'السعر بالساعة'} 
+                  rules={[{ required: true, message: t('branches.hourly_rate_required') || 'السعر بالساعة مطلوب' }]}
+                  tooltip={t('branches.hourly_rate_tooltip') || 'السعر الإضافي لكل ساعة'}
+                >
+                  <InputNumber min={0} step={10} style={{ width: '100%' }} placeholder="100" />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item 
+                  name="pricePerPerson" 
+                  label={t('branches.price_per_person') || 'السعر للشخص الواحد'} 
+                  tooltip={t('branches.price_per_person_tooltip') || 'السعر الإضافي لكل شخص'}
+                >
+                  <InputNumber min={0} step={1} style={{ width: '100%' }} placeholder="10" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item 
+                  name="decorationPrice" 
+                  label={t('branches.decoration_price') || 'سعر الديكور'} 
+                  tooltip={t('branches.decoration_price_tooltip') || 'السعر الإضافي للديكور (اختياري)'}
+                >
+                  <InputNumber min={0} step={10} style={{ width: '100%' }} placeholder="200" />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item 
+                  name="weekendMultiplier" 
+                  label={t('branches.weekend_multiplier') || 'مضاعف عطلة نهاية الأسبوع'} 
+                  rules={[{ required: true, message: t('branches.weekend_multiplier_required') || 'مضاعف عطلة نهاية الأسبوع مطلوب' }]}
+                  tooltip={t('branches.weekend_multiplier_tooltip') || 'مضاعف السعر في عطلة نهاية الأسبوع (مثال: 1.5 يعني زيادة 50%)'}
+                >
+                  <InputNumber min={1} step={0.1} precision={2} style={{ width: '100%' }} placeholder="1.5" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item 
+                  name="holidayMultiplier" 
+                  label={t('branches.holiday_multiplier') || 'مضاعف العطل الرسمية'} 
+                  rules={[{ required: true, message: t('branches.holiday_multiplier_required') || 'مضاعف العطل الرسمية مطلوب' }]}
+                  tooltip={t('branches.holiday_multiplier_tooltip') || 'مضاعف السعر في العطل الرسمية (مثال: 2.0 يعني زيادة 100%)'}
+                >
+                  <InputNumber min={1} step={0.1} precision={2} style={{ width: '100%' }} placeholder="2.0" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
           
           {/* Cover Image */}
           <Form.Item label={t('branches.cover_image') || 'صورة الغلاف'}>

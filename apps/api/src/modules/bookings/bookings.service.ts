@@ -11,7 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, LessThanOrEqual, MoreThanOrEqual, IsNull, Between } from 'typeorm';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
-import { Payment } from '../../database/entities/payment.entity';
+import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
 import { User } from '../../database/entities/user.entity';
 import { Offer } from '../../database/entities/offer.entity';
 import { Branch } from '../../database/entities/branch.entity';
@@ -92,14 +92,68 @@ export class BookingsService {
         startTime,
         durationHours,
         persons,
-        addOns = [],
+        addOns: rawAddOns,
         couponCode,
       } = quoteDto;
+      
+      // Ensure addOns is always an array (handle null/undefined)
+      const addOns = Array.isArray(rawAddOns) ? rawAddOns : [];
 
-      // Prevent quoting in the past
+      // #region agent log
       const now = new Date();
       const requestedStart = new Date(startTime);
+      const nowTime = now.getTime();
+      const requestedTime = requestedStart.getTime();
+      const timeDiffMs = requestedTime - nowTime;
+      const logData = {
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'E',
+        location: 'bookings.service.ts:104',
+        message: 'Server received startTime and parsed it',
+        data: {
+          startTimeString: startTime,
+          nowISO: now.toISOString(),
+          requestedStartISO: requestedStart.toISOString(),
+          nowTimeMs: nowTime,
+          requestedTimeMs: requestedTime,
+          timeDiffMs: timeDiffMs,
+          comparison: requestedTime <= nowTime,
+        },
+        timestamp: Date.now(),
+      };
+      fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logData),
+      }).catch(() => {});
+      // #endregion
+
+      // Prevent quoting in the past
       if (requestedStart.getTime() <= now.getTime()) {
+        // #region agent log
+        const logData2 = {
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'F',
+          location: 'bookings.service.ts:106',
+          message: 'Server validation failed - time in past',
+          data: {
+            startTimeString: startTime,
+            nowISO: now.toISOString(),
+            requestedStartISO: requestedStart.toISOString(),
+            nowTimeMs: nowTime,
+            requestedTimeMs: requestedTime,
+            timeDiffMs: timeDiffMs,
+          },
+          timestamp: Date.now(),
+        };
+        fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(logData2),
+        }).catch(() => {});
+        // #endregion
         throw new BadRequestException('Cannot book in the past');
       }
 
@@ -270,6 +324,24 @@ export class BookingsService {
 
       // Clear cache
       await this.redisService.del(`user:${userId}:bookings`);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'H1',
+          location: 'bookings.service.ts:createBooking',
+          message: 'Cleared bookings cache after creation',
+          data: {
+            cacheKeyCleared: `user:${userId}:bookings`,
+            userId,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
 
       // Schedule reminders: 24h and 2h before start, and at end time
       const startDate = new Date(startTime);
@@ -347,9 +419,47 @@ export class BookingsService {
   }> {
     const cacheKey = `user:${userId}:bookings:${page}:${limit}`;
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'H1',
+        location: 'bookings.service.ts:findUserBookings:cache-check',
+        message: 'Checking cache before fetching bookings',
+        data: { cacheKey, page, limit, userId },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     // Try cache first
     const cached = await this.redisService.get(cacheKey);
     if (cached) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'H1',
+          location: 'bookings.service.ts:findUserBookings:cache-hit',
+          message: 'Returning cached bookings',
+          data: {
+            cacheKey,
+            page,
+            limit,
+            userId,
+            total: cached?.total ?? null,
+            count: cached?.bookings?.length ?? null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       return cached;
     }
 
@@ -360,6 +470,57 @@ export class BookingsService {
       skip: (page - 1) * limit,
       take: limit,
     });
+
+    const statusCounts = bookings.reduce((acc, b) => {
+      const s = (b as any)?.status ?? 'unknown';
+      acc[s] = (acc[s] ?? 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+          hypothesisId: 'H2',
+          location: 'bookings.service.ts:findUserBookings:db',
+          message: 'Fetched bookings from DB and caching (time/status sample)',
+        data: {
+          cacheKey,
+          page,
+          limit,
+          userId,
+          total,
+          count: bookings.length,
+            sampleStatus: bookings[0]?.status ?? null,
+            sampleStartUTC: bookings[0]?.startTime ?? null,
+            sampleStartLocal: bookings[0]?.startTime ? new Date(bookings[0].startTime).toISOString() : null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'H3',
+        location: 'bookings.service.ts:findUserBookings:status-mix',
+        message: 'Bookings status distribution after DB fetch',
+        data: {
+          cacheKey,
+          statusCounts,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
 
     const result = {
       bookings,
@@ -509,9 +670,15 @@ export class BookingsService {
       relations: ['user', 'branch', 'tickets', 'payments'],
     });
 
-    this.logger.log(`Found booking ${id}: branchId=${booking?.branchId}`);
+    this.logger.log(`Found booking ${id}: branchId=${booking?.branchId}, userId=${booking?.userId}, status=${booking?.status}`);
 
     if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    // Check if booking is deleted (branchId is null/undefined after deletion)
+    if (!booking.branchId) {
+      this.logger.warn(`Booking ${id} has no branchId - may have been deleted`);
       throw new NotFoundException('Booking not found');
     }
 
@@ -635,33 +802,121 @@ export class BookingsService {
     requesterBranchId?: string,
     isRequesterBranchManager?: boolean,
   ): Promise<{ success: true }> {
-    const booking = await this.findBookingById(
-      bookingId,
-      userIdOrRequesterId,
-      requesterBranchId,
-      isRequesterBranchManager,
-    );
+    // Try to find booking, but handle case where branchId might be undefined
+    let booking: Booking | null = null;
+    try {
+      booking = await this.findBookingById(
+        bookingId,
+        userIdOrRequesterId,
+        requesterBranchId,
+        isRequesterBranchManager,
+      );
+    } catch (error) {
+      // If booking not found via findBookingById (e.g., branchId undefined), try direct query
+      const where: any = { id: bookingId };
+      if (userIdOrRequesterId && !isRequesterBranchManager) {
+        where.userId = userIdOrRequesterId;
+      }
+      booking = await this.bookingRepository.findOne({
+        where,
+        relations: ['payments'],
+      });
+      
+      if (!booking) {
+        this.logger.warn(`Booking ${bookingId} not found for hard delete`);
+        throw new NotFoundException('Booking not found');
+      }
+      
+      // If branchId is undefined, booking may already be partially deleted
+      if (!booking.branchId) {
+        this.logger.warn(`Booking ${bookingId} has no branchId - may already be deleted`);
+        // Still proceed with deletion to clean up any remaining data
+      }
+    }
+
+    this.logger.log(`Hard deleting booking ${bookingId} with ${booking.payments?.length || 0} payments`);
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      // Delete related tickets and payments, then booking
-      await queryRunner.manager.delete(Ticket, { bookingId: booking.id });
-      await queryRunner.manager.delete(Payment, { bookingId: booking.id });
-      await queryRunner.manager.delete(Booking, { id: booking.id });
+      // First, delete all related tickets
+      const ticketsResult = await queryRunner.manager
+        .createQueryBuilder()
+        .delete()
+        .from(Ticket)
+        .where('bookingId = :bookingId', { bookingId: booking.id })
+        .execute();
+      
+      this.logger.log(`Deleted ${ticketsResult.affected || 0} tickets`);
+
+      // Then, delete all related payments
+      const paymentsResult = await queryRunner.manager
+        .createQueryBuilder()
+        .delete()
+        .from(Payment)
+        .where('bookingId = :bookingId', { bookingId: booking.id })
+        .execute();
+      
+      this.logger.log(`Deleted ${paymentsResult.affected || 0} payments`);
+
+      // Finally, delete the booking itself
+      const bookingResult = await queryRunner.manager
+        .createQueryBuilder()
+        .delete()
+        .from(Booking)
+        .where('id = :id', { id: booking.id })
+        .execute();
+
+      this.logger.log(`Deleted ${bookingResult.affected || 0} booking`);
+
+      if (bookingResult.affected === 0) {
+        throw new NotFoundException(`Failed to delete booking ${bookingId}`);
+      }
 
       await queryRunner.commitTransaction();
+      
+      this.logger.log(`Successfully committed deletion of booking ${bookingId}`);
+
+      // Verify deletion by trying to find the booking
+      const verifyBooking = await this.bookingRepository.findOne({
+        where: { id: booking.id },
+      });
+      
+      if (verifyBooking) {
+        this.logger.error(`Booking ${bookingId} still exists after deletion attempt!`);
+        throw new Error(`Failed to delete booking ${bookingId} - booking still exists in database`);
+      }
+      
+      this.logger.log(`Verified: Booking ${bookingId} successfully deleted from database`);
 
       // Cancel scheduled notifications and clear caches
-      await this.notifications.cancelScheduledForBooking(booking.id);
-      await this.redisService.del(`user:${booking.userId}:bookings`);
+      try {
+        await this.notifications.cancelScheduledForBooking(booking.id);
+      } catch (e) {
+        this.logger.warn(`Failed to cancel notifications for booking ${booking.id}: ${e}`);
+      }
+      
+      if (booking.userId) {
+        try {
+          await this.redisService.del(`user:${booking.userId}:bookings`);
+        } catch (e) {
+          this.logger.warn(`Failed to clear cache for user ${booking.userId}: ${e}`);
+        }
+      }
 
       // Realtime notify deletion (optional: using updated event)
-      this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: 'DELETED' as any });
+      try {
+        this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: 'DELETED' as any });
+      } catch (e) {
+        this.logger.warn(`Failed to emit realtime event for booking ${booking.id}: ${e}`);
+      }
+      
+      this.logger.log(`Successfully hard deleted booking ${bookingId}`);
       return { success: true };
     } catch (e) {
       await queryRunner.rollbackTransaction();
+      this.logger.error(`Failed to hard delete booking ${bookingId}: ${e}`);
       throw e;
     } finally {
       await queryRunner.release();
@@ -780,7 +1035,34 @@ export class BookingsService {
     requesterBranchId?: string,
     isRequesterBranchManager?: boolean,
   ): Promise<Booking> {
-    const booking = await this.findBookingById(bookingId, userIdOrRequesterId, requesterBranchId, isRequesterBranchManager);
+    // Try to find booking, handle case where branchId might be undefined
+    let booking: Booking;
+    try {
+      booking = await this.findBookingById(bookingId, userIdOrRequesterId, requesterBranchId, isRequesterBranchManager);
+    } catch (error) {
+      // If booking not found via findBookingById (e.g., branchId undefined), try direct query
+      const where: any = { id: bookingId };
+      if (userIdOrRequesterId && !isRequesterBranchManager) {
+        where.userId = userIdOrRequesterId;
+      }
+      const foundBooking = await this.bookingRepository.findOne({
+        where,
+        relations: ['payments'],
+      });
+      
+      if (!foundBooking) {
+        this.logger.warn(`Booking ${bookingId} not found for cancellation`);
+        throw new NotFoundException('Booking not found');
+      }
+      
+      // If branchId is undefined, booking may already be partially deleted
+      if (!foundBooking.branchId) {
+        this.logger.warn(`Booking ${bookingId} has no branchId - treating as already deleted`);
+        throw new NotFoundException('Booking not found');
+      }
+      
+      booking = foundBooking;
+    }
 
     if (booking.status === BookingStatus.CANCELLED) {
       throw new BadRequestException('Booking is already cancelled');
@@ -790,7 +1072,36 @@ export class BookingsService {
       throw new BadRequestException('Cannot cancel completed booking');
     }
 
-    // Allow cancelling past pending bookings; enforce 24h rule only for future bookings
+    // Check if booking has any completed payment
+    // Ensure payments array exists and check for completed status
+    const payments = booking.payments || [];
+    const hasCompletedPayment = payments.length > 0 && 
+      payments.some(
+        (payment) => payment.status === PaymentStatus.COMPLETED,
+      );
+
+    this.logger.log(`Cancel booking ${bookingId}: payments count=${payments.length}, hasCompleted=${hasCompletedPayment}`);
+
+    // If no completed payment, delete the booking completely (hard delete)
+    if (!hasCompletedPayment) {
+      this.logger.log(`Deleting unpaid booking: ${bookingId} by user ${userIdOrRequesterId} (no completed payment found)`);
+      
+      // Save booking info before deletion for response
+      const bookingInfo = { ...booking };
+      
+      // Delete the booking
+      await this.deleteBookingHard(bookingId, userIdOrRequesterId, requesterBranchId, isRequesterBranchManager);
+      
+      // Return deleted booking info with cancelled status for API compatibility
+      return {
+        ...bookingInfo,
+        status: BookingStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancellationReason: reason || 'Unpaid booking deleted',
+      } as Booking;
+    }
+
+    // For paid bookings, apply 24h cancellation rule
     const now = new Date();
     const bookingStart = new Date(booking.startTime);
     const isPast = bookingStart.getTime() <= now.getTime();
@@ -946,10 +1257,10 @@ export class BookingsService {
       // Only look for branch-level offers (no hallId)
       const offers = await this.offerRepository.find({
         where: [
-          { branchId, hallId: IsNull(), isActive: true, startsAt: IsNull(), endsAt: IsNull() },
-          { branchId, hallId: IsNull(), isActive: true, startsAt: LessThanOrEqual(at), endsAt: IsNull() },
-          { branchId, hallId: IsNull(), isActive: true, startsAt: IsNull(), endsAt: MoreThanOrEqual(at) },
-          { branchId, hallId: IsNull(), isActive: true, startsAt: LessThanOrEqual(at), endsAt: MoreThanOrEqual(at) },
+          { branchId, isActive: true, startsAt: IsNull(), endsAt: IsNull() },
+          { branchId, isActive: true, startsAt: LessThanOrEqual(at), endsAt: IsNull() },
+          { branchId, isActive: true, startsAt: IsNull(), endsAt: MoreThanOrEqual(at) },
+          { branchId, isActive: true, startsAt: LessThanOrEqual(at), endsAt: MoreThanOrEqual(at) },
         ] as any,
         order: { createdAt: 'DESC' } as any,
       });

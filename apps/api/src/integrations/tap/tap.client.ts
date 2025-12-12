@@ -9,7 +9,13 @@ export interface TapCreateChargeRequest {
     email?: string;
     phone?: { country_code?: string; number?: string };
   };
-  source: { id: string } | { payment_method: string };
+  source?: { id?: string; payment_method?: string };
+  redirect?: {
+    url: string;
+    post?: {
+      url: string;
+    };
+  };
   threeDS?: 'N' | 'Y' | 'y' | 'n' | 'required';
   description?: string;
   metadata?: Record<string, any>;
@@ -21,7 +27,13 @@ export interface TapCharge {
   status: string; // e.g. CAPTURED, AUTHORIZED, INITIATED, FAILED
   amount: number;
   currency: string;
-  transaction?: { authorization_id?: string };
+  transaction?: {
+    authorization_id?: string;
+    url?: string; // Payment URL from Tap Payments (use this for redirect)
+  };
+  redirect?: {
+    url: string;
+  };
 }
 
 export class TapClient {
@@ -39,13 +51,41 @@ export class TapClient {
   }
 
   async createCharge(payload: TapCreateChargeRequest): Promise<TapCharge> {
-    const resp = await this.http.post('/v2/charges', payload);
-    return resp.data as TapCharge;
+    try {
+      const resp = await this.http.post('/v2/charges', payload);
+      // Log full response for debugging
+      console.log(`[TapClient] Full charge creation response:`, JSON.stringify(resp.data, null, 2));
+      return resp.data as TapCharge;
+    } catch (error: any) {
+      // Extract error message from Tap API response
+      const rawMessage = error.response?.data?.message ||
+        error.response?.data?.errors?.map((e: any) => e.message).join(', ') ||
+        error.message ||
+        'Unknown error from payment gateway';
+
+      const errorMessage = typeof rawMessage === 'object' ? JSON.stringify(rawMessage) : String(rawMessage);
+      const errorDetails = error.response?.data ? JSON.stringify(error.response.data) : '';
+      throw new Error(`Tap Payments API error: ${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`);
+    }
   }
 
   async retrieveCharge(chargeId: string): Promise<TapCharge> {
-    const resp = await this.http.get(`/v2/charges/${chargeId}`);
-    return resp.data as TapCharge;
+    try {
+      const resp = await this.http.get(`/v2/charges/${chargeId}`);
+      // Log full response for debugging
+      console.log(`[TapClient] Full charge response for ${chargeId}:`, JSON.stringify(resp.data, null, 2));
+      return resp.data as TapCharge;
+    } catch (error: any) {
+      // Extract error message from Tap API response
+      const rawMessage = error.response?.data?.message ||
+        error.response?.data?.errors?.map((e: any) => e.message).join(', ') ||
+        error.message ||
+        'Unknown error from payment gateway';
+
+      const errorMessage = typeof rawMessage === 'object' ? JSON.stringify(rawMessage) : String(rawMessage);
+      const errorDetails = error.response?.data ? JSON.stringify(error.response.data) : '';
+      throw new Error(`Tap Payments API error: ${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`);
+    }
   }
 }
 

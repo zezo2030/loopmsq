@@ -1,0 +1,23 @@
+# API (NestJS) Dockerfile for Development with Hot Reload
+FROM node:20
+
+WORKDIR /app/apps/api
+
+# Copy package files
+COPY apps/api/package*.json ./
+
+# Install dependencies
+RUN npm install --no-audit --no-fund
+
+# Copy source code structure (will be overridden by volume mount in docker-compose)
+# This ensures the structure exists, but volume mount will override it
+COPY apps/api/ ./
+
+WORKDIR /app/apps/api
+
+# Expose port
+EXPOSE 3000
+
+# Run in development mode with watch
+CMD ["npm", "run", "start:dev"]
+

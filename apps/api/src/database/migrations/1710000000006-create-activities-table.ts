@@ -54,3 +54,14 @@ export class CreateActivitiesTable1710000000006 implements MigrationInterface {
 
 
 
+
+
+
+
+
+
+
+
+
+
+

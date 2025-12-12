@@ -9,6 +9,8 @@ import {
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
+import { Transform } from 'class-transformer';
+
 export class CreateFreeTicketAdminDto {
   @ApiProperty({
     description: 'User ID to create ticket for',
@@ -21,6 +23,7 @@ export class CreateFreeTicketAdminDto {
     description: 'Branch ID (required for Admin)',
     example: 'branch-uuid',
   })
+  @Transform(({ obj }) => obj.branchId || obj.hallId)
   @IsUUID()
   branchId: string;
 

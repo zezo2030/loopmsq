@@ -9,6 +9,7 @@ import {
   Index,
 } from 'typeorm';
 import { User } from './user.entity';
+import { Branch } from './branch.entity';
 import { PaymentMethod } from './payment.entity';
 
 export enum TripRequestStatus {
@@ -29,8 +30,11 @@ export class SchoolTripRequest {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', nullable: true })
   requesterId: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  branchId: string;
 
   @Column({ type: 'varchar', length: 200 })
   schoolName: string;
@@ -119,6 +123,10 @@ export class SchoolTripRequest {
   @ManyToOne(() => User, (user) => user.schoolTripRequests)
   @JoinColumn({ name: 'requesterId' })
   requester: User;
+
+  @ManyToOne(() => Branch)
+  @JoinColumn({ name: 'branchId' })
+  branch: Branch;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'approvedBy' })

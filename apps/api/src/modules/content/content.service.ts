@@ -145,7 +145,6 @@ export class ContentService {
     try {
       const queryBuilder = this.branchRepository
         .createQueryBuilder('branch')
-        .leftJoinAndSelect('branch.halls', 'halls')
         .orderBy('branch.createdAt', 'DESC');
 
       if (!includeInactive) {
@@ -186,7 +185,6 @@ export class ContentService {
     try {
       const branch = await this.branchRepository.findOne({
         where: { id },
-        relations: ['halls'],
       });
 
       if (!branch) {

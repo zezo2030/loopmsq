@@ -14,8 +14,7 @@ import {
   Row,
   Col,
   Avatar,
-  Badge,
-  Table
+  Badge
 } from 'antd'
 import { 
   ArrowLeftOutlined,
@@ -25,7 +24,6 @@ import {
   DollarOutlined,
   CloseOutlined,
   WarningOutlined,
-  QrcodeOutlined,
   TeamOutlined
 } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
@@ -86,18 +84,10 @@ type Booking = {
   }
 }
 
-type Ticket = {
-  id: string
-  status: 'VALID' | 'USED' | 'EXPIRED' | 'CANCELLED'
-  scannedAt?: string
-  staffId?: string
-}
-
 export default function BookingDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [booking, setBooking] = useState<Booking | null>(null)
-  const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [cancelModalVisible, setCancelModalVisible] = useState(false)
   const [cancelForm] = Form.useForm()
@@ -132,15 +122,10 @@ export default function BookingDetail() {
       }
       
       setBooking(normalizedBooking)
-
-      // Load tickets
-      const ticketsData = await apiGet<Ticket[]>(`/bookings/${id}/tickets`)
-      setTickets(ticketsData)
     } catch (error) {
       console.error('Failed to load booking:', error)
       message.error('تعذّر تحميل تفاصيل الحجز')
       setBooking(null)
-      setTickets([])
     } finally {
       setLoading(false)
     }
@@ -187,42 +172,6 @@ export default function BookingDetail() {
       default: return status
     }
   }
-
-  const ticketColumns = [
-    {
-      title: 'رقم التذكرة',
-      dataIndex: 'id',
-      key: 'id',
-      render: (id: string) => (
-        <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{id}</span>
-      )
-    },
-    {
-      title: 'النوع',
-      key: 'type',
-      render: () => 'عادي',
-    },
-    {
-      title: 'الحالة',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: Ticket['status'], record: Ticket) => {
-        const isUsed = status === 'USED' || !!record.scannedAt
-        return (
-          <Tag color={isUsed ? 'default' : 'success'}>
-            {isUsed ? 'مستخدمة' : 'غير مستخدمة'}
-          </Tag>
-        )
-      }
-    },
-    {
-      title: 'تاريخ الاستخدام',
-      key: 'usage',
-      render: () => (
-        <span>{new Date(booking!.startTime).toLocaleDateString('ar-SA', { calendar: 'gregory' })}</span>
-      )
-    }
-  ]
 
   if (loading) {
     return (
@@ -533,20 +482,6 @@ export default function BookingDetail() {
               </Card>
             </Col>
 
-            {/* Tickets */}
-            {tickets.length > 0 && (
-              <Col xs={24}>
-                <Card className="custom-card" title="التذاكر" extra={<QrcodeOutlined />}>
-                  <Table
-                    dataSource={tickets}
-                    columns={ticketColumns}
-                    rowKey="id"
-                    pagination={false}
-                    size="small"
-                  />
-                </Card>
-              </Col>
-            )}
           </Row>
         </div>
       </div>

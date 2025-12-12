@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsDateString, IsEmail, IsEnum, IsInt, IsOptional, IsString, Length, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsDateString, IsEmail, IsEnum, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaymentMethod } from '../../../database/entities/payment.entity';
 
@@ -24,6 +24,10 @@ class AddOnDto {
 }
 
 export class CreateTripRequestDto {
+  @ApiProperty({ description: 'Branch ID', example: 'branch-uuid' })
+  @IsUUID()
+  branchId: string;
+
   @ApiProperty()
   @IsString()
   @Length(2, 200)

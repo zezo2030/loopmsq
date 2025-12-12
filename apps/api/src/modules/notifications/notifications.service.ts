@@ -7,8 +7,9 @@ import { User } from '../../database/entities/user.entity';
 import { DeviceToken } from '../../database/entities/device-token.entity';
 import { EncryptionService } from '../../utils/encryption.util';
 import { EmailProvider } from './providers/email.provider';
+import { WhatsAppProvider } from './providers/whatsapp.provider';
 
-export type NotificationChannel = 'sms' | 'email' | 'push';
+export type NotificationChannel = 'sms' | 'email' | 'push' | 'whatsapp';
 
 export interface EnqueueNotification {
   type:
@@ -42,10 +43,12 @@ export class NotificationsService {
     @InjectQueue('notifications_sms') private readonly smsQueue: Queue,
     @InjectQueue('notifications_email') private readonly emailQueue: Queue,
     @InjectQueue('notifications_push') private readonly pushQueue: Queue,
+    @InjectQueue('notifications_whatsapp') private readonly whatsappQueue: Queue,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(DeviceToken) private readonly tokenRepo: Repository<DeviceToken>,
     private readonly encryption: EncryptionService,
     private readonly emailProvider: EmailProvider,
+    private readonly whatsappProvider: WhatsAppProvider,
   ) {}
 
   async enqueue(n: EnqueueNotification): Promise<void> {
@@ -74,6 +77,29 @@ export class NotificationsService {
           { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, ...(n.delayMs ? { delay: n.delayMs } : {}), ...(n.jobId ? { jobId: n.jobId } : {}) },
         ),
       );
+    }
+
+    if (n.channels.includes('whatsapp') && (n.to.phone || resolved.phone)) {
+      // WhatsApp supports OTP messages only
+      if (n.type === 'OTP') {
+        jobs.push(
+          this.whatsappQueue.add(
+            'send',
+            { 
+              to: n.to.phone || resolved.phone!, 
+              otp: String(n.data.otp),
+              lang 
+            },
+            { 
+              attempts: 5, 
+              backoff: { type: 'exponential', delay: 2000 }, 
+              removeOnComplete: true,
+              ...(n.delayMs ? { delay: n.delayMs } : {}), 
+              ...(n.jobId ? { jobId: n.jobId } : {}) 
+            },
+          ),
+        );
+      }
     }
 
     if (n.channels.includes('push')) {
@@ -108,6 +134,7 @@ export class NotificationsService {
       ...jobIds.map((id) => this.smsQueue.removeJobs(id)),
       ...jobIds.map((id) => this.emailQueue.removeJobs(id)),
       ...jobIds.map((id) => this.pushQueue.removeJobs(id)),
+      ...jobIds.map((id) => this.whatsappQueue.removeJobs(id)),
     ]);
   }
 

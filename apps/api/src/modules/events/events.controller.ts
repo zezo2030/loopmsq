@@ -93,6 +93,15 @@ export class EventsController {
   confirm(@Param('id', ParseUUIDPipe) id: string) {
     return this.eventsService.confirm(id);
   }
+
+  @Get('requests/:id/tickets')
+  @ApiOperation({ summary: 'Get tickets for event request' })
+  @ApiResponse({ status: 200, description: 'Tickets retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Event request not found' })
+  async getEventTickets(@CurrentUser() user: any, @Param('id', ParseUUIDPipe) id: string) {
+    return this.eventsService.getEventTickets(id, user);
+  }
 }
 
 

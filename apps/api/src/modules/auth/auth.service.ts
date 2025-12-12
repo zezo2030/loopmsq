@@ -90,19 +90,19 @@ export class AuthService {
       Number(otpCfg.expirySeconds) || 300,
     );
 
-    // Enqueue SMS OTP
+    // Enqueue WhatsApp OTP (replacing SMS)
     await this.notifications.enqueue({
       type: 'OTP',
       to: { phone: normalizedPhone },
       data: { otp },
       lang,
-      channels: ['sms'],
+      channels: ['whatsapp'],
     });
 
     const message =
       language === 'ar'
-        ? 'تم إرسال رمز التحقق عبر الرسائل النصية'
-        : 'OTP sent via SMS';
+        ? 'تم إرسال رمز التحقق عبر واتساب'
+        : 'OTP sent via WhatsApp';
 
     return {
       success: true,
@@ -164,19 +164,19 @@ export class AuthService {
       Number(otpCfg.expirySeconds) || 300,
     );
 
-    // Enqueue SMS OTP for registration
+    // Enqueue WhatsApp OTP for registration
     await this.notifications.enqueue({
       type: 'OTP',
       to: { phone: normalizedPhone },
       data: { otp },
       lang: language as 'ar' | 'en',
-      channels: ['sms'],
+      channels: ['whatsapp'],
     });
 
     const message =
       language === 'ar'
-        ? 'تم إرسال رمز التحقق للتسجيل عبر الرسائل النصية'
-        : 'Registration OTP sent via SMS';
+        ? 'تم إرسال رمز التحقق للتسجيل عبر واتساب'
+        : 'Registration OTP sent via WhatsApp';
 
     return { success: true, message };
   }
