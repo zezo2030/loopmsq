@@ -28,6 +28,7 @@ import Offers from './pages/cms/Offers'
 import Coupons from './pages/cms/Coupons'
 import Packages from './pages/cms/Packages'
 import Activities from './pages/cms/Activities'
+import OrganizingBranches from './pages/cms/OrganizingBranches'
 import PaymentsList from './pages/finance/PaymentsList'
 import PaymentDetail from './pages/finance/PaymentDetail'
 import Loyalty from './pages/marketing/Loyalty'
@@ -104,6 +105,7 @@ const router = createBrowserRouter([
           { path: 'cms/coupons', element: <Coupons /> },
           { path: 'cms/packages', element: <Packages /> },
           { path: 'cms/activities', element: <Activities /> },
+          { path: 'cms/organizing-branches', element: <OrganizingBranches /> },
 
           // Content
           { path: 'content/branches', element: <Branches /> },

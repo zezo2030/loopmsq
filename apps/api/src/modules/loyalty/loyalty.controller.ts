@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { LoyaltyService } from './loyalty.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -59,6 +59,15 @@ export class LoyaltyController {
   async activateRule(@Param('id') id: string) {
     await this.loyalty.setActiveRule(id);
     return { success: true };
+  }
+
+  @Patch('rules/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update loyalty rule (Admin only)' })
+  async updateRule(@Param('id') id: string, @Body() body: { earnRate?: number; redeemRate?: number; minRedeemPoints?: number; isActive?: boolean }) {
+    return this.loyalty.updateRule(id, body);
   }
 
   // Wallet admin endpoints

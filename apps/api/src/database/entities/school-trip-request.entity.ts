@@ -10,7 +10,6 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Branch } from './branch.entity';
-import { PaymentMethod } from './payment.entity';
 
 export enum TripRequestStatus {
   PENDING = 'pending',
@@ -110,8 +109,8 @@ export class SchoolTripRequest {
     quantity: number;
   }[];
 
-  @Column({ type: 'enum', enum: PaymentMethod, nullable: true })
-  paymentMethod?: PaymentMethod;
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  paymentMethod?: string;
 
   @CreateDateColumn()
   createdAt: Date;

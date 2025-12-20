@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { User } from '../../database/entities/user.entity';
+import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
 import { CreateTripRequestDto } from './dto/create-trip-request.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubmitTripRequestDto } from './dto/submit-trip-request.dto';
@@ -23,15 +24,17 @@ export class TripsService {
     private readonly ticketRepo: Repository<Ticket>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(Payment)
+    private readonly paymentRepo: Repository<Payment>,
     private readonly notifications: NotificationsService,
-  ) {}
+  ) { }
 
   async createRequest(userId: string, dto: CreateTripRequestDto) {
     const req = this.tripRepo.create({
       requesterId: userId,
       branchId: dto.branchId,
       schoolName: dto.schoolName,
-      studentsCount: dto.studentsCount,
+      studentsCount: dto.studentsCount || 0, // Will be updated from Excel file
       accompanyingAdults: dto.accompanyingAdults,
       preferredDate: new Date(dto.preferredDate as any),
       preferredTime: dto.preferredTime,
@@ -76,23 +79,41 @@ export class TripsService {
     return { success: true };
   }
 
-  async approveRequest(approverId: string, id: string) {
+  async approveRequest(approverId: string, id: string, quotedPrice?: number, adminNotes?: string) {
     const req = await this.tripRepo.findOne({ where: { id } });
     if (!req) throw new NotFoundException('Request not found');
     if (req.status !== TripRequestStatus.UNDER_REVIEW) {
       throw new BadRequestException('Only under_review requests can be approved');
     }
+
+    // Calculate price if not provided
+    if (quotedPrice) {
+      req.quotedPrice = quotedPrice;
+    } else {
+      const baseCount = (req.studentsList?.length || req.studentsCount) + (req.accompanyingAdults || 0);
+      const pricePerPerson = 50; // SAR default pricing
+      const addOnsTotal = (req.addOns || []).reduce((sum, a) => sum + (a.price * a.quantity), 0);
+      req.quotedPrice = baseCount * pricePerPerson + addOnsTotal;
+    }
+
     req.status = TripRequestStatus.APPROVED;
     req.approvedAt = new Date();
     req.approvedBy = approverId;
+    if (adminNotes) req.adminNotes = adminNotes;
+
     await this.tripRepo.save(req);
+
     await this.notifications.enqueue({
       type: 'TRIP_STATUS',
       to: { userId: req.requesterId },
-      data: { status: 'APPROVED' },
-      channels: ['sms'],
+      data: {
+        status: 'APPROVED',
+        quotedPrice: req.quotedPrice,
+      },
+      channels: ['sms', 'push'],
     });
-    return { success: true };
+
+    return { success: true, quotedPrice: req.quotedPrice };
   }
 
   async uploadParticipants(userId: string, id: string, file: Express.Multer.File) {
@@ -121,6 +142,7 @@ export class TripsService {
       };
     });
     req.studentsList = participants;
+    req.studentsCount = participants.length; // Update studentsCount from Excel file
     req.excelFilePath = file.path;
     await this.tripRepo.save(req);
     return { count: participants.length };
@@ -152,11 +174,18 @@ export class TripsService {
   async issueTickets(issuerId: string, id: string, dto: IssueTicketsDto) {
     const req = await this.tripRepo.findOne({ where: { id } });
     if (!req) throw new NotFoundException('Request not found');
-    if (req.status !== TripRequestStatus.PAID && req.status !== TripRequestStatus.INVOICED) {
-      throw new BadRequestException('Tickets can be issued only after payment');
+
+    // Allow issuing tickets after payment (PAID) or directly after approval (APPROVED)
+    if (req.status !== TripRequestStatus.PAID && req.status !== TripRequestStatus.APPROVED) {
+      throw new BadRequestException('Tickets can be issued only after payment or approval');
     }
+
     // Create a booking representing the trip
-    const persons = (req.studentsList?.length || req.studentsCount) + (req.accompanyingAdults || 0);
+    const studentsList = req.studentsList || [];
+    const studentsCount = studentsList.length || req.studentsCount || 0;
+    const adultsCount = req.accompanyingAdults || 0;
+    const totalPersons = studentsCount + adultsCount;
+
     // derive branch from issuer if available
     const issuer = await this.userRepo.findOne({ where: { id: issuerId } });
     const bookingData: Partial<Booking> = {
@@ -164,8 +193,8 @@ export class TripsService {
       branchId: (req as any).branchId || issuer?.branchId,
       startTime: new Date(dto.startTime),
       durationHours: dto.durationHours as any,
-      persons: persons as any,
-      totalPrice: Number(req.quotedPrice ?? persons * 50) as any,
+      persons: totalPersons as any,
+      totalPrice: Number(req.quotedPrice ?? totalPersons * 50) as any,
       status: BookingStatus.CONFIRMED,
     };
     const booking = this.bookingRepo.create(bookingData);
@@ -173,31 +202,65 @@ export class TripsService {
 
     // Generate tickets for each participant/person
     const tickets: Ticket[] = [];
-    for (let i = 0; i < persons; i++) {
+
+    // Create tickets for students with their names
+    for (let i = 0; i < studentsList.length; i++) {
+      const student = studentsList[i];
       const t = this.ticketRepo.create({
         bookingId: savedBooking.id,
-        qrTokenHash: '', // will be filled later by QR flow; keep valid placeholder
+        qrTokenHash: `trip_${savedBooking.id}_${i}`, // Temporary hash, will be updated by QR flow
         status: TicketStatus.VALID,
         personCount: 1,
+        holderName: student.name, // ✅ اسم الطالب
+        holderPhone: student.guardianPhone,
         validFrom: savedBooking.startTime as any,
         validUntil: new Date(
           (savedBooking.startTime as any as Date).getTime() + (savedBooking.durationHours as any as number) * 3600 * 1000,
         ),
+        metadata: {
+          studentAge: student.age,
+          guardianName: student.guardianName,
+          tripType: 'school',
+        },
       } as Partial<Ticket>);
       tickets.push(t);
     }
+
+    // Create tickets for accompanying adults
+    for (let i = 0; i < adultsCount; i++) {
+      const t = this.ticketRepo.create({
+        bookingId: savedBooking.id,
+        qrTokenHash: `trip_${savedBooking.id}_adult_${i}`,
+        status: TicketStatus.VALID,
+        personCount: 1,
+        holderName: `مرافق ${i + 1}`, // ✅ اسم عام للمرافقين
+        validFrom: savedBooking.startTime as any,
+        validUntil: new Date(
+          (savedBooking.startTime as any as Date).getTime() + (savedBooking.durationHours as any as number) * 3600 * 1000,
+        ),
+        metadata: {
+          tripType: 'school',
+          role: 'adult',
+        },
+      } as Partial<Ticket>);
+      tickets.push(t);
+    }
+
     await this.ticketRepo.save(tickets);
+
     // Send notifications (welcome message / tickets issued)
     await this.notifications.enqueue({
       type: 'TICKETS_ISSUED',
       to: { userId: req.requesterId },
       data: { bookingId: savedBooking.id, welcomeMessage: dto.welcomeMessage },
       lang: 'ar',
-      channels: ['sms'],
+      channels: ['sms', 'push'],
     });
+
     req.status = TripRequestStatus.COMPLETED;
     await this.tripRepo.save(req);
-    return { bookingId: savedBooking.id };
+
+    return { bookingId: savedBooking.id, ticketsCount: tickets.length };
   }
 
   async markPaid(approverId: string, id: string, dto: any) {
@@ -301,6 +364,120 @@ export class TripsService {
         totalRevenue,
       },
     };
+  }
+
+  /**
+   * User pays for an approved trip request
+   * This will create a payment intent  and after successful payment,
+   * automatically issue tickets and mark as completed
+   */
+  async payForTrip(userId: string, id: string, dto: { paymentMethod?: string }) {
+    const req = await this.tripRepo.findOne({ where: { id, requesterId: userId } });
+    if (!req) throw new NotFoundException('Request not found');
+
+    if (req.status !== TripRequestStatus.APPROVED) {
+      throw new BadRequestException('Only approved requests can be paid');
+    }
+
+    if (!req.quotedPrice || req.quotedPrice <= 0) {
+      throw new BadRequestException('No quoted price available');
+    }
+
+    // For now, we'll simulate successful payment
+    // In production, this should integrate with the PaymentsService
+    // to create a payment intent and handle the actual payment flow
+
+    // TODO: Integrate with PaymentsService.createIntent()
+    // const paymentIntent = await this.paymentsService.createIntent(userId, {
+    //   tripRequestId: id,
+    //   method: dto.paymentMethod || PaymentMethod.CREDIT_CARD,
+    // });
+
+    // For now, mark as paid immediately (simulate successful payment)
+    req.status = TripRequestStatus.PAID;
+    req.paymentMethod = dto.paymentMethod as any;
+    await this.tripRepo.save(req);
+
+    // Send notification
+    await this.notifications.enqueue({
+      type: 'TRIP_STATUS',
+      to: { userId: req.requesterId },
+      data: {
+        status: 'PAID',
+        amount: req.quotedPrice,
+      },
+      channels: ['sms', 'push'],
+    });
+
+    // Automatically issue tickets after payment
+    // Using the trip's preferred date and duration
+    const issueDto: IssueTicketsDto = {
+      startTime: req.preferredDate.toISOString(),
+      durationHours: req.durationHours,
+      welcomeMessage: `مرحباً بكم في رحلة ${req.schoolName}`,
+    };
+
+    const ticketsResult = await this.issueTickets(userId, id, issueDto);
+
+    return {
+      success: true,
+      status: 'PAID_AND_COMPLETED',
+      quotedPrice: req.quotedPrice,
+      bookingId: ticketsResult.bookingId,
+      ticketsCount: ticketsResult.ticketsCount,
+    };
+  }
+
+  async getTripTickets(tripRequestId: string, user: any): Promise<Ticket[]> {
+    // Verify access
+    const tripRequest = await this.tripRepo.findOne({
+      where: { id: tripRequestId },
+    });
+    if (!tripRequest) throw new NotFoundException('Trip request not found');
+    
+    const isOwner = tripRequest.requesterId === user.id;
+    const roles: string[] = user.roles || [];
+    const isStaff = roles.includes('staff') || roles.includes('admin');
+    if (!isOwner && !isStaff) throw new ForbiddenException('Not allowed');
+
+    // First, try to find payment linked to this trip request
+    const payment = await this.paymentRepo.findOne({
+      where: {
+        tripRequestId: tripRequestId,
+        status: PaymentStatus.COMPLETED,
+      },
+    });
+
+    if (payment && payment.bookingId) {
+      // Get tickets from the booking linked to the payment
+      const tickets = await this.ticketRepo.find({
+        where: { bookingId: payment.bookingId },
+        relations: ['staff'], // Load staff relation to get staff name
+      });
+      return tickets;
+    }
+
+    // If no payment found, try to find booking by matching trip request details
+    // This handles cases where booking was created during payment confirmation
+    const booking = await this.bookingRepo.findOne({
+      where: {
+        userId: tripRequest.requesterId,
+        branchId: tripRequest.branchId,
+        startTime: tripRequest.preferredDate,
+        status: BookingStatus.CONFIRMED,
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (booking) {
+      const tickets = await this.ticketRepo.find({
+        where: { bookingId: booking.id },
+        relations: ['staff'], // Load staff relation to get staff name
+      });
+      return tickets;
+    }
+
+    return [];
   }
 }
 

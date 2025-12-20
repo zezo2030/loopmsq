@@ -58,3 +58,13 @@ echo "💡 The database will be recreated with migrations on next API startup"
 
 
 
+
+
+
+
+
+
+
+
+
+

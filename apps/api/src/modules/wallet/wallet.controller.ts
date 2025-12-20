@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, GoneException, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WalletService } from './wallet.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -16,15 +16,14 @@ export class WalletController {
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Recharge wallet with payment gateway' })
-  @ApiResponse({ status: 200, description: 'Wallet recharge initiated' })
-  @ApiResponse({ status: 400, description: 'Invalid request or insufficient funds' })
-  @ApiResponse({ status: 404, description: 'Wallet not found' })
+  @ApiOperation({ summary: 'Recharge wallet with payment gateway (DISABLED)' })
+  @ApiResponse({ status: 410, description: 'Wallet recharge disabled' })
   async rechargeWallet(
     @CurrentUser() user: User,
     @Body() dto: RechargeWalletDto,
   ) {
-    return this.walletService.rechargeWallet(user.id, dto);
+    // Feature disabled: allow only converting points to wallet (loyalty redeem)
+    throw new GoneException('Wallet recharge is disabled. Use points conversion instead.');
   }
 
   @Get('me')

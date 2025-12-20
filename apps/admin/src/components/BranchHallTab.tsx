@@ -16,59 +16,59 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
   const [form] = Form.useForm()
   const qc = useQueryClient()
 
-  const { data: hall, isLoading, refetch } = useQuery<any>({
-    queryKey: ['branch-hall', branchId],
+  const { data: branch, isLoading, refetch } = useQuery<any>({
+    queryKey: ['branch', branchId],
     queryFn: async () => {
-      const data = await apiGet(`/content/branches/${branchId}/hall`)
+      const data = await apiGet(`/content/branches/${branchId}`)
       return data
     },
     retry: false,
   })
 
-  const updateHall = useMutation({
+  const updateBranch = useMutation({
     mutationFn: async (body: any) => {
-      return apiPatch(`/content/branches/${branchId}/hall`, body)
+      return apiPatch(`/content/branches/${branchId}`, body)
     },
     onSuccess: () => {
-      message.success(t('halls.updated') || 'Hall updated successfully')
-      qc.invalidateQueries({ queryKey: ['branch-hall', branchId] })
+      message.success(t('branches.updated') || 'Branch updated successfully')
+      qc.invalidateQueries({ queryKey: ['branch', branchId] })
       qc.invalidateQueries({ queryKey: ['branches'] })
     },
     onError: (error: any) => {
-      message.error(error?.message || (t('halls.update_failed') || 'Failed to update hall'))
+      message.error(error?.message || (t('branches.update_failed') || 'Failed to update branch'))
     },
   })
 
   useEffect(() => {
-    if (hall) {
+    if (branch) {
       form.setFieldsValue({
-        name_ar: hall.name_ar,
-        name_en: hall.name_en,
-        capacity: hall.capacity,
-        isDecorated: hall.isDecorated,
-        price_basePrice: hall.priceConfig?.basePrice,
-        price_hourlyRate: hall.priceConfig?.hourlyRate,
-        price_pricePerPerson: hall.priceConfig?.pricePerPerson,
-        price_weekendMultiplier: hall.priceConfig?.weekendMultiplier,
-        price_holidayMultiplier: hall.priceConfig?.holidayMultiplier,
-        price_decorationPrice: hall.priceConfig?.decorationPrice,
-        description_ar: hall.description_ar,
-        description_en: hall.description_en,
-        features: hall.features,
-        images: hall.images,
-        videoUrl: hall.videoUrl,
-        status: hall.status,
+        name_ar: branch.nameAr || branch.name_ar,
+        name_en: branch.nameEn || branch.name_en,
+        capacity: branch.capacity,
+        isDecorated: branch.isDecorated,
+        price_basePrice: branch.priceConfig?.basePrice,
+        price_hourlyRate: branch.priceConfig?.hourlyRate,
+        price_pricePerPerson: branch.priceConfig?.pricePerPerson,
+        price_weekendMultiplier: branch.priceConfig?.weekendMultiplier,
+        price_holidayMultiplier: branch.priceConfig?.holidayMultiplier,
+        price_decorationPrice: branch.priceConfig?.decorationPrice,
+        description_ar: branch.descriptionAr || branch.description_ar,
+        description_en: branch.descriptionEn || branch.description_en,
+        features: branch.hallFeatures || branch.features,
+        images: branch.hallImages || branch.images,
+        videoUrl: branch.hallVideoUrl || branch.videoUrl,
+        status: branch.hallStatus || branch.status,
       })
     }
-  }, [hall, form])
+  }, [branch, form])
 
   const handleSubmit = (values: any) => {
     const body = {
-      name_ar: values.name_ar,
-      name_en: values.name_en,
+      nameAr: values.name_ar,
+      nameEn: values.name_en,
       capacity: Number(values.capacity || 0),
       isDecorated: !!values.isDecorated,
-      priceConfig: {
+      hallPriceConfig: {
         basePrice: Number(values.price_basePrice || 0),
         hourlyRate: Number(values.price_hourlyRate || 0),
         pricePerPerson: Number(values.price_pricePerPerson || 0),
@@ -76,23 +76,24 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
         holidayMultiplier: Number(values.price_holidayMultiplier || 1),
         decorationPrice: values.price_decorationPrice != null ? Number(values.price_decorationPrice) : undefined,
       },
-      description_ar: values.description_ar || null,
-      description_en: values.description_en || null,
-      features: values.features?.length ? values.features : undefined,
-      images: values.images?.length ? values.images : undefined,
-      videoUrl: values.videoUrl || null,
+      descriptionAr: values.description_ar || null,
+      descriptionEn: values.description_en || null,
+      hallFeatures: values.features?.length ? values.features : undefined,
+      hallImages: values.images?.length ? values.images : undefined,
+      hallVideoUrl: values.videoUrl || null,
+      hallStatus: values.status || 'available',
     }
-    updateHall.mutate(body)
+    updateBranch.mutate(body)
   }
 
   if (isLoading) {
     return <Spin size="large" style={{ display: 'block', textAlign: 'center', padding: '40px' }} />
   }
 
-  if (!hall) {
+  if (!branch) {
     return (
       <Card>
-        <p>{t('halls.no_hall_found') || 'No hall found for this branch. Hall should be created automatically when branch is created.'}</p>
+        <p>{t('branches.not_found') || 'Branch not found.'}</p>
       </Card>
     )
   }
@@ -106,12 +107,12 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
       >
         <Row gutter={16}>
           <Col span={12}>
-            <Form.Item name="name_ar" label={t('halls.name_ar') || 'الاسم (AR)'} rules={[{ required: true }]}>
+            <Form.Item name="name_ar" label={t('branches.name_ar') || 'الاسم (AR)'} rules={[{ required: true }]}>
               <Input />
             </Form.Item>
           </Col>
           <Col span={12}>
-            <Form.Item name="name_en" label={t('halls.name_en') || 'الاسم (EN)'} rules={[{ required: true }]}>
+            <Form.Item name="name_en" label={t('branches.name_en') || 'الاسم (EN)'} rules={[{ required: true }]}>
               <Input />
             </Form.Item>
           </Col>
@@ -119,12 +120,12 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
 
         <Row gutter={16}>
           <Col span={12}>
-            <Form.Item name="capacity" label={t('halls.capacity') || 'السعة'} rules={[{ required: true }]}>
+            <Form.Item name="capacity" label={t('branches.capacity') || 'السعة'} rules={[{ required: true }]}>
               <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           <Col span={12}>
-            <Form.Item name="isDecorated" label={t('halls.decorated') || 'مزينة'}>
+            <Form.Item name="isDecorated" label={t('branches.decorated') || 'مزينة'}>
               <Select
                 options={[
                   { label: t('common.yes') || 'Yes', value: true },
@@ -137,22 +138,22 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
 
         <Row gutter={16}>
           <Col span={6}>
-            <Form.Item name="price_basePrice" label={t('halls.price_base') || 'Base Price'}>
+            <Form.Item name="price_basePrice" label={t('branches.base_price') || 'Base Price'}>
               <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           <Col span={6}>
-            <Form.Item name="price_hourlyRate" label={t('halls.price_hourly') || 'Hourly Rate'}>
+            <Form.Item name="price_hourlyRate" label={t('branches.hourly_rate') || 'Hourly Rate'}>
               <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           <Col span={6}>
-            <Form.Item name="price_pricePerPerson" label={t('halls.price_per_person') || 'Per Person'}>
+            <Form.Item name="price_pricePerPerson" label={t('branches.price_per_person') || 'Per Person'}>
               <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           <Col span={6}>
-            <Form.Item name="price_weekendMultiplier" label={t('halls.price_weekend') || 'Weekend Multiplier'}>
+            <Form.Item name="price_weekendMultiplier" label={t('branches.weekend_multiplier') || 'Weekend Multiplier'}>
               <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
@@ -160,51 +161,51 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
 
         <Row gutter={16}>
           <Col span={6}>
-            <Form.Item name="price_holidayMultiplier" label={t('halls.price_holiday') || 'Holiday Multiplier'}>
+            <Form.Item name="price_holidayMultiplier" label={t('branches.holiday_multiplier') || 'Holiday Multiplier'}>
               <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           <Col span={6}>
-            <Form.Item name="price_decorationPrice" label={t('halls.price_decoration') || 'Decoration Price'}>
+            <Form.Item name="price_decorationPrice" label={t('branches.decoration_price') || 'Decoration Price'}>
               <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           <Col span={6}>
-            <Form.Item name="status" label={t('halls.status') || 'Status'}>
+            <Form.Item name="status" label={t('branches.status') || 'Status'}>
               <Select
                 options={[
-                  { label: t('halls.available') || 'Available', value: 'available' },
-                  { label: t('halls.maintenance') || 'Maintenance', value: 'maintenance' },
-                  { label: t('halls.reserved') || 'Reserved', value: 'reserved' },
+                  { label: t('branches.available') || 'Available', value: 'available' },
+                  { label: t('branches.maintenance') || 'Maintenance', value: 'maintenance' },
+                  { label: t('branches.reserved') || 'Reserved', value: 'reserved' },
                 ]}
               />
             </Form.Item>
           </Col>
         </Row>
 
-        <Form.Item name="features" label={t('halls.features') || 'المزايا'}>
-          <Select mode="tags" placeholder={t('halls.features_ph') || 'أدخل المزايا'} />
+        <Form.Item name="features" label={t('branches.features') || 'المزايا'}>
+          <Select mode="tags" placeholder={t('branches.features_ph') || 'أدخل المزايا'} />
         </Form.Item>
 
-        <Form.Item name="description_ar" label={t('halls.description_ar') || 'الوصف (AR)'}>
+        <Form.Item name="description_ar" label={t('branches.description_ar') || 'الوصف (AR)'}>
           <TextArea rows={3} />
         </Form.Item>
 
-        <Form.Item name="description_en" label={t('halls.description_en') || 'الوصف (EN)'}>
+        <Form.Item name="description_en" label={t('branches.description_en') || 'الوصف (EN)'}>
           <TextArea rows={3} />
         </Form.Item>
 
         <Form.Item
           name="videoUrl"
-          label={t('halls.video_url') || 'رابط فيديو YouTube'}
-          help={t('halls.video_url_help') || 'أدخل رابط فيديو YouTube'}
+          label={t('branches.video_url') || 'رابط فيديو YouTube'}
+          help={t('branches.video_url_help') || 'أدخل رابط فيديو YouTube'}
         >
           <Input placeholder="https://www.youtube.com/watch?v=..." />
         </Form.Item>
 
         <Form.Item>
           <Space>
-            <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={updateHall.isPending}>
+            <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={updateBranch.isPending}>
               {t('common.save') || 'Save'}
             </Button>
             <Button onClick={() => refetch()}>

@@ -11,7 +11,6 @@ import { useAuth } from '../../shared/auth'
 type Offer = {
   id: string
   branchId: string
-  hallId?: string | null
   title: string
   description?: string | null
   discountType: 'percentage' | 'fixed'
@@ -57,37 +56,12 @@ export default function Offers() {
   // Auto-set hall when modal opens (each branch has one hall)
   useEffect(() => {
     if (open && editing && editing.branchId) {
-      // Auto-set the hall for editing mode
-      const loadHall = async () => {
-        try {
-          const halls = await apiGet<any[]>(`/content/halls?branchId=${editing.branchId}`)
-          if (halls && halls.length > 0) {
-            form.setFieldsValue({ hallId: halls[0].id })
-          }
-        } catch (error) {
-          console.error('Failed to load hall:', error)
-        }
-      }
-      loadHall()
-    }
-    // Auto-set hall for branch mode when creating new offer
-    if (open && !editing && isBranchMode && enforcedBranchId) {
-      (async () => {
-        try {
-          const halls = await apiGet<any[]>(`/content/halls?branchId=${enforcedBranchId}`)
-          if (halls && halls.length > 0) {
-            form.setFieldsValue({ hallId: halls[0].id })
-          }
-        } catch {
-          // Ignore errors - backend will handle it
-        }
-      })()
+      // Branch is already set from editing.branchId
     }
   }, [open, editing, isBranchMode, enforcedBranchId, form])
 
   const columns = [
     { title: 'Branch', dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
-    { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? v : 'Auto-linked' },
     { title: 'Title', dataIndex: 'title' },
     { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrlWithBust(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: 'Type', dataIndex: 'discountType' },
@@ -140,7 +114,6 @@ export default function Offers() {
           form.validateFields().then(values => {
             const body: any = {
               branchId: enforcedBranchId || values.branchId,
-              hallId: values.hallId || null,
               title: values.title,
               description: values.description || null,
               discountType: values.discountType,
@@ -162,29 +135,13 @@ export default function Offers() {
               <Select
                 placeholder="Select branch"
                 options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
-                onChange={async (v) => {
-                  // Hall will be automatically linked to branch's single hall on backend
-                  if (!v) {
-                    return
-                  }
-                  // Optionally load the hall to set it automatically (though backend will handle it)
-                  try {
-                    const halls = await apiGet<any[]>(`/content/halls?branchId=${v}`)
-                    if (halls && halls.length > 0) {
-                      // Auto-set the single hall for this branch
-                      form.setFieldsValue({ hallId: halls[0].id })
-                    }
-                  } catch (error) {
-                    console.error('Failed to load hall:', error)
-                  }
+                onChange={() => {
+                  // Branch is set, backend will handle the rest
                 }}
               />
             </Form.Item>
           )}
           {/* Hall selection is hidden - automatically linked to branch's single hall */}
-          <Form.Item name="hallId" hidden>
-            <Input />
-          </Form.Item>
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>
             <Input />
           </Form.Item>

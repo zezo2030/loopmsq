@@ -9,7 +9,6 @@ import { useAuth } from '../../shared/auth'
 type Coupon = {
   id: string
   branchId: string
-  hallId?: string | null
   code: string
   discountType: 'percentage' | 'fixed'
   discountValue: number
@@ -30,7 +29,6 @@ export default function Coupons() {
     const res = await apiGet<any>('/content/branches?includeInactive=true')
     return Array.isArray(res) ? res : (res.items || res.branches || [])
   }})
-  const [hallsOptions, setHallsOptions] = useState<any[]>([])
   const [open, setOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [editing, setEditing] = useState<Coupon | null>(null)
@@ -60,7 +58,6 @@ export default function Coupons() {
 
   const columns = [
     { title: 'Branch', dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
-    { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? (hallsOptions.find(h => h.id === v)?.name_en || v) : 'All Halls' },
     { title: 'Code', dataIndex: 'code' },
     { title: 'Type', dataIndex: 'discountType' },
     { title: 'Value', dataIndex: 'discountValue' },
@@ -123,21 +120,12 @@ export default function Coupons() {
               <Select
                 placeholder="Select branch"
                 options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
-                onChange={async (v) => {
-                  form.setFieldsValue({ hallId: undefined })
-                  const halls = await apiGet<any[]>(`/content/halls?branchId=${v}`)
-                  setHallsOptions(halls || [])
+                onChange={() => {
+                  // Branch is set, backend will handle the rest
                 }}
               />
             </Form.Item>
           )}
-          <Form.Item name="hallId" label="Hall (optional)">
-            <Select
-              allowClear
-              placeholder="All Halls"
-              options={(hallsOptions || []).map(h => ({ value: h.id, label: h.name_en }))}
-            />
-          </Form.Item>
           <Form.Item name="code" label="Code" rules={[{ required: true }]}>
             <Input />
           </Form.Item>

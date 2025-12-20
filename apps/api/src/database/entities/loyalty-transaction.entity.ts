@@ -66,7 +66,7 @@ export class LoyaltyTransaction {
   @JoinColumn({ name: 'walletId' })
   wallet: Wallet;
 
-  @ManyToOne(() => Booking)
+  @ManyToOne(() => Booking, { nullable: true })
   @JoinColumn({ name: 'relatedBookingId' })
   relatedBooking: Booking;
 }

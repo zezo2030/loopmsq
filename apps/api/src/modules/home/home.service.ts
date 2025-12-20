@@ -5,6 +5,7 @@ import { Banner } from '../../database/entities/banner.entity';
 import { Offer } from '../../database/entities/offer.entity';
 import { Branch } from '../../database/entities/branch.entity';
 import { Activity } from '../../database/entities/activity.entity';
+import { OrganizingBranch } from '../../database/entities/organizing-branch.entity';
 import { RedisService } from '../../utils/redis.service';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class HomeService {
     @InjectRepository(Offer) private readonly offerRepo: Repository<Offer>,
     @InjectRepository(Branch) private readonly branchRepo: Repository<Branch>,
     @InjectRepository(Activity) private readonly activityRepo: Repository<Activity>,
+    @InjectRepository(OrganizingBranch) private readonly organizingBranchRepo: Repository<OrganizingBranch>,
     private readonly redis: RedisService,
   ) {}
 
@@ -62,8 +64,14 @@ export class HomeService {
       order: { createdAt: 'DESC' },
     });
     
+    // Get active organizing branches
+    const organizingBranches = await this.organizingBranchRepo.find({
+      where: { isActive: true },
+      order: { createdAt: 'DESC' },
+    });
+    
     const featuredBranches = await this.branchRepo.find({ order: { createdAt: 'DESC' }, take: 10 });
-    const payload = { banners, offers: filteredOffers, featuredBranches, activities };
+    const payload = { banners, offers: filteredOffers, featuredBranches, activities, organizingBranches };
     await this.redis.set(cacheKey, payload, 120);
     return payload;
   }

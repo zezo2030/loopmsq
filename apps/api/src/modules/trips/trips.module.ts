@@ -4,6 +4,7 @@ import { SchoolTripRequest } from '../../database/entities/school-trip-request.e
 import { Booking } from '../../database/entities/booking.entity';
 import { Ticket } from '../../database/entities/ticket.entity';
 import { User } from '../../database/entities/user.entity';
+import { Payment } from '../../database/entities/payment.entity';
 import { TripsController } from './trips.controller';
 import { TripsService } from './trips.service';
 import { UsersModule } from '../users/users.module';
@@ -15,7 +16,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([SchoolTripRequest, Booking, Ticket, User]),
+    TypeOrmModule.forFeature([SchoolTripRequest, Booking, Ticket, User, Payment]),
     UsersModule,
     PaymentsModule,
     BookingsModule,

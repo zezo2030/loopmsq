@@ -33,11 +33,12 @@ export class CreateTripRequestDto {
   @Length(2, 200)
   schoolName: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Students count (optional, will be set from Excel file)' })
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(10000)
-  studentsCount: number;
+  studentsCount?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

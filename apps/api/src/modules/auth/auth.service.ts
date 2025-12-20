@@ -212,6 +212,16 @@ export class AuthService {
 
     if (user) {
       // Existing user - login directly
+      // Load wallet relation
+      const userWithWallet = await this.userRepository.findOne({
+        where: { id: user.id },
+        relations: ['wallet'],
+      });
+
+      if (!userWithWallet) {
+        throw new UnauthorizedException('User not found');
+      }
+
       // Delete OTP after successful verification
       try {
         await this.redisService.deleteOTP(normalizedPhone);
@@ -222,16 +232,16 @@ export class AuthService {
       }
 
       // Update last login
-      user.lastLoginAt = new Date();
-      await this.userRepository.save(user);
+      userWithWallet.lastLoginAt = new Date();
+      await this.userRepository.save(userWithWallet);
 
       // Generate tokens
-      const tokens = await this.generateTokens(user);
+      const tokens = await this.generateTokens(userWithWallet);
 
       let decryptedPhone: string | undefined;
-      if (user.phone) {
+      if (userWithWallet.phone) {
         try {
-          decryptedPhone = this.encryptionService.decrypt(user.phone);
+          decryptedPhone = this.encryptionService.decrypt(userWithWallet.phone);
         } catch {
           // ignore decryption errors
         }
@@ -240,12 +250,13 @@ export class AuthService {
       return {
         ...tokens,
         user: {
-          id: user.id,
-          email: user.email,
+          id: userWithWallet.id,
+          email: userWithWallet.email,
           phone: decryptedPhone,
-          name: user.name,
-          roles: user.roles,
-          language: user.language,
+          name: userWithWallet.name,
+          roles: userWithWallet.roles,
+          language: userWithWallet.language,
+          wallet: userWithWallet.wallet || null,
         },
         isNewUser: false,
       };
@@ -413,6 +424,7 @@ export class AuthService {
       isActive: user.isActive,
       branchId: user.branchId,
       createdAt: user.createdAt,
+      wallet: user.wallet || null,
     };
   }
 
@@ -477,27 +489,37 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Load wallet relation
+    const userWithWallet = await this.userRepository.findOne({
+      where: { id: user.id },
+      relations: ['wallet'],
+    });
+
+    if (!userWithWallet) {
+      throw new UnauthorizedException('User not found');
+    }
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(
       dto.password,
-      user.passwordHash,
+      userWithWallet.passwordHash,
     );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Update last login
-    user.lastLoginAt = new Date();
-    await this.userRepository.save(user);
+    userWithWallet.lastLoginAt = new Date();
+    await this.userRepository.save(userWithWallet);
 
     // Generate tokens
-    const tokens = await this.generateTokens(user);
+    const tokens = await this.generateTokens(userWithWallet);
 
     // Decrypt phone for response
     let decryptedPhone: string | undefined;
-    if (user.phone) {
+    if (userWithWallet.phone) {
       try {
-        decryptedPhone = this.encryptionService.decrypt(user.phone);
+        decryptedPhone = this.encryptionService.decrypt(userWithWallet.phone);
       } catch {
         // ignore decryption errors
       }
@@ -506,12 +528,13 @@ export class AuthService {
     return {
       ...tokens,
       user: {
-        id: user.id,
-        email: user.email,
+        id: userWithWallet.id,
+        email: userWithWallet.email,
         phone: decryptedPhone,
-        name: user.name,
-        roles: user.roles,
-        language: user.language,
+        name: userWithWallet.name,
+        roles: userWithWallet.roles,
+        language: userWithWallet.language,
+        wallet: userWithWallet.wallet || null,
       },
     };
   }
@@ -575,19 +598,30 @@ export class AuthService {
       );
     }
 
-    // Generate tokens
-    const tokens = await this.generateTokens(user);
+    // Reload user with wallet relation
+    const userWithWallet = await this.userRepository.findOne({
+      where: { id: user.id },
+      relations: ['wallet'],
+    });
 
-    this.logger.log(`New user registered: ${user.id}`);
+    if (!userWithWallet) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Generate tokens
+    const tokens = await this.generateTokens(userWithWallet);
+
+    this.logger.log(`New user registered: ${userWithWallet.id}`);
 
     return {
       ...tokens,
       user: {
-        id: user.id,
+        id: userWithWallet.id,
         phone: normalizedPhone,
-        name: user.name,
-        roles: user.roles,
-        language: user.language,
+        name: userWithWallet.name,
+        roles: userWithWallet.roles,
+        language: userWithWallet.language,
+        wallet: userWithWallet.wallet || null,
       },
     };
   }

@@ -1,12 +1,12 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateActivitiesTable1710000000006 implements MigrationInterface {
-  name = 'CreateActivitiesTable1710000000006';
+export class CreateOrganizingBranchesTable1710000000010 implements MigrationInterface {
+  name = 'CreateOrganizingBranchesTable1710000000010';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.createTable(
       new Table({
-        name: 'activities',
+        name: 'organizing_branches',
         columns: [
           {
             name: 'id',
@@ -22,6 +22,11 @@ export class CreateActivitiesTable1710000000006 implements MigrationInterface {
           },
           {
             name: 'videoUrl',
+            type: 'text',
+            isNullable: true,
+          },
+          {
+            name: 'videoCoverUrl',
             type: 'text',
             isNullable: true,
           },
@@ -47,31 +52,7 @@ export class CreateActivitiesTable1710000000006 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.dropTable('activities');
+    await queryRunner.dropTable('organizing_branches');
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

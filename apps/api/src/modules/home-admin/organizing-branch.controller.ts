@@ -10,9 +10,9 @@ import { extname, join } from 'path';
 import * as fs from 'fs';
 import { CloudinaryService } from '../../utils/cloudinary.service';
 
-@ApiTags('admin/activities')
-@Controller('admin/activities')
-export class ActivityAdminController {
+@ApiTags('admin/organizing-branches')
+@Controller('admin/organizing-branches')
+export class OrganizingBranchAdminController {
   constructor(
     private readonly svc: HomeAdminService,
     private readonly cloudinaryService: CloudinaryService,
@@ -22,13 +22,13 @@ export class ActivityAdminController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  list() { return this.svc.listActivities(); }
+  list() { return this.svc.listOrganizingBranches(); }
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  create(@Body() body: any) { return this.svc.createActivity(body); }
+  create(@Body() body: any) { return this.svc.createOrganizingBranch(body); }
 
   @Post('upload')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -46,19 +46,19 @@ export class ActivityAdminController {
           const uploadsRoot = uploadsRootCandidates.find((p) => {
             try { return !!p && fs.existsSync(p); } catch { return false; }
           }) || uploadsRootCandidates[0];
-          const target = join(uploadsRoot, 'activities');
+          const target = join(uploadsRoot, 'organizing-branches');
           try { fs.mkdirSync(target, { recursive: true }); } catch {}
           cb(null, target);
         },
         filename: (req, file, cb) => {
           const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `activity-${unique}${extname(file.originalname)}`);
+          cb(null, `organizing-branch-${unique}${extname(file.originalname)}`);
         },
       }),
     }),
   )
-  uploadActivityImage(@UploadedFile() file: Express.Multer.File) {
-    return { imageUrl: `/uploads/activities/${file.filename}` };
+  uploadOrganizingBranchImage(@UploadedFile() file: Express.Multer.File) {
+    return { imageUrl: `/uploads/organizing-branches/${file.filename}` };
   }
 
   @Post('upload-video')
@@ -84,7 +84,8 @@ export class ActivityAdminController {
       throw new BadRequestException('Video file size must be less than 100MB');
     }
 
-    const { videoUrl, coverUrl } = await this.cloudinaryService.uploadVideo(file, 'activities/videos');
+    const { videoUrl, coverUrl } = await this.cloudinaryService.uploadVideo(file, 'organizing-branches/videos');
+    console.log('Organizing Branch Video Upload:', { videoUrl, coverUrl });
     return { videoUrl, coverUrl };
   }
 
@@ -111,7 +112,8 @@ export class ActivityAdminController {
       throw new BadRequestException('Cover image file size must be less than 10MB');
     }
 
-    const coverUrl = await this.cloudinaryService.uploadImage(file, 'activities/video-covers');
+    const coverUrl = await this.cloudinaryService.uploadImage(file, 'organizing-branches/video-covers');
+    console.log('Organizing Branch Cover Upload:', { coverUrl });
     return { coverUrl };
   }
 
@@ -119,32 +121,12 @@ export class ActivityAdminController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  update(@Param('id') id: string, @Body() body: any) { return this.svc.updateActivity(id, body); }
+  update(@Param('id') id: string, @Body() body: any) { return this.svc.updateOrganizingBranch(id, body); }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  remove(@Param('id') id: string) { return this.svc.deleteActivity(id); }
+  remove(@Param('id') id: string) { return this.svc.deleteOrganizingBranch(id); }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

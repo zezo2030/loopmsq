@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
-@Entity('activities')
-export class Activity {
+@Entity('organizing_branches')
+export class OrganizingBranch {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -23,25 +23,4 @@ export class Activity {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

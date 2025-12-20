@@ -128,25 +128,12 @@ export class WalletService {
         }
 
         try {
-          // Get redirect URLs from config or use defaults
-          const frontendBaseUrl = this.configService.get<string>('FRONTEND_BASE_URL') || 'http://localhost:3000';
-          const apiBaseUrl = this.configService.get<string>('API_BASE_URL') || 'http://localhost:3000';
-          const successUrl = `${frontendBaseUrl}/payment/success?transactionId=${savedTransaction.id}`;
-          const webhookUrl = `${apiBaseUrl}/api/v1/payments/webhook`;
-
-          // Use src_all to show all payment methods including Mada
           const charge = await this.tapService.createCharge({
             amount: Number(amount),
             currency: 'SAR',
             capture: true,
             threeDS: 'required',
-            source: { id: 'src_all' }, // Use src_all for redirect flow (supports Mada)
-            redirect: {
-              url: successUrl,
-              post: {
-                url: webhookUrl,
-              },
-            },
+            source: { payment_method: method === 'credit_card' ? 'card' : 'card' },
             description: `Wallet recharge ${wallet.id}`,
             metadata: { walletId: wallet.id, transactionId: savedTransaction.id },
           });

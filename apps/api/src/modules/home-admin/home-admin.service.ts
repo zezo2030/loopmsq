@@ -5,6 +5,7 @@ import { RedisService } from '../../utils/redis.service';
 import { Banner } from '../../database/entities/banner.entity';
 import { Offer } from '../../database/entities/offer.entity';
 import { Activity } from '../../database/entities/activity.entity';
+import { OrganizingBranch } from '../../database/entities/organizing-branch.entity';
 
 @Injectable()
 export class HomeAdminService {
@@ -12,6 +13,7 @@ export class HomeAdminService {
     @InjectRepository(Banner) private readonly bannerRepo: Repository<Banner>,
     @InjectRepository(Offer) private readonly offerRepo: Repository<Offer>,
     @InjectRepository(Activity) private readonly activityRepo: Repository<Activity>,
+    @InjectRepository(OrganizingBranch) private readonly organizingBranchRepo: Repository<OrganizingBranch>,
     private readonly redis: RedisService,
   ) {}
 
@@ -84,11 +86,30 @@ export class HomeAdminService {
       throw new BadRequestException('Cannot have both imageUrl and videoUrl');
     }
 
-    // Validate YouTube URL format if videoUrl is provided
+    // Validate URL format if videoUrl is provided (accepts both YouTube and Cloudinary URLs)
     if (dto.videoUrl) {
-      const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
-      if (!youtubeRegex.test(dto.videoUrl)) {
-        throw new BadRequestException('Invalid YouTube URL format');
+      try {
+        const url = new URL(dto.videoUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new BadRequestException('Invalid video URL format');
+        }
+      } catch {
+        throw new BadRequestException('Invalid video URL format');
+      }
+    }
+
+    // Validate videoCoverUrl format if provided (only allowed with videoUrl)
+    if (dto.videoCoverUrl && !dto.videoUrl) {
+      throw new BadRequestException('videoCoverUrl can only be set when videoUrl is provided');
+    }
+    if (dto.videoCoverUrl) {
+      try {
+        const url = new URL(dto.videoCoverUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new BadRequestException('Invalid video cover URL format');
+        }
+      } catch {
+        throw new BadRequestException('Invalid video cover URL format');
       }
     }
 
@@ -109,11 +130,37 @@ export class HomeAdminService {
       }
     }
 
-    // Validate YouTube URL format if videoUrl is provided
+    // Validate URL format if videoUrl is provided (accepts both YouTube and Cloudinary URLs)
     if (dto.videoUrl) {
-      const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
-      if (!youtubeRegex.test(dto.videoUrl)) {
-        throw new BadRequestException('Invalid YouTube URL format');
+      try {
+        const url = new URL(dto.videoUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new BadRequestException('Invalid video URL format');
+        }
+      } catch {
+        throw new BadRequestException('Invalid video URL format');
+      }
+    }
+
+    // Validate videoCoverUrl format if provided (only allowed with videoUrl)
+    if (dto.videoCoverUrl !== undefined) {
+      // Check if videoUrl exists in current entity or in dto
+      const currentActivity = await this.activityRepo.findOne({ where: { id } as any });
+      const hasVideoUrl = dto.videoUrl || currentActivity?.videoUrl;
+      
+      if (dto.videoCoverUrl && !hasVideoUrl) {
+        throw new BadRequestException('videoCoverUrl can only be set when videoUrl is provided');
+      }
+      
+      if (dto.videoCoverUrl) {
+        try {
+          const url = new URL(dto.videoCoverUrl);
+          if (!['http:', 'https:'].includes(url.protocol)) {
+            throw new BadRequestException('Invalid video cover URL format');
+          }
+        } catch {
+          throw new BadRequestException('Invalid video cover URL format');
+        }
       }
     }
 
@@ -124,6 +171,109 @@ export class HomeAdminService {
 
   async deleteActivity(id: string) {
     const res = await this.activityRepo.delete(id);
+    await this.redis.del('home:v1');
+    return res;
+  }
+
+  // Organizing Branch
+  listOrganizingBranches() {
+    return this.organizingBranchRepo.find({ order: { createdAt: 'DESC' } as any });
+  }
+
+  async createOrganizingBranch(dto: Partial<OrganizingBranch>) {
+    // Validate: must have either imageUrl or videoUrl, but not both
+    if (!dto.imageUrl && !dto.videoUrl) {
+      throw new BadRequestException('Either imageUrl or videoUrl must be provided');
+    }
+    if (dto.imageUrl && dto.videoUrl) {
+      throw new BadRequestException('Cannot have both imageUrl and videoUrl');
+    }
+
+    // Validate URL format if videoUrl is provided (accepts both YouTube and Cloudinary URLs)
+    if (dto.videoUrl) {
+      try {
+        const url = new URL(dto.videoUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new BadRequestException('Invalid video URL format');
+        }
+      } catch {
+        throw new BadRequestException('Invalid video URL format');
+      }
+    }
+
+    // Validate videoCoverUrl format if provided (only allowed with videoUrl)
+    if (dto.videoCoverUrl && !dto.videoUrl) {
+      throw new BadRequestException('videoCoverUrl can only be set when videoUrl is provided');
+    }
+    if (dto.videoCoverUrl) {
+      try {
+        const url = new URL(dto.videoCoverUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new BadRequestException('Invalid video cover URL format');
+        }
+      } catch {
+        throw new BadRequestException('Invalid video cover URL format');
+      }
+    }
+
+    const entity = this.organizingBranchRepo.create(dto);
+    const saved = await this.organizingBranchRepo.save(entity);
+    await this.redis.del('home:v1');
+    return saved;
+  }
+
+  async updateOrganizingBranch(id: string, dto: Partial<OrganizingBranch>) {
+    // Validate: if both are being set, ensure only one is provided
+    if (dto.imageUrl !== undefined && dto.videoUrl !== undefined) {
+      if (dto.imageUrl && dto.videoUrl) {
+        throw new BadRequestException('Cannot have both imageUrl and videoUrl');
+      }
+      if (!dto.imageUrl && !dto.videoUrl) {
+        throw new BadRequestException('Either imageUrl or videoUrl must be provided');
+      }
+    }
+
+    // Validate URL format if videoUrl is provided (accepts both YouTube and Cloudinary URLs)
+    if (dto.videoUrl) {
+      try {
+        const url = new URL(dto.videoUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new BadRequestException('Invalid video URL format');
+        }
+      } catch {
+        throw new BadRequestException('Invalid video URL format');
+      }
+    }
+
+    // Validate videoCoverUrl format if provided (only allowed with videoUrl)
+    if (dto.videoCoverUrl !== undefined) {
+      // Check if videoUrl exists in current entity or in dto
+      const currentOrganizingBranch = await this.organizingBranchRepo.findOne({ where: { id } as any });
+      const hasVideoUrl = dto.videoUrl || currentOrganizingBranch?.videoUrl;
+      
+      if (dto.videoCoverUrl && !hasVideoUrl) {
+        throw new BadRequestException('videoCoverUrl can only be set when videoUrl is provided');
+      }
+      
+      if (dto.videoCoverUrl) {
+        try {
+          const url = new URL(dto.videoCoverUrl);
+          if (!['http:', 'https:'].includes(url.protocol)) {
+            throw new BadRequestException('Invalid video cover URL format');
+          }
+        } catch {
+          throw new BadRequestException('Invalid video cover URL format');
+        }
+      }
+    }
+
+    const res = await this.organizingBranchRepo.update(id, dto);
+    await this.redis.del('home:v1');
+    return res;
+  }
+
+  async deleteOrganizingBranch(id: string) {
+    const res = await this.organizingBranchRepo.delete(id);
     await this.redis.del('home:v1');
     return res;
   }

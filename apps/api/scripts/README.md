@@ -71,3 +71,13 @@ cat apps/api/scripts/clear-database.sql | docker exec -i booking-postgres psql -
 
 
 
+
+
+
+
+
+
+
+
+
+

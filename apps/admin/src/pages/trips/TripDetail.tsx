@@ -16,21 +16,22 @@ import {
   Badge,
   Steps,
   Select,
-  Alert
+  Alert,
+  Tag
 } from 'antd'
 import {
   ArrowLeftOutlined,
   BookOutlined,
   TeamOutlined,
   CalendarOutlined,
-  DollarOutlined,
   CheckOutlined,
   FileTextOutlined,
   WarningOutlined,
   PhoneOutlined,
   MailOutlined,
   EditOutlined,
-  FileExcelOutlined
+  FileExcelOutlined,
+  IdcardOutlined
 } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
 import '../../theme.css'
@@ -79,11 +80,31 @@ type TripRequest = {
 
 const { Step } = Steps
 
+type Ticket = {
+  id: string
+  bookingId: string
+  status: string
+  holderName?: string
+  validFrom?: string
+  validUntil?: string
+  createdAt: string
+  qrTokenHash?: string
+  scannedAt?: string
+  staffId?: string
+  staff?: {
+    id: string
+    name?: string
+    email?: string
+  }
+}
+
 export default function TripDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [trip, setTrip] = useState<TripRequest | null>(null)
   const [loading, setLoading] = useState(true)
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [loadingTickets, setLoadingTickets] = useState(false)
 
   // Modal states
   const [reviewModalVisible, setReviewModalVisible] = useState(false)
@@ -103,6 +124,12 @@ export default function TripDetail() {
       loadTripData()
     }
   }, [id])
+
+  useEffect(() => {
+    if (trip && (trip.status === 'paid' || trip.status === 'completed')) {
+      loadTickets()
+    }
+  }, [trip?.id, trip?.status])
 
   async function loadTripData() {
     setLoading(true)
@@ -211,35 +238,22 @@ export default function TripDetail() {
     }
   }
 
-  async function handleMarkPaid() {
-    if (!trip) return
-
-    setActionLoading(true)
+  async function loadTickets() {
+    if (!trip || !id) return
+    
+    setLoadingTickets(true)
     try {
-      await apiPost(`/trips/requests/${trip.id}/mark-paid`, {})
-      message.success('تم تحديث حالة الدفع بنجاح')
-      await loadTripData()
+      const ticketsData = await apiGet<Ticket[]>(`/trips/requests/${id}/tickets`)
+      setTickets(ticketsData || [])
     } catch (error) {
-      message.error('فشل في تحديث حالة الدفع')
+      console.error('Failed to load tickets:', error)
+      setTickets([])
     } finally {
-      setActionLoading(false)
+      setLoadingTickets(false)
     }
   }
 
-  async function handleIssueTickets() {
-    if (!trip) return
-
-    setActionLoading(true)
-    try {
-      await apiPost(`/trips/requests/${trip.id}/issue-tickets`, {})
-      message.success('تم إصدار التذاكر بنجاح')
-      await loadTripData()
-    } catch (error) {
-      message.error('فشل في إصدار التذاكر')
-    } finally {
-      setActionLoading(false)
-    }
-  }
+  // Note: handleMarkPaid and handleIssueTickets removed - payments now automated via user app
 
 
 
@@ -264,12 +278,10 @@ export default function TripDetail() {
         return 0
       case 'approved':
         return 1
-      case 'invoiced':
-        return 2
       case 'paid':
-        return 3
+        return 2
       case 'completed':
-        return 4
+        return 3
       case 'rejected':
       case 'cancelled':
         return -1
@@ -346,33 +358,19 @@ export default function TripDetail() {
               </Button>
             )}
             {trip.status === 'approved' && (
-              <Button
-                type="primary"
-                icon={<FileTextOutlined />}
-                onClick={() => setInvoiceModalVisible(true)}
-              >
-                إرسال فاتورة
-              </Button>
-            )}
-            {trip.status === 'invoiced' && (
-              <Button
-                type="primary"
-                icon={<DollarOutlined />}
-                onClick={handleMarkPaid}
-                loading={actionLoading}
-              >
-                تأكيد الدفع
-              </Button>
+              <Tag color="blue" style={{ fontSize: '14px', padding: '4px 12px' }}>
+                في انتظار الدفع من المستخدم
+              </Tag>
             )}
             {trip.status === 'paid' && (
-              <Button
-                type="primary"
-                icon={<CheckOutlined />}
-                onClick={handleIssueTickets}
-                loading={actionLoading}
-              >
-                إصدار تذاكر
-              </Button>
+              <Tag color="green" style={{ fontSize: '14px', padding: '4px 12px' }}>
+                تم الدفع - يتم إصدار التذاكر تلقائياً
+              </Tag>
+            )}
+            {trip.status === 'completed' && (
+              <Tag color="success" style={{ fontSize: '14px', padding: '4px 12px' }}>
+                مكتمل - التذاكر صادرة
+              </Tag>
             )}
           </Space>
         </div>
@@ -390,10 +388,9 @@ export default function TripDetail() {
                 size="small"
               >
                 <Step title="طلب مرسل" description="في انتظار المراجعة" />
-                <Step title="قبول الطلب" description="تحديد السعر والتفاصيل" />
-                <Step title="إرسال فاتورة" description="إرسال الفاتورة للمدرسة" />
-                <Step title="تأكيد الدفع" description="استلام المبلغ" />
-                <Step title="إصدار تذاكر" description="إصدار التذاكر النهائية" />
+                <Step title="قبول الطلب" description="تحديد السعر" />
+                <Step title="الدفع" description="الدفع من التطبيق" />
+                <Step title="مكتمل" description="التذاكر صادرة" />
               </Steps>
             </Card>
           )}
@@ -578,6 +575,120 @@ export default function TripDetail() {
                   }}>
                     {trip.adminNotes}
                   </div>
+                </Card>
+              </Col>
+            )}
+
+            {/* Tickets Section */}
+            {(trip.status === 'paid' || trip.status === 'completed') && (
+              <Col xs={24}>
+                <Card 
+                  className="custom-card" 
+                  title={
+                    <Space>
+                      <IdcardOutlined />
+                      <span>التذاكر ({tickets.length})</span>
+                    </Space>
+                  }
+                  extra={
+                    <Button 
+                      icon={<ArrowLeftOutlined />} 
+                      onClick={loadTickets}
+                      loading={loadingTickets}
+                      size="small"
+                    >
+                      تحديث
+                    </Button>
+                  }
+                >
+                  {loadingTickets ? (
+                    <div style={{ textAlign: 'center', padding: '40px' }}>
+                      <div className="ant-spin ant-spin-spinning">
+                        <span className="ant-spin-dot ant-spin-dot-spin">
+                          <i></i><i></i><i></i><i></i>
+                        </span>
+                      </div>
+                      <div style={{ marginTop: '16px', color: '#8c8c8c' }}>جاري تحميل التذاكر...</div>
+                    </div>
+                  ) : tickets.length === 0 ? (
+                    <div style={{ 
+                      textAlign: 'center', 
+                      padding: '40px',
+                      color: '#8c8c8c'
+                    }}>
+                      <IdcardOutlined style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.3 }} />
+                      <div>لا توجد تذاكر متاحة</div>
+                    </div>
+                  ) : (
+                    <div style={{ maxHeight: '500px', overflow: 'auto' }}>
+                      <Row gutter={[16, 16]}>
+                        {tickets.map((ticket) => (
+                          <Col xs={24} sm={12} lg={8} key={ticket.id}>
+                            <Card
+                              size="small"
+                              style={{
+                                border: '1px solid #d9d9d9',
+                                borderRadius: '8px'
+                              }}
+                            >
+                              <Space direction="vertical" style={{ width: '100%' }} size="small">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div style={{ fontWeight: '600' }}>
+                                    {ticket.holderName || `تذكرة #${ticket.id.slice(-6)}`}
+                                  </div>
+                                  <Tag color={
+                                    ticket.status === 'valid' ? 'green' :
+                                    ticket.status === 'used' ? 'blue' :
+                                    ticket.status === 'expired' ? 'red' : 'default'
+                                  }>
+                                    {ticket.status === 'valid' ? 'صالحة' :
+                                     ticket.status === 'used' ? 'مستخدمة' :
+                                     ticket.status === 'expired' ? 'منتهية' : ticket.status}
+                                  </Tag>
+                                </div>
+                                {ticket.validFrom && (
+                                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                                    من: {new Date(ticket.validFrom).toLocaleString('ar-SA')}
+                                  </div>
+                                )}
+                                {ticket.validUntil && (
+                                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                                    إلى: {new Date(ticket.validUntil).toLocaleString('ar-SA')}
+                                  </div>
+                                )}
+                                {ticket.status === 'used' && ticket.scannedAt && (
+                                  <div style={{ 
+                                    fontSize: '12px', 
+                                    color: '#1890ff',
+                                    marginTop: '8px',
+                                    padding: '8px',
+                                    backgroundColor: '#e6f7ff',
+                                    borderRadius: '4px',
+                                    border: '1px solid #91d5ff'
+                                  }}>
+                                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                                      تم المسح
+                                    </div>
+                                    <div style={{ fontSize: '11px' }}>
+                                      التاريخ: {new Date(ticket.scannedAt).toLocaleString('ar-SA')}
+                                    </div>
+                                    {ticket.staff?.name && (
+                                      <div style={{ fontSize: '11px' }}>
+                                        الموظف: {ticket.staff.name}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '11px', color: '#bfbfbf', marginTop: '4px' }}>
+                                  ID: {ticket.id.slice(0, 8)}...
+                                </div>
+                              </Space>
+                            </Card>
+                          </Col>
+                        ))}
+                      </Row>
+                    </div>
+                  )}
                 </Card>
               </Col>
             )}

@@ -5,7 +5,7 @@ import { resolveFileUrlWithBust } from '../../shared/url'
 import { useState } from 'react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
 
-type Activity = {
+type OrganizingBranch = {
   id: string
   imageUrl?: string | null
   videoUrl?: string | null
@@ -15,43 +15,46 @@ type Activity = {
   updatedAt: string
 }
 
-export default function Activities() {
+export default function OrganizingBranches() {
   const qc = useQueryClient()
-  const { data, isLoading } = useQuery<Activity[]>({ 
-    queryKey: ['activities'], 
-    queryFn: () => apiGet('/admin/activities') 
+  const { data, isLoading } = useQuery<OrganizingBranch[]>({ 
+    queryKey: ['organizing-branches'], 
+    queryFn: () => apiGet('/admin/organizing-branches') 
   })
   const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<Activity | null>(null)
+  const [editing, setEditing] = useState<OrganizingBranch | null>(null)
   const [form] = Form.useForm()
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image')
+  const [coverUrl, setCoverUrl] = useState<string | null>(null)
 
   const createMutation = useMutation({
-    mutationFn: (body: Partial<Activity>) => apiPost<Activity>('/admin/activities', body),
-    onSuccess: () => { 
-      message.success('Activity created'); 
-      qc.invalidateQueries({ queryKey: ['activities'] }); 
+    mutationFn: (body: Partial<OrganizingBranch>) => apiPost<OrganizingBranch>('/admin/organizing-branches', body),
+      onSuccess: () => { 
+      message.success('Organizing Branch created'); 
+      qc.invalidateQueries({ queryKey: ['organizing-branches'] }); 
       setOpen(false);
       form.resetFields();
       setMediaType('image');
+      setCoverUrl(null);
     },
   })
   const updateMutation = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Partial<Activity> }) => apiPatch(`/admin/activities/${id}`, body),
-    onSuccess: () => { 
-      message.success('Activity updated'); 
-      qc.invalidateQueries({ queryKey: ['activities'] }); 
+    mutationFn: ({ id, body }: { id: string; body: Partial<OrganizingBranch> }) => apiPatch(`/admin/organizing-branches/${id}`, body),
+      onSuccess: () => { 
+      message.success('Organizing Branch updated'); 
+      qc.invalidateQueries({ queryKey: ['organizing-branches'] }); 
       setOpen(false); 
       setEditing(null);
       form.resetFields();
       setMediaType('image');
+      setCoverUrl(null);
     },
   })
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiDelete(`/admin/activities/${id}`),
+    mutationFn: (id: string) => apiDelete(`/admin/organizing-branches/${id}`),
     onSuccess: () => { 
-      message.success('Activity removed'); 
-      qc.invalidateQueries({ queryKey: ['activities'] }) 
+      message.success('Organizing Branch removed'); 
+      qc.invalidateQueries({ queryKey: ['organizing-branches'] }) 
     },
   })
 
@@ -64,7 +67,7 @@ export default function Activities() {
     { 
       title: 'Media', 
       dataIndex: 'imageUrl', 
-      render: (_: any, r: Activity) => {
+      render: (_: any, r: OrganizingBranch) => {
         if (r.videoUrl) {
           const isCloudinary = isCloudinaryVideo(r.videoUrl)
           // Show cover if available, otherwise show video icon
@@ -94,7 +97,7 @@ export default function Activities() {
     },
     { 
       title: 'URL', 
-      render: (_: any, r: Activity) => {
+      render: (_: any, r: OrganizingBranch) => {
         if (r.videoUrl) return <a href={r.videoUrl} target="_blank" rel="noopener noreferrer">{r.videoUrl}</a>
         if (r.imageUrl) return <span>{r.imageUrl}</span>
         return '-'
@@ -103,7 +106,7 @@ export default function Activities() {
     { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
     {
       title: 'Actions', 
-      render: (_: any, r: Activity) => (
+      render: (_: any, r: OrganizingBranch) => (
         <span style={{ display: 'flex', gap: 8 }}>
           <Button 
             size="small" 
@@ -116,6 +119,7 @@ export default function Activities() {
                 mediaType: type,
                 videoCoverUrl: r.videoCoverUrl || null,
               }); 
+              setCoverUrl(r.videoCoverUrl || null)
               setOpen(true) 
             }}
           >
@@ -162,14 +166,15 @@ export default function Activities() {
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <Button 
           type="primary" 
-          onClick={() => { 
+            onClick={() => { 
             setEditing(null); 
             form.resetFields(); 
             setMediaType('image');
+            setCoverUrl(null);
             setOpen(true) 
           }}
         >
-          New Activity
+          New Organizing Branch
         </Button>
       </div>
       <Table 
@@ -181,13 +186,14 @@ export default function Activities() {
       />
 
       <Modal
-        title={editing ? 'Edit Activity' : 'Create Activity'}
+        title={editing ? 'Edit Organizing Branch' : 'Create Organizing Branch'}
         open={open}
         onCancel={() => { 
           setOpen(false); 
           setEditing(null);
           form.resetFields();
           setMediaType('image');
+          setCoverUrl(null);
         }}
         onOk={handleSubmit}
         width={600}
@@ -205,8 +211,10 @@ export default function Activities() {
                 setMediaType(e.target.value);
                 form.setFieldsValue({ 
                   imageUrl: null, 
-                  videoUrl: null 
+                  videoUrl: null,
+                  videoCoverUrl: null
                 });
+                setCoverUrl(null);
               }}
             >
               <Radio value="image">Image</Radio>
@@ -233,7 +241,7 @@ export default function Activities() {
                   beforeUpload={(file) => {
                     const fd = new FormData()
                     fd.append('file', file)
-                    apiPost<{ imageUrl: string }>('/admin/activities/upload', fd)
+                    apiPost<{ imageUrl: string }>('/admin/organizing-branches/upload', fd)
                       .then((res) => {
                         form.setFieldsValue({ imageUrl: res.imageUrl })
                         message.success('Image uploaded')
@@ -281,15 +289,19 @@ export default function Activities() {
                   beforeUpload={(file) => {
                     const fd = new FormData()
                     fd.append('file', file)
-                    apiPost<{ videoUrl: string; coverUrl: string }>('/admin/activities/upload-video', fd)
+                    apiPost<{ videoUrl: string; coverUrl: string }>('/admin/organizing-branches/upload-video', fd)
                       .then((res) => {
+                        console.log('Video upload response:', res)
+                        const cover = res.coverUrl || null
                         form.setFieldsValue({ 
                           videoUrl: res.videoUrl,
-                          videoCoverUrl: res.coverUrl || null
+                          videoCoverUrl: cover
                         })
-                        message.success('Video uploaded successfully' + (res.coverUrl ? ' (cover generated automatically)' : ''))
+                        setCoverUrl(cover)
+                        message.success('Video uploaded successfully' + (cover ? ' (cover generated automatically)' : ''))
                       })
                       .catch((err) => {
+                        console.error('Video upload error:', err)
                         message.error(err.response?.data?.message || 'Upload failed')
                       })
                     return false
@@ -322,10 +334,10 @@ export default function Activities() {
 
                 <Form.Item label="Video Cover">
                   <Space direction="vertical" style={{ width: '100%' }}>
-                    {form.getFieldValue('videoCoverUrl') ? (
+                    {(coverUrl || form.getFieldValue('videoCoverUrl')) ? (
                       <div>
                         <Image 
-                          src={resolveFileUrlWithBust(form.getFieldValue('videoCoverUrl'))} 
+                          src={resolveFileUrlWithBust(coverUrl || form.getFieldValue('videoCoverUrl'))} 
                           width={200} 
                           height={120} 
                           style={{ objectFit: 'cover', borderRadius: 8 }} 
@@ -339,12 +351,15 @@ export default function Activities() {
                       beforeUpload={(file) => {
                         const fd = new FormData()
                         fd.append('file', file)
-                        apiPost<{ coverUrl: string }>('/admin/activities/upload-video-cover', fd)
+                        apiPost<{ coverUrl: string }>('/admin/organizing-branches/upload-video-cover', fd)
                           .then((res) => {
+                            console.log('Cover upload response:', res)
                             form.setFieldsValue({ videoCoverUrl: res.coverUrl })
+                            setCoverUrl(res.coverUrl)
                             message.success('Cover uploaded successfully')
                           })
                           .catch((err) => {
+                            console.error('Cover upload error:', err)
                             message.error(err.response?.data?.message || 'Upload failed')
                           })
                         return false
@@ -353,12 +368,13 @@ export default function Activities() {
                       <Button icon={<UploadOutlined />}>Upload Cover Image</Button>
                     </Upload>
                     
-                    {form.getFieldValue('videoCoverUrl') && (
+                    {(coverUrl || form.getFieldValue('videoCoverUrl')) && (
                       <Button 
                         size="small" 
                         danger
                         onClick={() => {
                           form.setFieldsValue({ videoCoverUrl: null })
+                          setCoverUrl(null)
                           message.info('Cover removed')
                         }}
                       >
@@ -391,24 +407,4 @@ export default function Activities() {
     </div>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

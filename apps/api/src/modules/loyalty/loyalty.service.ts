@@ -18,7 +18,7 @@ export class LoyaltyService {
   async getActiveRule(): Promise<LoyaltyRule> {
     let rule = await this.ruleRepo.findOne({ where: { isActive: true } });
     if (!rule) {
-      rule = this.ruleRepo.create({ earnRate: 1, redeemRate: 0.05, minRedeemPoints: 0, isActive: true });
+      rule = this.ruleRepo.create({ earnRate: 0.05, redeemRate: 1, minRedeemPoints: 0, isActive: true });
       rule = await this.ruleRepo.save(rule);
     }
     return rule;
@@ -99,8 +99,8 @@ export class LoyaltyService {
 
   async createRule(input: Partial<LoyaltyRule>): Promise<LoyaltyRule> {
     const rule = this.ruleRepo.create({
-      earnRate: input.earnRate ?? 1,
-      redeemRate: input.redeemRate ?? 0.05,
+      earnRate: input.earnRate ?? 0.05,
+      redeemRate: input.redeemRate ?? 1,
       minRedeemPoints: input.minRedeemPoints ?? 0,
       isActive: input.isActive ?? true,
     });
@@ -116,6 +116,24 @@ export class LoyaltyService {
     await this.ruleRepo.update({ isActive: true } as any, { isActive: false } as any);
     rule.isActive = true;
     await this.ruleRepo.save(rule);
+  }
+
+  async updateRule(id: string, input: Partial<LoyaltyRule>): Promise<LoyaltyRule> {
+    const rule = await this.ruleRepo.findOne({ where: { id } });
+    if (!rule) throw new NotFoundException('Rule not found');
+    
+    if (input.earnRate !== undefined) rule.earnRate = input.earnRate;
+    if (input.redeemRate !== undefined) rule.redeemRate = input.redeemRate;
+    if (input.minRedeemPoints !== undefined) rule.minRedeemPoints = input.minRedeemPoints;
+    if (input.isActive !== undefined) {
+      if (input.isActive && !rule.isActive) {
+        // Deactivate all other rules before activating this one
+        await this.ruleRepo.update({ isActive: true } as any, { isActive: false } as any);
+      }
+      rule.isActive = input.isActive;
+    }
+    
+    return this.ruleRepo.save(rule);
   }
 
   async listWallets(params: { query?: string; page?: number; pageSize?: number }) {

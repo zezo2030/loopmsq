@@ -13,6 +13,7 @@ import {
   PaymentStatus,
 } from '../../database/entities/payment.entity';
 import { EventRequest, EventRequestStatus } from '../../database/entities/event-request.entity';
+import { SchoolTripRequest, TripRequestStatus } from '../../database/entities/school-trip-request.entity';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { CreatePaymentIntentDto } from './dto/create-intent.dto';
@@ -57,6 +58,7 @@ export class PaymentsService {
   async createIntent(userId: string, dto: CreatePaymentIntentDto) {
     let booking: Booking | null = null;
     let eventRequest: EventRequest | null = null;
+    let tripRequest: SchoolTripRequest | null = null;
     let targetEntity: any = null;
     let customerUser: any = null;
     let amountToPay: number = 0;
@@ -121,8 +123,47 @@ export class PaymentsService {
           status: existingPayment.status,
         };
       }
+    }
+    // Check for School Trip Request
+    else if (dto.tripRequestId) {
+      const tripRepo = this.dataSource.getRepository(SchoolTripRequest);
+      tripRequest = await tripRepo.findOne({
+        where: { id: dto.tripRequestId, requesterId: userId } as any,
+        relations: ['requester'],
+      });
+
+      if (!tripRequest) throw new NotFoundException('Trip request not found');
+
+      // Only allow payment for approved trips
+      if (tripRequest.status !== TripRequestStatus.APPROVED) {
+        throw new BadRequestException('Trip request not payable (must be APPROVED)');
+      }
+      if (!tripRequest.quotedPrice) {
+        throw new BadRequestException('Trip request has no quoted price');
+      }
+
+      targetEntity = tripRequest;
+      customerUser = tripRequest.requester;
+      amountToPay = Number(tripRequest.quotedPrice);
+
+      // Check for existing payments
+      const existingPayment = await this.paymentRepository.findOne({
+        where: {
+          tripRequestId: tripRequest.id,
+        } as any,
+      });
+
+      if (existingPayment && existingPayment.method === dto.method && existingPayment.status === PaymentStatus.PENDING) {
+        return {
+          paymentId: existingPayment.id,
+          clientSecret: existingPayment.gatewayRef,
+          amount: existingPayment.amount,
+          currency: existingPayment.currency,
+          status: existingPayment.status,
+        };
+      }
     } else {
-      throw new BadRequestException('bookingId or eventRequestId is required');
+      throw new BadRequestException('bookingId, eventRequestId, or tripRequestId is required');
     }
 
     if (!customerUser) throw new BadRequestException('User information not found');
@@ -158,7 +199,7 @@ export class PaymentsService {
     }
 
     // Idempotency by key
-    const uniqueId = booking ? booking.id : eventRequest!.id;
+    const uniqueId = booking ? booking.id : (eventRequest ? eventRequest.id : dto.tripRequestId);
     const idempotencyKey = `pay:intent:${uniqueId}:${dto.method}`;
     const exists = await this.redisService.get(idempotencyKey);
     if (exists) {
@@ -198,6 +239,8 @@ export class PaymentsService {
         paymentData.bookingId = booking.id;
       } else if (eventRequest) {
         paymentData.eventRequestId = eventRequest.id;
+      } else if (dto.tripRequestId) {
+        paymentData.tripRequestId = dto.tripRequestId;
       }
 
       const payment = queryRunner.manager.create(Payment, paymentData);
@@ -260,7 +303,8 @@ export class PaymentsService {
             }
           }
 
-          const bookingOrEventId = booking ? booking.id : eventRequest!.id;
+          const entityId = booking ? booking.id : (eventRequest ? eventRequest.id : tripRequest!.id);
+          const entityType = booking ? 'Booking' : (eventRequest ? 'Event Request' : 'Trip Request');
 
           charge = await this.tapService.createCharge({
             amount: Number(amountToPay),
@@ -283,10 +327,11 @@ export class PaymentsService {
                 url: webhookUrl,
               },
             },
-            description: booking ? `Booking ${booking.id}` : `Event Request ${eventRequest!.id}`,
+            description: `${entityType} ${entityId}`,
             metadata: {
               bookingId: booking?.id,
               eventRequestId: eventRequest?.id,
+              tripRequestId: tripRequest?.id,
               paymentId: savedPayment.id
             },
           });
@@ -328,6 +373,7 @@ export class PaymentsService {
   async confirmPayment(userId: string, dto: ConfirmPaymentDto) {
     let booking: Booking | null = null;
     let eventRequest: EventRequest | null = null;
+    let tripRequest: SchoolTripRequest | null = null;
     let payment: Payment | null = null;
 
     // First try to find by booking
@@ -376,11 +422,18 @@ export class PaymentsService {
           booking = await this.bookingRepository.findOne({ where: { id: loadedPayment.bookingId, userId } });
           if (!booking) throw new NotFoundException('Booking not found or access denied');
           payment = loadedPayment;
-        } else if ((loadedPayment as any).eventRequestId) {
+        } else if (loadedPayment.eventRequestId) {
           const eventRepo = this.dataSource.getRepository(EventRequest);
-          const eventId = (loadedPayment as any).eventRequestId;
+          const eventId = loadedPayment.eventRequestId;
           eventRequest = await eventRepo.findOne({ where: { id: eventId, requesterId: userId } });
           if (!eventRequest) throw new NotFoundException('Event request not found or access denied');
+          payment = loadedPayment;
+        } else if (loadedPayment.tripRequestId) {
+          // Handle trip request payment
+          tripRequest = await this.dataSource.getRepository(SchoolTripRequest).findOne({
+            where: { id: loadedPayment.tripRequestId, requesterId: userId }
+          });
+          if (!tripRequest) throw new NotFoundException('Trip request not found or access denied');
           payment = loadedPayment;
         } else {
           // Orphan payment?
@@ -399,9 +452,8 @@ export class PaymentsService {
         throw new BadRequestException('Wallet service not available');
       }
       // Deduct from wallet
-      // Note: deductWallet usually expects bookingId for reference/metadata
-      // Use booking.id or eventRequest.id
-      const refId = booking ? booking.id : eventRequest!.id;
+      // Use booking.id, eventRequest.id, or tripRequest.id
+      const refId = booking ? booking.id : (eventRequest ? eventRequest.id : tripRequest!.id);
       await this.walletService.deductWallet(userId, payment.amount, refId);
     } else {
       const bypass = !this.configService.get<string>('TAP_SECRET_KEY') ||
@@ -419,8 +471,13 @@ export class PaymentsService {
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
-    await queryRunner.startTransaction();
+    let transactionStarted = false;
+    let savedBooking: Booking | null = null;
+    
     try {
+      await queryRunner.startTransaction();
+      transactionStarted = true;
+
       payment.status = PaymentStatus.COMPLETED;
       payment.paidAt = new Date();
       if (!payment.transactionId) {
@@ -449,7 +506,7 @@ export class PaymentsService {
           addOns: eventRequest.addOns,
           specialRequests: eventRequest.notes,
         });
-        const savedBooking = await queryRunner.manager.save(newBooking);
+        savedBooking = await queryRunner.manager.save(newBooking);
 
         // Generate Tickets with unique QR token hashes
         const tickets: Ticket[] = [];
@@ -462,13 +519,18 @@ export class PaymentsService {
             ? this.qrCodeService.generateQRTokenHash(qrToken)
             : require('crypto').createHash('sha256').update(qrToken).digest('hex');
 
+          // Ensure startTime is a Date object
+          const startTime = savedBooking.startTime instanceof Date 
+            ? savedBooking.startTime 
+            : new Date(savedBooking.startTime);
+          
           const t = queryRunner.manager.create(Ticket, {
             bookingId: savedBooking.id,
             qrTokenHash,
             status: TicketStatus.VALID,
             personCount: 1,
-            validFrom: savedBooking.startTime,
-            validUntil: new Date(savedBooking.startTime.getTime() + savedBooking.durationHours * 3600 * 1000),
+            validFrom: startTime,
+            validUntil: new Date(startTime.getTime() + savedBooking.durationHours * 3600 * 1000),
           });
           tickets.push(t);
         }
@@ -483,13 +545,133 @@ export class PaymentsService {
           data: { bookingId: savedBooking.id },
           channels: ['sms', 'push'],
         });
+      } else if (tripRequest) {
+        // Handle school trip request payment completion
+        const tripRepo = this.dataSource.getRepository(SchoolTripRequest);
+
+        // Update trip request status
+        tripRequest.status = TripRequestStatus.PAID;
+        tripRequest.paymentMethod = payment.method;
+        await queryRunner.manager.save(tripRequest);
+
+        // Create Booking for the trip
+        const studentsList = tripRequest.studentsList || [];
+        const studentsCount = studentsList.length > 0 ? studentsList.length : (tripRequest.studentsCount || 0);
+        const adultsCount = tripRequest.accompanyingAdults || 0;
+        const totalPersons = studentsCount + adultsCount;
+
+        const newBooking = queryRunner.manager.create(Booking, {
+          userId: tripRequest.requesterId,
+          branchId: (tripRequest as any).branchId,
+          startTime: tripRequest.preferredDate,
+          durationHours: tripRequest.durationHours || 2,
+          persons: totalPersons,
+          totalPrice: tripRequest.quotedPrice || 0,
+          status: BookingStatus.CONFIRMED,
+        });
+        savedBooking = await queryRunner.manager.save(newBooking);
+
+        // Generate Tickets for each student with their name
+        // Ensure startTime is a Date object
+        const startTime = savedBooking.startTime instanceof Date 
+          ? savedBooking.startTime 
+          : new Date(savedBooking.startTime);
+        
+        const tickets: Ticket[] = [];
+        
+        // Generate tickets for students - use studentsList if available, otherwise create generic tickets
+        if (studentsList.length > 0) {
+          // Create tickets with student names from the list
+          for (let i = 0; i < studentsList.length; i++) {
+            const student = studentsList[i];
+            const qrToken = this.qrCodeService
+              ? this.qrCodeService.generateQRToken(savedBooking.id, `${savedBooking.id}-student-${i}`)
+              : `${savedBooking.id}-student-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+            const qrTokenHash = this.qrCodeService
+              ? this.qrCodeService.generateQRTokenHash(qrToken)
+              : require('crypto').createHash('sha256').update(qrToken).digest('hex');
+
+            const t = queryRunner.manager.create(Ticket, {
+              bookingId: savedBooking.id,
+              qrTokenHash,
+              status: TicketStatus.VALID,
+              personCount: 1,
+              holderName: student.name || `طالب ${i + 1}`,
+              validFrom: startTime,
+              validUntil: new Date(startTime.getTime() + (tripRequest.durationHours || 2) * 3600 * 1000),
+            });
+            tickets.push(t);
+          }
+        } else {
+          // Create generic tickets if studentsList is empty but studentsCount exists
+          for (let i = 0; i < studentsCount; i++) {
+            const qrToken = this.qrCodeService
+              ? this.qrCodeService.generateQRToken(savedBooking.id, `${savedBooking.id}-student-${i}`)
+              : `${savedBooking.id}-student-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+            const qrTokenHash = this.qrCodeService
+              ? this.qrCodeService.generateQRTokenHash(qrToken)
+              : require('crypto').createHash('sha256').update(qrToken).digest('hex');
+
+            const t = queryRunner.manager.create(Ticket, {
+              bookingId: savedBooking.id,
+              qrTokenHash,
+              status: TicketStatus.VALID,
+              personCount: 1,
+              holderName: `طالب ${i + 1}`,
+              validFrom: startTime,
+              validUntil: new Date(startTime.getTime() + (tripRequest.durationHours || 2) * 3600 * 1000),
+            });
+            tickets.push(t);
+          }
+        }
+
+        // Generate placeholder tickets for accompanying adults
+        for (let i = 0; i < adultsCount; i++) {
+          const qrToken = this.qrCodeService
+            ? this.qrCodeService.generateQRToken(savedBooking.id, `${savedBooking.id}-adult-${i}`)
+            : `${savedBooking.id}-adult-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+          const qrTokenHash = this.qrCodeService
+            ? this.qrCodeService.generateQRTokenHash(qrToken)
+            : require('crypto').createHash('sha256').update(qrToken).digest('hex');
+
+          const t = queryRunner.manager.create(Ticket, {
+            bookingId: savedBooking.id,
+            qrTokenHash,
+            status: TicketStatus.VALID,
+            personCount: 1,
+            holderName: `مرافق ${i + 1}`,
+            validFrom: startTime,
+            validUntil: new Date(startTime.getTime() + (tripRequest.durationHours || 2) * 3600 * 1000),
+          });
+          tickets.push(t);
+        }
+        await queryRunner.manager.save(tickets);
+
+        // Update trip request to completed
+        tripRequest.status = TripRequestStatus.COMPLETED;
+        await queryRunner.manager.save(tripRequest);
+
+        // Send notification
+        await this.notifications.enqueue({
+          type: 'TICKETS_ISSUED',
+          to: { userId: tripRequest.requesterId },
+          data: {
+            bookingId: savedBooking.id,
+            tripRequestId: tripRequest.id,
+            ticketsCount: tickets.length,
+          },
+          channels: ['sms', 'push'],
+        });
       }
 
       await queryRunner.commitTransaction();
+      transactionStarted = false;
 
-      const targetId = booking ? booking.id : eventRequest!.id;
+      // Post-confirmation actions (tickets, notifications) - outside transaction
+      // Use savedBooking if it was created, otherwise use booking.id, or null if neither exists
+      const bookingIdForLoyalty = savedBooking ? savedBooking.id : (booking ? booking.id : null);
+      const targetId = booking ? booking.id : (eventRequest ? eventRequest.id : tripRequest!.id);
 
-      // Post-confirmation actions (tickets, notifications)
       try {
         if (booking && this.bookings) {
           await this.bookings.issueTicketsForBooking(booking.id);
@@ -519,8 +701,8 @@ export class PaymentsService {
         channels: ['sms', 'push'],
       });
 
-      // Award loyalty points
-      await this.loyalty.awardPoints(userId, Number(payment.amount), targetId);
+      // Award loyalty points - use bookingId only if it exists (not eventRequest.id or tripRequest.id)
+      await this.loyalty.awardPoints(userId, Number(payment.amount), bookingIdForLoyalty || undefined);
 
       // Realtime updates
       // this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: booking.status });
@@ -532,7 +714,9 @@ export class PaymentsService {
       }
       return { success: true, paymentId: payment.id };
     } catch (e) {
-      await queryRunner.rollbackTransaction();
+      if (transactionStarted) {
+        await queryRunner.rollbackTransaction();
+      }
       throw e;
     } finally {
       await queryRunner.release();

@@ -31,7 +31,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 @UseGuards(AuthGuard('jwt'))
 @Controller('trips')
 export class TripsController {
-  constructor(private readonly tripsService: TripsService) {}
+  constructor(private readonly tripsService: TripsService) { }
 
   @Get('requests')
   @ApiOperation({ summary: 'Get user\'s trip requests' })
@@ -103,8 +103,9 @@ export class TripsController {
   approveRequest(
     @CurrentUser() user: any,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { quotedPrice?: number; adminNotes?: string; rejectionReason?: string },
   ) {
-    return this.tripsService.approveRequest(user.id, id);
+    return this.tripsService.approveRequest(user.id, id, dto.quotedPrice, dto.adminNotes);
   }
 
   @Post('requests/:id/upload')
@@ -165,6 +166,25 @@ export class TripsController {
     @Body() dto: MarkPaidDto,
   ) {
     return this.tripsService.markPaid(user.id, id, dto);
+  }
+
+  @Post('requests/:id/pay')
+  @ApiOperation({ summary: 'Pay for an approved trip request (User)' })
+  async payForTrip(
+    @CurrentUser() user: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { paymentMethod?: string },
+  ) {
+    return this.tripsService.payForTrip(user.id, id, dto);
+  }
+
+  @Get('requests/:id/tickets')
+  @ApiOperation({ summary: 'Get tickets for trip request' })
+  @ApiResponse({ status: 200, description: 'Tickets retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Trip request not found' })
+  async getTripTickets(@CurrentUser() user: any, @Param('id', ParseUUIDPipe) id: string) {
+    return this.tripsService.getTripTickets(id, user);
   }
 }
 

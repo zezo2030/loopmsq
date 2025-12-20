@@ -7,7 +7,6 @@ import dayjs from 'dayjs'
 type Coupon = {
   id: string
   branchId: string
-  hallId?: string | null
   code: string
   discountType: 'percentage' | 'fixed'
   discountValue: number
@@ -25,10 +24,6 @@ export default function BranchCouponsTab({ branchId }: BranchCouponsTabProps) {
   const { data, isLoading } = useQuery<Coupon[]>({ 
     queryKey: ['coupons', branchId], 
     queryFn: () => apiGet(`/admin/coupons?branchId=${branchId}`) 
-  })
-  const { data: halls } = useQuery<any[]>({ 
-    queryKey: ['halls', branchId], 
-    queryFn: () => apiGet(`/content/halls?branchId=${branchId}`) 
   })
   const [open, setOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -58,7 +53,6 @@ export default function BranchCouponsTab({ branchId }: BranchCouponsTabProps) {
   })
 
   const columns = [
-    { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? (halls?.find(h => h.id === v)?.name_en || v) : 'All Halls' },
     { title: 'Code', dataIndex: 'code' },
     { title: 'Type', dataIndex: 'discountType' },
     { title: 'Value', dataIndex: 'discountValue' },
@@ -95,7 +89,6 @@ export default function BranchCouponsTab({ branchId }: BranchCouponsTabProps) {
         onOk={() => {
           form.validateFields().then(values => {
             const body: any = {
-              hallId: values.hallId || null,
               code: values.code,
               discountType: values.discountType,
               discountValue: Number(values.discountValue),
@@ -110,13 +103,6 @@ export default function BranchCouponsTab({ branchId }: BranchCouponsTabProps) {
         }}
       >
         <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
-          <Form.Item name="hallId" label="Hall (optional)">
-            <Select
-              allowClear
-              placeholder="All Halls"
-              options={(halls || []).map(h => ({ value: h.id, label: h.name_en }))}
-            />
-          </Form.Item>
           <Form.Item name="code" label="Code" rules={[{ required: true }]}>
             <Input />
           </Form.Item>

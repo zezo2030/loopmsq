@@ -35,6 +35,14 @@ export class ReferralsController {
     return this.referrals.listCodes(query);
   }
 
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get my referral code' })
+  async getMyCode(@CurrentUser() user: User) {
+    return this.referrals.getMyCode(user.id);
+  }
+
   @Post('attribute')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()

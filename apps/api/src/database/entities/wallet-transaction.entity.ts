@@ -20,6 +20,7 @@ export enum WalletTransactionType {
 export enum WalletTransactionStatus {
   SUCCESS = 'success',
   FAILED = 'failed',
+  PENDING = 'pending',
 }
 
 @Entity('wallet_transactions')

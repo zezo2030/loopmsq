@@ -2,14 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Switch, Table, message, Upload, Image, Space } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 import { resolveFileUrl } from '../shared/url'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../api'
 import dayjs from 'dayjs'
 
 type Offer = {
   id: string
   branchId: string
-  hallId?: string | null
   title: string
   description?: string | null
   discountType: 'percentage' | 'fixed'
@@ -30,20 +29,9 @@ export default function BranchOffersTab({ branchId }: BranchOffersTabProps) {
     queryKey: ['offers', branchId], 
     queryFn: () => apiGet(`/admin/offers?branchId=${branchId}`) 
   })
-  const { data: halls } = useQuery<any[]>({ 
-    queryKey: ['halls', branchId], 
-    queryFn: () => apiGet(`/content/halls?branchId=${branchId}`) 
-  })
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Offer | null>(null)
   const [form] = Form.useForm()
-
-  // Auto-set hall when modal opens (each branch has one hall)
-  useEffect(() => {
-    if (open && branchId && halls && halls.length > 0) {
-      form.setFieldsValue({ hallId: halls[0].id })
-    }
-  }, [open, branchId, halls, form])
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<Offer>) => apiPost<Offer>('/admin/offers', { ...body, branchId }),
@@ -59,7 +47,7 @@ export default function BranchOffersTab({ branchId }: BranchOffersTabProps) {
   })
 
   const columns = [
-    { title: 'Hall', dataIndex: 'hallId', render: (v: string) => v ? (halls?.find(h => h.id === v)?.name_en || v) : 'All Halls' },
+    { title: 'Branch', dataIndex: 'branchId', render: (v: string) => v || 'All Branches' },
     { title: 'Title', dataIndex: 'title' },
     { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrl(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: 'Type', dataIndex: 'discountType' },
@@ -95,7 +83,7 @@ export default function BranchOffersTab({ branchId }: BranchOffersTabProps) {
         onOk={() => {
           form.validateFields().then(values => {
             const body: any = {
-              hallId: values.hallId || null,
+              branchId: branchId,
               title: values.title,
               description: values.description || null,
               discountType: values.discountType,
@@ -112,8 +100,8 @@ export default function BranchOffersTab({ branchId }: BranchOffersTabProps) {
         }}
       >
         <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
-          {/* Hall selection is hidden - automatically linked to branch's single hall */}
-          <Form.Item name="hallId" hidden>
+          {/* Branch is automatically set from props */}
+          <Form.Item name="branchId" hidden>
             <Input />
           </Form.Item>
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>

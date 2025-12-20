@@ -228,6 +228,7 @@ export default function MainLayout() {
         { key: 'cms-coupons', icon: <PercentageOutlined />, label: <Link to="/admin/cms/coupons">{t('cms.coupons') || 'Coupons'}</Link> },
         { key: 'cms-packages', icon: <GiftOutlined />, label: <Link to="/admin/cms/packages">{t('cms.packages') || 'Packages'}</Link> },
         { key: 'cms-activities', icon: <PlayCircleOutlined />, label: <Link to="/admin/cms/activities">{t('cms.activities') || 'Activities'}</Link> },
+        { key: 'cms-organizing-branches', icon: <AppstoreOutlined />, label: <Link to="/admin/cms/organizing-branches">{t('cms.organizingBranches') || 'Organizing Branches'}</Link> },
       ],
     },
     {
