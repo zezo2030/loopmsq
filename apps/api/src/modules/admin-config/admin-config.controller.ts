@@ -21,20 +21,38 @@ export class AdminConfigController {
   constructor(private readonly service: AdminConfigService) {}
 
   @Get('sms')
-  @ApiOperation({ summary: 'Get SMS configuration (masked)' })
+  @ApiOperation({ summary: 'Get WhatsApp configuration (masked)' })
   async getSms() {
     return this.service.getSmsConfig(true);
   }
 
   @Put('sms')
-  @ApiOperation({ summary: 'Update SMS configuration' })
+  @ApiOperation({ summary: 'Update WhatsApp configuration' })
   async updateSms(@Body() dto: UpdateSmsConfigDto) {
     return this.service.updateSmsConfig(dto);
   }
 
   @Post('sms/test')
-  @ApiOperation({ summary: 'Send a test SMS message' })
+  @ApiOperation({ summary: 'Send a test WhatsApp OTP message' })
   async testSms(@Body() body: { to: string; message: string }) {
+    return this.service.testSms(body.to, body.message);
+  }
+
+  @Get('whatsapp')
+  @ApiOperation({ summary: 'Get WhatsApp configuration (masked)' })
+  async getWhatsApp() {
+    return this.service.getSmsConfig(true);
+  }
+
+  @Put('whatsapp')
+  @ApiOperation({ summary: 'Update WhatsApp configuration' })
+  async updateWhatsApp(@Body() dto: UpdateSmsConfigDto) {
+    return this.service.updateSmsConfig(dto);
+  }
+
+  @Post('whatsapp/test')
+  @ApiOperation({ summary: 'Send a test WhatsApp OTP message' })
+  async testWhatsApp(@Body() body: { to: string; message: string }) {
     return this.service.testSms(body.to, body.message);
   }
 

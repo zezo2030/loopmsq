@@ -24,7 +24,9 @@ import {
   DollarOutlined,
   CloseOutlined,
   WarningOutlined,
-  TeamOutlined
+  TeamOutlined,
+  IdcardOutlined,
+  ReloadOutlined
 } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
 import '../../theme.css'
@@ -84,6 +86,16 @@ type Booking = {
   }
 }
 
+type Ticket = {
+  id: string
+  status: 'valid' | 'used' | 'expired' | 'cancelled'
+  holderName?: string
+  validFrom?: string
+  validUntil?: string
+  scannedAt?: string
+  createdAt: string
+}
+
 export default function BookingDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -92,6 +104,8 @@ export default function BookingDetail() {
   const [cancelModalVisible, setCancelModalVisible] = useState(false)
   const [cancelForm] = Form.useForm()
   const [cancelling, setCancelling] = useState(false)
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [loadingTickets, setLoadingTickets] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -122,12 +136,30 @@ export default function BookingDetail() {
       }
       
       setBooking(normalizedBooking)
+      if (normalizedBooking.status === 'confirmed' || normalizedBooking.status === 'completed') {
+        await loadBookingTickets(normalizedBooking.id)
+      } else {
+        setTickets([])
+      }
     } catch (error) {
       console.error('Failed to load booking:', error)
       message.error('تعذّر تحميل تفاصيل الحجز')
       setBooking(null)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadBookingTickets(bookingId: string) {
+    setLoadingTickets(true)
+    try {
+      const ticketsData = await apiGet<Ticket[]>(`/bookings/${bookingId}/tickets`)
+      setTickets(ticketsData || [])
+    } catch (error) {
+      console.error('Failed to load booking tickets:', error)
+      setTickets([])
+    } finally {
+      setLoadingTickets(false)
     }
   }
 
@@ -272,35 +304,7 @@ export default function BookingDetail() {
                   <Descriptions.Item label="العنوان">
                     {booking.branch?.address || 'غير محدد'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="القاعة">
-                    <span style={{ 
-                      color: booking.hall?.name && booking.hall.name !== 'غير محدد' ? 'inherit' : '#ff4d4f',
-                      fontWeight: booking.hall?.name && booking.hall.name !== 'غير محدد' ? 'normal' : '500'
-                    }}>
-                      {booking.hall?.name && booking.hall.name !== 'غير محدد' ? booking.hall.name : '⚠️ لم يتم تحديد القاعة'}
-                    </span>
-                  </Descriptions.Item>
-                  {booking.hall?.capacity && (
-                    <Descriptions.Item label="سعة القاعة">
-                      <Space>
-                        <TeamOutlined />
-                        {booking.hall.capacity} شخص
-                      </Space>
-                    </Descriptions.Item>
-                  )}
                 </Descriptions>
-                
-                {booking.hall?.amenities && (
-                  <>
-                    <Divider />
-                    <div style={{ marginBottom: '8px', fontWeight: '600' }}>المرافق المتاحة:</div>
-                    <Space wrap>
-                      {booking.hall.amenities.map((amenity, index) => (
-                        <Tag key={index} color="blue">{amenity}</Tag>
-                      ))}
-                    </Space>
-                  </>
-                )}
               </Card>
             </Col>
 
@@ -482,6 +486,106 @@ export default function BookingDetail() {
               </Card>
             </Col>
 
+            {/* Tickets */}
+            {(booking.status === 'confirmed' || booking.status === 'completed') && (
+              <Col xs={24}>
+                <Card
+                  className="custom-card"
+                  title={
+                    <Space>
+                      <IdcardOutlined />
+                      <span>التذاكر ({tickets.length})</span>
+                    </Space>
+                  }
+                  extra={
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => loadBookingTickets(booking.id)}
+                      loading={loadingTickets}
+                      size="small"
+                    >
+                      تحديث
+                    </Button>
+                  }
+                >
+                  {loadingTickets ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#8c8c8c' }}>
+                      جاري تحميل التذاكر...
+                    </div>
+                  ) : tickets.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#8c8c8c' }}>
+                      <IdcardOutlined style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.3 }} />
+                      <div>لا توجد تذاكر متاحة</div>
+                    </div>
+                  ) : (
+                    <div style={{ maxHeight: '500px', overflow: 'auto' }}>
+                      <Row gutter={[16, 16]}>
+                        {tickets.map((ticket) => (
+                          <Col xs={24} sm={12} lg={8} key={ticket.id}>
+                            <Card size="small" style={{ border: '1px solid #d9d9d9', borderRadius: '8px' }}>
+                              <Space direction="vertical" style={{ width: '100%' }} size="small">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div style={{ fontWeight: '600' }}>
+                                    {ticket.holderName || `تذكرة #${ticket.id.slice(-6)}`}
+                                  </div>
+                                  <Tag
+                                    color={
+                                      ticket.status === 'valid'
+                                        ? 'green'
+                                        : ticket.status === 'used'
+                                          ? 'blue'
+                                          : ticket.status === 'expired'
+                                            ? 'red'
+                                            : 'default'
+                                    }
+                                  >
+                                    {ticket.status === 'valid'
+                                      ? 'صالحة'
+                                      : ticket.status === 'used'
+                                        ? 'مستخدمة'
+                                        : ticket.status === 'expired'
+                                          ? 'منتهية'
+                                          : 'ملغية'}
+                                  </Tag>
+                                </div>
+                                {ticket.validFrom && (
+                                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                                    من: {new Date(ticket.validFrom).toLocaleString('ar-SA', { calendar: 'gregory' })}
+                                  </div>
+                                )}
+                                {ticket.validUntil && (
+                                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                                    إلى: {new Date(ticket.validUntil).toLocaleString('ar-SA', { calendar: 'gregory' })}
+                                  </div>
+                                )}
+                                {ticket.status === 'used' && ticket.scannedAt && (
+                                  <div
+                                    style={{
+                                      fontSize: '12px',
+                                      color: '#1890ff',
+                                      marginTop: '8px',
+                                      padding: '8px',
+                                      backgroundColor: '#e6f7ff',
+                                      borderRadius: '4px',
+                                      border: '1px solid #91d5ff',
+                                    }}
+                                  >
+                                    تاريخ المسح: {new Date(ticket.scannedAt).toLocaleString('ar-SA', { calendar: 'gregory' })}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '11px', color: '#bfbfbf', marginTop: '4px' }}>
+                                  ID: {ticket.id.slice(0, 8)}...
+                                </div>
+                              </Space>
+                            </Card>
+                          </Col>
+                        ))}
+                      </Row>
+                    </div>
+                  )}
+                </Card>
+              </Col>
+            )}
           </Row>
         </div>
       </div>

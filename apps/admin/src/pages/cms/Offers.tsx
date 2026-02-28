@@ -7,6 +7,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
 import dayjs from 'dayjs'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../shared/auth'
+import { useTranslation } from 'react-i18next'
 
 type Offer = {
   id: string
@@ -22,6 +23,7 @@ type Offer = {
 }
 
 export default function Offers() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const location = useLocation()
   const { me } = useAuth()
@@ -42,15 +44,15 @@ export default function Offers() {
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<Offer>) => apiPost<Offer>('/admin/offers', body),
-    onSuccess: () => { message.success('Offer created'); qc.invalidateQueries({ queryKey: ['offers'] }); setOpen(false) },
+    onSuccess: () => { message.success(t('offers.created')); qc.invalidateQueries({ queryKey: ['offers'] }); setOpen(false) },
   })
   const updateMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Partial<Offer> }) => apiPatch(`/admin/offers/${id}`, body),
-    onSuccess: () => { message.success('Offer updated'); qc.invalidateQueries({ queryKey: ['offers'] }); setOpen(false); setEditing(null) },
+    onSuccess: () => { message.success(t('offers.updated')); qc.invalidateQueries({ queryKey: ['offers'] }); setOpen(false); setEditing(null) },
   })
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiDelete(`/admin/offers/${id}`),
-    onSuccess: () => { message.success('Offer removed'); qc.invalidateQueries({ queryKey: ['offers'] }) },
+    onSuccess: () => { message.success(t('offers.removed')); qc.invalidateQueries({ queryKey: ['offers'] }) },
   })
 
   // Auto-set hall when modal opens (each branch has one hall)
@@ -61,20 +63,20 @@ export default function Offers() {
   }, [open, editing, isBranchMode, enforcedBranchId, form])
 
   const columns = [
-    { title: 'Branch', dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
-    { title: 'Title', dataIndex: 'title' },
-    { title: 'Image', dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrlWithBust(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
-    { title: 'Type', dataIndex: 'discountType' },
-    { title: 'Value', dataIndex: 'discountValue' },
-    { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
-    { title: 'Schedule', render: (_: any, r: Offer) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
-    { title: 'Actions', render: (_: any, r: Offer) => (
+    { title: t('offers.branch'), dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
+    { title: t('offers.title'), dataIndex: 'title' },
+    { title: t('offers.image'), dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrlWithBust(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
+    { title: t('offers.type'), dataIndex: 'discountType' },
+    { title: t('offers.value'), dataIndex: 'discountValue' },
+    { title: t('offers.active'), dataIndex: 'isActive', render: (v: boolean) => (v ? t('offers.yes') : t('offers.no')) },
+    { title: t('offers.schedule'), render: (_: any, r: Offer) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
+    { title: t('offers.actions'), render: (_: any, r: Offer) => (
       <span style={{ display: 'flex', gap: 8 }}>
         <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue({
           ...r,
           range: [r.startsAt ? dayjs(r.startsAt) : null, r.endsAt ? dayjs(r.endsAt) : null]
-        }); setOpen(true) }}>Edit</Button>
-        <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>Delete</Button>
+        }); setOpen(true) }}>{t('offers.edit')}</Button>
+        <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>{t('offers.delete')}</Button>
       </span>
     )},
   ]
@@ -86,7 +88,7 @@ export default function Offers() {
           {!isBranchMode && (
             <Select
               allowClear
-              placeholder="Filter by branch"
+              placeholder={t('offers.filter_by_branch')}
               style={{ width: 240 }}
               value={branchFilter}
               onChange={(v) => setBranchFilter(v)}
@@ -98,12 +100,12 @@ export default function Offers() {
           setEditing(null); 
           form.resetFields(); 
           setOpen(true);
-        }}>New Offer</Button>
+        }}>{t('offers.new_offer')}</Button>
       </div>
       <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
 
       <Modal
-        title={editing ? 'Edit Offer' : 'Create Offer'}
+        title={editing ? t('offers.edit_offer') : t('offers.create_offer')}
         open={open}
         onCancel={() => { 
           setOpen(false); 
@@ -131,9 +133,9 @@ export default function Offers() {
       >
         <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
           {!isBranchMode && (
-            <Form.Item name="branchId" label="Branch" rules={[{ required: true }]}>
+            <Form.Item name="branchId" label={t('offers.branch')} rules={[{ required: true }]}>
               <Select
-                placeholder="Select branch"
+                placeholder={t('offers.select_branch')}
                 options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
                 onChange={() => {
                   // Branch is set, backend will handle the rest
@@ -142,10 +144,10 @@ export default function Offers() {
             </Form.Item>
           )}
           {/* Hall selection is hidden - automatically linked to branch's single hall */}
-          <Form.Item name="title" label="Title" rules={[{ required: true }]}>
+          <Form.Item name="title" label={t('offers.title')} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item label="Image">
+          <Form.Item label={t('offers.image')}>
             <Space direction="vertical" style={{ width: '100%' }}>
               {form.getFieldValue('imageUrl') ? (
                 <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -161,32 +163,32 @@ export default function Offers() {
                   apiPost<{ imageUrl: string }>('/admin/offers/upload', fd)
                     .then((res) => {
                       form.setFieldsValue({ imageUrl: res.imageUrl })
-                      message.success('Image uploaded')
+                      message.success(t('offers.image_uploaded'))
                     })
-                    .catch(() => message.error('Upload failed'))
+                    .catch(() => message.error(t('offers.upload_failed')))
                   return false
                 }}
               >
-                <Button icon={<UploadOutlined />}>Upload Image</Button>
+                <Button icon={<UploadOutlined />}>{t('offers.upload_image')}</Button>
               </Upload>
               <Form.Item name="imageUrl" hidden> 
                 <Input />
               </Form.Item>
             </Space>
           </Form.Item>
-          <Form.Item name="description" label="Description">
+          <Form.Item name="description" label={t('offers.description')}>
             <Input.TextArea rows={3} />
           </Form.Item>
-          <Form.Item name="discountType" label="Discount Type" rules={[{ required: true }]}>
-            <Select options={[{ value: 'percentage', label: 'Percentage %' }, { value: 'fixed', label: 'Fixed' }]} />
+          <Form.Item name="discountType" label={t('offers.discount_type')} rules={[{ required: true }]}>
+            <Select options={[{ value: 'percentage', label: t('offers.percentage') }, { value: 'fixed', label: t('offers.fixed') }]} />
           </Form.Item>
-          <Form.Item name="discountValue" label="Discount Value" rules={[{ required: true }]}>
+          <Form.Item name="discountValue" label={t('offers.discount_value')} rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="range" label="Schedule">
+          <Form.Item name="range" label={t('offers.schedule')}>
             <DatePicker.RangePicker showTime />
           </Form.Item>
-          <Form.Item name="isActive" label="Active" valuePropName="checked">
+          <Form.Item name="isActive" label={t('offers.active')} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

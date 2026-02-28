@@ -4,6 +4,11 @@ import { ILike, Repository } from 'typeorm';
 import { LoyaltyRule } from '../../database/entities/loyalty-rule.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { LoyaltyTransaction, TransactionType } from '../../database/entities/loyalty-transaction.entity';
+import {
+  WalletTransaction,
+  WalletTransactionStatus,
+  WalletTransactionType,
+} from '../../database/entities/wallet-transaction.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -12,6 +17,8 @@ export class LoyaltyService {
     @InjectRepository(LoyaltyRule) private readonly ruleRepo: Repository<LoyaltyRule>,
     @InjectRepository(Wallet) private readonly walletRepo: Repository<Wallet>,
     @InjectRepository(LoyaltyTransaction) private readonly txRepo: Repository<LoyaltyTransaction>,
+    @InjectRepository(WalletTransaction)
+    private readonly walletTxRepo: Repository<WalletTransaction>,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -83,6 +90,17 @@ export class LoyaltyService {
       metadata: { conversionRate: Number(rule.redeemRate) },
     });
     await this.txRepo.save(tx);
+    const walletTx = this.walletTxRepo.create({
+      walletId: wallet.id,
+      userId,
+      type: WalletTransactionType.DEPOSIT,
+      amount: value,
+      method: 'loyalty_points',
+      status: WalletTransactionStatus.SUCCESS,
+      reference: `loyalty_redeem_${tx.id}`,
+      metadata: { loyaltyTransactionId: tx.id, redeemedPoints: points },
+    } as any);
+    await this.walletTxRepo.save(walletTx);
     await this.notifications.enqueue({
       type: 'LOYALTY_REDEEM',
       to: { userId },

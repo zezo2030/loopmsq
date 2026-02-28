@@ -3,6 +3,7 @@ import { Card, Table, Input, Space, Button, Modal, Form, InputNumber, message } 
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../../api'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 interface WalletItem {
   id: string
@@ -22,6 +23,7 @@ interface WalletsResponse {
 }
 
 export default function WalletsList() {
+  const { t } = useTranslation()
   const [query, setQuery] = useState<string>('')
   const [page, setPage] = useState<number>(1)
   const [pageSize, setPageSize] = useState<number>(20)
@@ -66,7 +68,7 @@ export default function WalletsList() {
       return apiPost(`/loyalty/wallets/${payload.userId}/adjust`, { balanceDelta: payload.balanceDelta, pointsDelta: payload.pointsDelta, reason: payload.reason })
     },
     onSuccess: () => {
-      message.success('Wallet adjusted successfully')
+      message.success(t('wallets.adjusted_successfully'))
       setAdjustUserId(null)
       form.resetFields()
       refetch()
@@ -74,23 +76,23 @@ export default function WalletsList() {
   })
 
   const columns = [
-    { title: 'User ID', dataIndex: 'userId', key: 'userId' },
-    { title: 'Balance', dataIndex: 'balance', key: 'balance' },
-    { title: 'Points', dataIndex: 'loyaltyPoints', key: 'loyaltyPoints' },
-    { title: 'Total Earned', dataIndex: 'totalEarned', key: 'totalEarned' },
-    { title: 'Total Spent', dataIndex: 'totalSpent', key: 'totalSpent' },
-    { title: 'Last Tx', dataIndex: 'lastTransactionAt', key: 'lastTransactionAt' },
+    { title: t('wallets.user_id'), dataIndex: 'userId', key: 'userId' },
+    { title: t('wallets.balance'), dataIndex: 'balance', key: 'balance' },
+    { title: t('wallets.points'), dataIndex: 'loyaltyPoints', key: 'loyaltyPoints' },
+    { title: t('wallets.total_earned'), dataIndex: 'totalEarned', key: 'totalEarned' },
+    { title: t('wallets.total_spent'), dataIndex: 'totalSpent', key: 'totalSpent' },
+    { title: t('wallets.last_tx'), dataIndex: 'lastTransactionAt', key: 'lastTransactionAt' },
     {
-      title: 'Actions',
+      title: t('wallets.actions'),
       key: 'actions',
-      render: (_: any, r: WalletItem) => <Button onClick={() => setAdjustUserId(r.userId)}>Adjust</Button>,
+      render: (_: any, r: WalletItem) => <Button onClick={() => setAdjustUserId(r.userId)}>{t('wallets.adjust')}</Button>,
     },
   ]
 
   return (
-    <Card title="Wallets" extra={<Button onClick={() => refetch()}>Refresh</Button>}>
+    <Card title={t('wallets.title')} extra={<Button onClick={() => refetch()}>{t('wallets.refresh')}</Button>}>
       <Space style={{ marginBottom: 16 }}>
-        <Input placeholder="Search userId or name" style={{ width: 320 }} value={query} onChange={(e) => { setPage(1); setQuery(e.target.value) }} />
+        <Input placeholder={t('wallets.search_placeholder')} style={{ width: 320 }} value={query} onChange={(e) => { setPage(1); setQuery(e.target.value) }} />
       </Space>
 
       <Table
@@ -108,20 +110,20 @@ export default function WalletsList() {
       />
 
       <Modal
-        title="Adjust Wallet"
+        title={t('wallets.adjust_wallet')}
         open={!!adjustUserId}
         onCancel={() => { setAdjustUserId(null); form.resetFields() }}
         onOk={() => form.submit()}
       >
         <Form form={form} layout="vertical" onFinish={(values) => adjustMutation.mutate({ userId: adjustUserId!, ...values })}>
-          <Form.Item name="balanceDelta" label="Balance Delta">
+          <Form.Item name="balanceDelta" label={t('wallets.balance_delta')}>
             <InputNumber style={{ width: '100%' }} placeholder="e.g. 25 or -10" />
           </Form.Item>
-          <Form.Item name="pointsDelta" label="Points Delta">
+          <Form.Item name="pointsDelta" label={t('wallets.points_delta')}>
             <InputNumber style={{ width: '100%' }} placeholder="e.g. 100 or -50" />
           </Form.Item>
-          <Form.Item name="reason" label="Reason">
-            <Input placeholder="Reason for adjustment" />
+          <Form.Item name="reason" label={t('wallets.reason')}>
+            <Input placeholder={t('wallets.reason_placeholder')} />
           </Form.Item>
         </Form>
       </Modal>

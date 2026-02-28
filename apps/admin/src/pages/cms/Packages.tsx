@@ -3,6 +3,7 @@ import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Switch, Ta
 import { useState } from 'react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
 import dayjs from 'dayjs'
+import { useTranslation } from 'react-i18next'
 
 type EventPackage = {
   id: string
@@ -24,6 +25,7 @@ type EventPackage = {
 }
 
 export default function Packages() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data, isLoading } = useQuery<EventPackage[]>({ queryKey: ['packages'], queryFn: () => apiGet('/admin/packages') })
   const [open, setOpen] = useState(false)
@@ -34,37 +36,37 @@ export default function Packages() {
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<EventPackage>) => apiPost<EventPackage>('/admin/packages', body),
-    onSuccess: () => { message.success('Package created'); qc.invalidateQueries({ queryKey: ['packages'] }); setOpen(false) },
+    onSuccess: () => { message.success(t('packages.created')); qc.invalidateQueries({ queryKey: ['packages'] }); setOpen(false) },
   })
   const updateMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Partial<EventPackage> }) => apiPatch(`/admin/packages/${id}`, body),
-    onSuccess: () => { message.success('Package updated'); qc.invalidateQueries({ queryKey: ['packages'] }); setOpen(false); setEditing(null) },
+    onSuccess: () => { message.success(t('packages.updated')); qc.invalidateQueries({ queryKey: ['packages'] }); setOpen(false); setEditing(null) },
   })
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiDelete(`/admin/packages/${id}`),
-    onSuccess: () => { message.success('Package removed'); qc.invalidateQueries({ queryKey: ['packages'] }) },
+    onSuccess: () => { message.success(t('packages.removed')); qc.invalidateQueries({ queryKey: ['packages'] }) },
   })
   const previewMutation = useMutation({
     mutationFn: (body: { packageId: string; persons: number; durationHours: number }) => apiPost('/admin/packages/preview', body),
-    onSuccess: (res: any) => { if (res.valid) message.success(`Total: ${res.total}`); else message.error(res.reason) }
+    onSuccess: (res: any) => { if (res.valid) message.success(t('packages.total', { amount: res.total })); else message.error(res.reason) }
   })
 
   const columns = [
-    { title: 'Name', dataIndex: 'name' },
-    { title: 'Event Type', dataIndex: 'eventType' },
-    { title: 'Branch', dataIndex: 'branchId' },
-    { title: 'Base', dataIndex: 'basePrice' },
-    { title: 'Per Person', dataIndex: 'pricePerPerson' },
-    { title: 'Per Hour', dataIndex: 'pricePerHour' },
-    { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
-    { title: 'Actions', render: (_: any, r: EventPackage) => (
+    { title: t('packages.name'), dataIndex: 'name' },
+    { title: t('packages.event_type'), dataIndex: 'eventType' },
+    { title: t('packages.branch'), dataIndex: 'branchId' },
+    { title: t('packages.base'), dataIndex: 'basePrice' },
+    { title: t('packages.per_person'), dataIndex: 'pricePerPerson' },
+    { title: t('packages.per_hour'), dataIndex: 'pricePerHour' },
+    { title: t('packages.active'), dataIndex: 'isActive', render: (v: boolean) => (v ? t('packages.yes') : t('packages.no')) },
+    { title: t('packages.actions'), render: (_: any, r: EventPackage) => (
       <span style={{ display: 'flex', gap: 8 }}>
         <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue({
           ...r,
           range: [r.startsAt ? dayjs(r.startsAt) : null, r.endsAt ? dayjs(r.endsAt) : null]
-        }); setOpen(true) }}>Edit</Button>
-        <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ packageId: r.id }) }}>Preview</Button>
-        <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>Delete</Button>
+        }); setOpen(true) }}>{t('packages.edit')}</Button>
+        <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ packageId: r.id }) }}>{t('packages.preview')}</Button>
+        <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>{t('packages.delete')}</Button>
       </span>
     )},
   ]
@@ -72,12 +74,12 @@ export default function Packages() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>New Package</Button>
+        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('packages.new_package')}</Button>
       </div>
       <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
 
       <Modal
-        title={editing ? 'Edit Package' : 'Create Package'}
+        title={editing ? t('packages.edit_package') : t('packages.create_package')}
         open={open}
         onCancel={() => { setOpen(false); setEditing(null) }}
         onOk={() => {
@@ -105,50 +107,50 @@ export default function Packages() {
         }}
       >
         <Form form={form} layout="vertical" initialValues={{ isActive: true }}>
-          <Form.Item name="branchId" label="Branch ID" rules={[{ required: true }]}>
+          <Form.Item name="branchId" label={t('packages.branch_id')} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="eventType" label="Event Type" rules={[{ required: true }]}>
+          <Form.Item name="eventType" label={t('packages.event_type')} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Form.Item name="name" label={t('packages.name')} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="description" label="Description">
+          <Form.Item name="description" label={t('packages.description')}>
             <Input.TextArea rows={3} />
           </Form.Item>
-          <Form.Item name="basePrice" label="Base Price">
+          <Form.Item name="basePrice" label={t('packages.base_price')}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="pricePerPerson" label="Price Per Person">
+          <Form.Item name="pricePerPerson" label={t('packages.price_per_person')}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="pricePerHour" label="Price Per Hour">
+          <Form.Item name="pricePerHour" label={t('packages.price_per_hour')}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="minPersons" label="Min Persons">
+          <Form.Item name="minPersons" label={t('packages.min_persons')}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="maxPersons" label="Max Persons">
+          <Form.Item name="maxPersons" label={t('packages.max_persons')}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="minDuration" label="Min Duration (hours)">
+          <Form.Item name="minDuration" label={t('packages.min_duration')}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="maxDuration" label="Max Duration (hours)">
+          <Form.Item name="maxDuration" label={t('packages.max_duration')}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="range" label="Schedule">
+          <Form.Item name="range" label={t('packages.schedule')}>
             <DatePicker.RangePicker showTime />
           </Form.Item>
-          <Form.Item name="isActive" label="Active" valuePropName="checked">
+          <Form.Item name="isActive" label={t('packages.active')} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
-        title="Price Preview"
+        title={t('packages.price_preview')}
         open={previewOpen}
         onCancel={() => setPreviewOpen(false)}
         onOk={() => {
@@ -158,17 +160,17 @@ export default function Packages() {
         }}
       >
         <Form form={previewForm} layout="vertical">
-          <Form.Item name="packageId" label="Package" rules={[{ required: true }]}>
+          <Form.Item name="packageId" label={t('packages.package')} rules={[{ required: true }]}>
             <Select
               options={(data || []).map(p => ({ value: p.id, label: `${p.name} (${p.eventType})` }))}
               showSearch
               filterOption={(input, option) => (option?.label as string).toLowerCase().includes(input.toLowerCase())}
             />
           </Form.Item>
-          <Form.Item name="persons" label="Persons" rules={[{ required: true }]}>
+          <Form.Item name="persons" label={t('packages.persons')} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="durationHours" label="Duration (hours)" rules={[{ required: true }]}>
+          <Form.Item name="durationHours" label={t('packages.duration_hours')} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
         </Form>

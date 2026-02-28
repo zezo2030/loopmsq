@@ -1,4 +1,4 @@
-# Environment Configuration for Email OTP & SMS (Dreams)
+# Environment Configuration for Email OTP & WhatsApp OTP
 
 ## المشكلة
 عند إرسال OTP عبر البريد الإلكتروني، لا يتم إرسال الرسائل بسبب عدم تكوين إعدادات SMTP.
@@ -44,11 +44,9 @@ SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 SMTP_FROM=noreply@yourdomain.com
 
-# Dreams SMS Configuration (Optional)
-DREAMS_API_URL=https://www.dreams.sa/index.php/api/sendsms/
-DREAMS_USER=your-dreams-username
-DREAMS_SECRET_KEY=your-dreams-secret
-DREAMS_SENDER=YourBrandOrNumber
+# WhatsApp Business API Configuration (Required for WhatsApp OTP)
+WHATSAPP_ACCESS_TOKEN=your-whatsapp-access-token
+WHATSAPP_PHONE_NUMBER_ID=your-whatsapp-phone-number-id
 
 # Payment Configuration
 PAYMENT_WEBHOOK_SECRET=dev-webhook-secret

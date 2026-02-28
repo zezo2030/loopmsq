@@ -70,11 +70,8 @@ services:
       # WhatsApp Business API Configuration
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
-      # Dreams SMS Configuration (deprecated - kept for fallback)
-      DREAMS_API_URL: ${DREAMS_API_URL:-}
-      DREAMS_USER: ${DREAMS_USER:-}
-      DREAMS_SECRET_KEY: ${DREAMS_SECRET_KEY:-}
-      DREAMS_SENDER: ${DREAMS_SENDER:-}
+      WHATSAPP_OTP_TEMPLATE_NAME: ${WHATSAPP_OTP_TEMPLATE_NAME:-ver_number}
+      WHATSAPP_OTP_LANGUAGE: ${WHATSAPP_OTP_LANGUAGE:-}
       # TAP Configuration
       TAP_SECRET_KEY: ${TAP_SECRET_KEY:-}
       TAP_PUBLIC_KEY: ${TAP_PUBLIC_KEY:-}

@@ -1101,17 +1101,19 @@ export class BookingsService {
       } as Booking;
     }
 
-    // For paid bookings, apply 24h cancellation rule
     const now = new Date();
-    const bookingStart = new Date(booking.startTime);
-    const isPast = bookingStart.getTime() <= now.getTime();
-    if (!isPast) {
-      const hoursUntilBooking =
-        (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60);
-      if (hoursUntilBooking < 24) {
-        throw new BadRequestException(
-          'Cannot cancel booking less than 24 hours before start time',
-        );
+    // For paid bookings, apply 24h cancellation rule (skip for admins/managers)
+    if (!isRequesterBranchManager) {
+      const bookingStart = new Date(booking.startTime);
+      const isPast = bookingStart.getTime() <= now.getTime();
+      if (!isPast) {
+        const hoursUntilBooking =
+          (bookingStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+        if (hoursUntilBooking < 24) {
+          throw new BadRequestException(
+            'Cannot cancel booking less than 24 hours before start time',
+          );
+        }
       }
     }
 

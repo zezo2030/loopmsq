@@ -88,9 +88,7 @@ export default function BookingsList() {
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [dateRange, setDateRange] = useState<[any, any] | null>(null)
   const [branchFilter, setBranchFilter] = useState<string>('')
-  const [hallFilter, setHallFilter] = useState<string>('')
   const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([])
-  const [halls, setHalls] = useState<Array<{ id: string; name: string; branchId: string }>>([])
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -107,13 +105,11 @@ export default function BookingsList() {
     const s = searchParams.get('q') || ''
     const st = searchParams.get('status') || ''
     const b = searchParams.get('branchId') || ''
-    const h = searchParams.get('hallId') || ''
     const from = searchParams.get('from')
     const to = searchParams.get('to')
     setSearchText(s)
     setStatusFilter(st)
     setBranchFilter(b)
-    setHallFilter(h)
     if (from && to) {
       // AntD dayjs-compatible strings; we’ll keep raw strings and coerce on compare
       setDateRange([{
@@ -127,22 +123,11 @@ export default function BookingsList() {
   }, [])
 
   useEffect(() => {
-    // Load halls when branch changes
-    if (!branchFilter) {
-      setHalls([])
-      setHallFilter('')
-      return
-    }
-    loadHalls(branchFilter)
-  }, [branchFilter])
-
-  useEffect(() => {
     // Sync filters to URL
     const params: Record<string, string> = {}
     if (searchText) params.q = searchText
     if (statusFilter) params.status = statusFilter
     if (branchFilter) params.branchId = branchFilter
-    if (hallFilter) params.hallId = hallFilter
     if (dateRange?.[0]?.toDate && dateRange?.[1]?.toDate) {
       const fromISO = new Date(dateRange[0].toDate()).toISOString()
       const toISO = new Date(dateRange[1].toDate()).toISOString()
@@ -150,7 +135,7 @@ export default function BookingsList() {
       params.to = toISO
     }
     setSearchParams(params, { replace: true })
-  }, [searchText, statusFilter, branchFilter, hallFilter, dateRange])
+  }, [searchText, statusFilter, branchFilter, dateRange])
 
   async function loadBookings() {
     setLoading(true)
@@ -231,7 +216,6 @@ export default function BookingsList() {
     setSearchText('')
     setStatusFilter('')
     setBranchFilter('')
-    setHallFilter('')
     setDateRange(null)
   }
 
@@ -242,19 +226,11 @@ export default function BookingsList() {
     } catch {}
   }
 
-  async function loadHalls(branchId: string) {
-    try {
-      const resp = await apiGet<Array<{ id: string; name_en?: string; name_ar?: string; branchId: string }>>(`/content/halls?branchId=${branchId}`)
-      setHalls((resp || []).map(h => ({ id: h.id, name: (h as any).name_ar || (h as any).name_en || 'Hall', branchId: (h as any).branchId })))
-    } catch {}
-  }
-
   const filteredBookings = bookings.filter(booking => {
     const matchesSearch = !searchText || 
       booking.user.name?.toLowerCase().includes(searchText.toLowerCase()) ||
       booking.user.email?.toLowerCase().includes(searchText.toLowerCase()) ||
-      booking.user.phone?.includes(searchText) ||
-      booking.hall?.name?.toLowerCase().includes(searchText.toLowerCase())
+      booking.user.phone?.includes(searchText)
     
     const matchesStatus = !statusFilter || booking.status === statusFilter
     
@@ -264,9 +240,8 @@ export default function BookingsList() {
     )
 
     const matchesBranch = !branchFilter || booking.branch.id === branchFilter
-    const matchesHall = !hallFilter || booking.hall?.id === hallFilter
     
-    return matchesSearch && matchesStatus && matchesDate && matchesBranch && matchesHall
+    return matchesSearch && matchesStatus && matchesDate && matchesBranch
   })
 
   const getStatusColor = (status: string) => {
@@ -315,21 +290,12 @@ export default function BookingsList() {
       ),
     },
     {
-      title: 'الفرع والقاعة',
+      title: 'الفرع',
       key: 'venue',
       render: (_: any, record: BookingRow) => (
-        <div>
-          <div style={{ fontWeight: '600', fontSize: '14px' }}>
-            {record.branch?.name || 'غير محدد'}
-          </div>
-          <div style={{ 
-            color: record.hall?.name ? '#8c8c8c' : '#ff4d4f', 
-            fontSize: '12px',
-            fontWeight: record.hall?.name ? 'normal' : '500'
-          }}>
-            {record.hall?.name || '⚠️ لم يتم تحديد القاعة'}
-          </div>
-        </div>
+        <span style={{ fontWeight: '600', fontSize: '14px' }}>
+          {record.branch?.name || 'غير محدد'}
+        </span>
       ),
     },
     {
@@ -484,7 +450,7 @@ export default function BookingsList() {
             <Space size="middle" wrap style={{ width: '100%', justifyContent: 'space-between' }}>
               <Space size="middle" wrap>
               <Input
-                placeholder="البحث بالاسم، الإيميل، الهاتف، أو اسم القاعة..."
+                placeholder="البحث بالاسم، الإيميل، أو الهاتف..."
                 prefix={<SearchOutlined />}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
@@ -519,17 +485,6 @@ export default function BookingsList() {
                 options={branches.map(b => ({ label: b.name, value: b.id }))}
               />
 
-              <Select
-                placeholder="اختر القاعة"
-                value={hallFilter || undefined}
-                onChange={setHallFilter}
-                style={{ width: 220 }}
-                size="large"
-                allowClear
-                disabled={!branchFilter}
-                options={halls.map(h => ({ label: h.name, value: h.id }))}
-              />
-
               <RangePicker
                 placeholder={['من تاريخ', 'إلى تاريخ']}
                 value={dateRange}
@@ -553,7 +508,6 @@ export default function BookingsList() {
                       email: b.user.email,
                       phone: b.user.phone,
                       branch: b.branch.name,
-                      hall: b.hall?.name || '',
                       startTime: new Date(b.startTime).toISOString(),
                       persons: b.persons,
                       totalPrice: b.totalPrice,

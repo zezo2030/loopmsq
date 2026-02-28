@@ -7,7 +7,7 @@ import { Coupon } from '../../database/entities/coupon.entity';
 export class CouponsService {
   constructor(
     @InjectRepository(Coupon) private readonly repo: Repository<Coupon>,
-  ) {}
+  ) { }
 
   list(filter?: { branchId?: string }) {
     const where: any = {};
@@ -28,7 +28,7 @@ export class CouponsService {
   }
 
   update(id: string, dto: Partial<Coupon>) {
-    return this.repo.update(id, dto);
+    return this.repo.update(id, dto as any);
   }
 
   remove(id: string) {

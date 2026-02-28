@@ -25,6 +25,7 @@ import { BookingQuoteDto } from './dto/booking-quote.dto';
 import { ScanTicketDto } from './dto/scan-ticket.dto';
 import { CreateFreeTicketDto } from './dto/create-free-ticket.dto';
 import { CreateFreeTicketAdminDto } from './dto/create-free-ticket-admin.dto';
+import { CancelBookingDto } from './dto/cancel-booking.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -174,10 +175,10 @@ export class BookingsController {
   async cancelBooking(
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('reason') reason?: string,
+    @Body() body: CancelBookingDto,
   ) {
-    const isManager = user.roles?.includes(UserRole.BRANCH_MANAGER) || false;
-    return this.bookingsService.cancelBooking(id, user.id, reason, user.branchId, isManager);
+    const isManagerOrAdmin = user.roles?.includes(UserRole.BRANCH_MANAGER) || user.roles?.includes(UserRole.ADMIN) || false;
+    return this.bookingsService.cancelBooking(id, user.id, body.reason, user.branchId, isManagerOrAdmin);
   }
 
   // Staff endpoints

@@ -21,7 +21,7 @@ Queues Dashboard: http://localhost:3000/api/v1/queues (Development Only)
 - **تسجيل جديد بالبريد الإلكتروني + كلمة المرور**
 - **تسجيل جديد بـ OTP فقط**
 
-> ملاحظة: تم اعتماد OTP عبر الجوال (SMS) باستخدام Dreams API، وإيقاف OTP عبر البريد الإلكتروني.
+> ملاحظة: تم اعتماد OTP عبر WhatsApp Business API، وإيقاف OTP عبر البريد الإلكتروني.
 
 ---
 
@@ -80,7 +80,7 @@ Content-Type: application/json
 
 ### 2. تسجيل الدخول بـ OTP (بدون كلمة مرور)
 
-> يتم الآن إرسال OTP عبر الجوال (SMS) وليس البريد الإلكتروني.
+> يتم الآن إرسال OTP عبر WhatsApp وليس البريد الإلكتروني.
 
 #### أ) إرسال OTP:
 ```http

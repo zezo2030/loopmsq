@@ -1,36 +1,39 @@
-import { Row, Col, Card, Statistic, List, Avatar, Button, Space, Tag, Divider, Image } from 'antd'
-import { resolveFileUrlWithBust } from '../shared/url'
-import { 
-  CalendarOutlined,
-  RiseOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
-  DollarOutlined,
-  CheckCircleOutlined,
-  FileTextOutlined
-} from '@ant-design/icons'
-import '../theme.css'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import {
+  Calendar,
+  DollarSign,
+  CheckCircle,
+  XCircle,
+  ChevronRight,
+  FileText,
+  TrendingUp,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
 import { apiGet } from '../shared/api'
 import { useAuth } from '../shared/auth'
+import { resolveFileUrlWithBust } from '../shared/url'
+import { cn } from '@/lib/utils'
 
 export default function Dashboard() {
   const { t } = useTranslation()
   const { me } = useAuth()
-  const [overview, setOverview] = useState<{ 
-    bookings: { total: number; confirmed: number; cancelled: number; pending?: number }; 
-    scans: number; 
-    revenueByMethod: Record<string, number> 
+  const [overview, setOverview] = useState<{
+    bookings: { total: number; confirmed: number; cancelled: number; pending?: number }
+    scans: number
+    revenueByMethod: Record<string, number>
   } | null>(null)
-  const [recent, setRecent] = useState<Array<{ 
-    id: string; 
-    branch?: any; 
-    hall?: any; 
-    startTime?: string; 
-    status?: string 
-  }>>([])
-  const [branchData, setBranchData] = useState<any>(null)
+  const [recent, setRecent] = useState<
+    Array<{
+      id: string
+      branch?: { name?: string; name_ar?: string; nameAr?: string; name_en?: string; nameEn?: string }
+      hall?: { name?: string; name_ar?: string; nameAr?: string; name_en?: string; nameEn?: string }
+      startTime?: string
+      status?: string
+    }>
+  >([])
+  const [branchData, setBranchData] = useState<{ coverImage?: string; images?: string[] } | null>(null)
 
   useEffect(() => {
     ;(async () => {
@@ -41,12 +44,21 @@ export default function Dashboard() {
       } catch {}
       try {
         const res = await apiGet<any>('/bookings/branch/me?page=1&limit=8')
-        const items = Array.isArray(res?.bookings) ? res.bookings : (res?.items || [])
-        setRecent(items)
+        const items = Array.isArray(res?.bookings) ? res.bookings : res?.items || []
+        const displayName = (o?: { name?: string; name_ar?: string; nameAr?: string; name_en?: string; nameEn?: string }) =>
+          o?.name ?? o?.name_ar ?? o?.nameAr ?? o?.name_en ?? o?.nameEn ?? ''
+        const normalized = items.map((b: any) => ({
+          ...b,
+          branch: b.branch ? { ...b.branch, name: displayName(b.branch) } : b.branch,
+          hall: b.hall ? { ...b.hall, name: displayName(b.hall) } : b.hall,
+        }))
+        setRecent(normalized)
       } catch {}
       try {
         if (me?.branchId) {
-          const branch = await apiGet(`/content/branches/${me.branchId}`)
+          const branch = await apiGet<{ coverImage?: string; images?: string[] }>(
+            `/content/branches/${me.branchId}`
+          ) as { coverImage?: string; images?: string[] } | null
           setBranchData(branch)
         }
       } catch {}
@@ -54,284 +66,306 @@ export default function Dashboard() {
   }, [me?.branchId])
 
   const revenueEntries = Object.entries(overview?.revenueByMethod || {})
+  const totalRevenue = Object.values(overview?.revenueByMethod || {}).reduce(
+    (a: number, b: unknown) => a + Number(b || 0),
+    0
+  )
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'confirmed':
+        return 'bg-emerald-50 text-emerald-600'
+      case 'pending':
+        return 'bg-amber-50 text-amber-600'
+      case 'cancelled':
+        return 'bg-rose-50 text-rose-600'
+      default:
+        return 'bg-slate-100 text-slate-600'
+    }
+  }
 
   return (
-    <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
-      {/* Branch Cover Image */}
+    <div className="space-y-8">
+      {/* Branch Cover */}
       {branchData?.coverImage && (
-        <Card style={{ marginBottom: '24px', padding: 0, overflow: 'hidden' }}>
-          <Image
+        <Card className="overflow-hidden border-slate-100 p-0 shadow-sm">
+          <img
             src={resolveFileUrlWithBust(branchData.coverImage)}
             alt="Branch Cover"
-            style={{ width: '100%', height: '200px', objectFit: 'cover' }}
-            preview={false}
+            className="h-48 w-full object-cover md:h-52"
           />
         </Card>
       )}
 
       {/* Page Header */}
-      <div className="page-header">
-        <div className="page-header-content">
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="page-title">{t('dashboard.title') || 'Branch Overview'}</h1>
-            <p className="page-subtitle">{t('dashboard.subtitle') || 'Monitor your branch performance and key metrics'}</p>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+              {t('dashboard.title') || 'نظرة عامة على الفرع'}
+            </h1>
+            <p className="mt-1 font-medium text-slate-600">
+              {t('dashboard.subtitle') || 'راقب أداء فرعك والمؤشرات الرئيسية'}
+            </p>
           </div>
-          <Space>
-            <Button type="primary" className="btn-primary" icon={<CalendarOutlined />} onClick={() => (window.location.href = '/branch/bookings')}>
-              {t('dashboard.go_bookings') || 'Go to Bookings'}
-            </Button>
-          </Space>
+          <Button
+            onClick={() => {
+              window.location.href = '/branch/bookings'
+            }}
+          >
+            <Calendar className="h-4 w-4" />
+            {t('dashboard.go_bookings') || 'الانتقال إلى الحجوزات'}
+          </Button>
         </div>
       </div>
 
-      <div className="page-content">
-        <div className="page-content-inner">
-          {/* Main Stats Cards */}
-          <Row gutter={[24, 24]} style={{ marginBottom: '32px' }}>
-            {[{
-              title: t('reports.bookings_total') || 'Bookings (Total)',
-              value: overview?.bookings?.total ?? 0,
-              prefix: <CalendarOutlined />,
-              suffix: t('dashboard.kpi_bookings') || 'bookings',
-              change: 0,
-              trend: 'stable'
-            }, {
-              title: t('reports.bookings_confirmed') || 'Bookings (Confirmed)',
-              value: overview?.bookings?.confirmed ?? 0,
-              prefix: <CheckCircleOutlined />,
-              suffix: '',
-              change: 0,
-              trend: 'stable'
-            }, {
-              title: t('reports.bookings_cancelled') || 'Bookings (Cancelled)',
-              value: overview?.bookings?.cancelled ?? 0,
-              prefix: <ArrowDownOutlined />,
-              suffix: '',
-              change: 0,
-              trend: 'stable'
-            }, {
-              title: t('dashboard.kpi_revenue') || 'Revenue',
-              value: Object.values(overview?.revenueByMethod || {}).reduce((a: number, b: any) => a + Number(b || 0), 0),
-              prefix: <DollarOutlined />,
-              suffix: 'SAR',
-              change: 0,
-              trend: 'stable'
-            }].map((stat, index) => (
-              <Col xs={24} sm={12} md={8} lg={6} key={index}>
-                <Card className="custom-card">
-                  <Statistic
-                    title={stat.title}
-                    value={stat.value}
-                    prefix={stat.prefix}
-                    suffix={stat.suffix}
-                    valueStyle={{ 
-                      color: stat.trend === 'up' ? '#10b981' : stat.trend === 'down' ? '#ef4444' : '#3b82f6',
-                      fontSize: '28px',
-                      fontWeight: 'bold'
-                    }}
-                  />
-                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {stat.trend === 'up' && (
-                      <>
-                        <ArrowUpOutlined style={{ color: '#10b981' }} />
-                        <span style={{ color: '#10b981', fontSize: '14px' }}>
-                          +{stat.change}% from last month
-                        </span>
-                      </>
-                    )}
-                    {stat.trend === 'down' && (
-                      <>
-                        <ArrowDownOutlined style={{ color: '#ef4444' }} />
-                        <span style={{ color: '#ef4444', fontSize: '14px' }}>
-                          {stat.change}% from last month
-                        </span>
-                      </>
-                    )}
-                    {stat.trend === 'stable' && (
-                      <span style={{ color: '#64748b', fontSize: '14px' }}>
-                        {t('dashboard.no_change') || 'No change from last month'}
-                      </span>
-                    )}
-                  </div>
-                </Card>
-              </Col>
-            ))}
-          </Row>
+      {/* Stats Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="overflow-hidden border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md group">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-600 transition-colors group-hover:text-primary">
+              {t('reports.bookings_total') || 'إجمالي الحجوزات'}
+            </CardTitle>
+            <div className="rounded-lg bg-slate-50 p-2 transition-colors group-hover:bg-primary/10">
+              <Calendar className="h-4 w-4 text-slate-600 group-hover:text-primary" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold tracking-tight text-slate-900">
+              {overview?.bookings?.total ?? 0}
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Revenue by Method */}
-          {revenueEntries.length > 0 && (
-            <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
-              {revenueEntries.map(([k, v]) => (
-                <Col xs={24} sm={12} md={8} lg={6} key={k}>
-                  <Card className="custom-card">
-                    <Statistic title={`${t('reports.revenue_by_method') || 'Revenue'}: ${k}`} value={Number(v)} suffix="SAR" />
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          )}
+        <Card className="overflow-hidden border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md group">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-600 transition-colors group-hover:text-primary">
+              {t('reports.bookings_confirmed') || 'الحجوزات المؤكدة'}
+            </CardTitle>
+            <div className="rounded-lg bg-emerald-50 p-2 transition-colors group-hover:bg-emerald-100">
+              <CheckCircle className="h-4 w-4 text-emerald-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold tracking-tight text-slate-900">
+              {overview?.bookings?.confirmed ?? 0}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Row gutter={[24, 24]}>
-            {/* Recent Activity */}
-            <Col xs={24} md={16} lg={16}>
-              <Card 
-                className="custom-card"
-                title={t('dashboard.recent_activity') || 'Recent Activity'} 
-                extra={<Button type="link">{t('common.view_all') || 'View All'}</Button>}
+        <Card className="overflow-hidden border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md group">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-600 transition-colors group-hover:text-primary">
+              {t('reports.bookings_cancelled') || 'الحجوزات الملغية'}
+            </CardTitle>
+            <div className="rounded-lg bg-rose-50 p-2 transition-colors group-hover:bg-rose-100">
+              <XCircle className="h-4 w-4 text-rose-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold tracking-tight text-slate-900">
+              {overview?.bookings?.cancelled ?? 0}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md group">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-600 transition-colors group-hover:text-primary">
+              {t('dashboard.kpi_revenue') || 'الإيرادات'}
+            </CardTitle>
+            <div className="rounded-lg bg-slate-50 p-2 transition-colors group-hover:bg-primary/10">
+              <DollarSign className="h-4 w-4 text-slate-600 group-hover:text-primary" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold tracking-tight text-slate-900">
+              {totalRevenue} <span className="text-base font-medium">SAR</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Revenue by Method */}
+      {revenueEntries.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {revenueEntries.map(([k, v]) => (
+            <Card key={k} className="border-slate-100 bg-white shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-600">
+                  {t('reports.revenue_by_method') || 'الإيرادات'}: {k}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold tracking-tight text-slate-900">
+                  {Number(v)} SAR
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Main Content Grid */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Card className="border-slate-100 bg-white shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg font-bold text-slate-900">
+                {t('dashboard.recent_activity') || 'آخر الأنشطة'}
+              </CardTitle>
+              <Button
+                variant="link"
+                className="h-auto p-0 font-medium text-primary"
+                onClick={() => {
+                  window.location.href = '/branch/bookings'
+                }}
               >
-                <List
-                  style={{ maxHeight: '400px', overflowY: 'auto' }}
-                  itemLayout="horizontal"
-                  dataSource={recent}
-                  renderItem={(item: any) => (
-                    <List.Item>
-                      <List.Item.Meta
-                        avatar={
-                          <Avatar 
-                            size={40}
-                            style={{ 
-                              backgroundColor: '#dbeafe',
-                              fontSize: '18px' 
-                            }}
-                          >
-                            📅
-                          </Avatar>
-                        }
-                        title={
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: '600' }}>{`${t('dashboard.booking') || 'Booking'} #${String(item.id).slice(0,8)}...`}</span>
-                            <Tag 
-                              color={'blue'}
+                {t('common.view_all') || 'عرض الكل'} <ChevronRight className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-0">
+                {recent.length === 0 ? (
+                  <p className="py-8 text-center text-slate-600">لا توجد حجوزات حديثة</p>
+                ) : (
+                  recent.map((item) => {
+                    const branchName =
+                      item.branch?.name ||
+                      item.branch?.name_ar ||
+                      item.branch?.nameAr ||
+                      item.branch?.name_en ||
+                      item.branch?.nameEn ||
+                      ''
+                    const locationText = branchName || 'غير محدد'
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex items-start gap-4 border-b border-slate-100 py-4 last:border-0"
+                      >
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg text-primary">
+                          📅
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-slate-900">
+                              {t('dashboard.booking') || 'حجز'} #{String(item.id).slice(0, 8)}...
+                            </span>
+                            <span
+                              className={cn(
+                                'rounded-full px-2.5 py-0.5 text-xs font-medium',
+                                getStatusBadgeClass(item.status || '')
+                              )}
                             >
                               {item.status || ''}
-                            </Tag>
-                          </div>
-                        }
-                        description={
-                          <div>
-                            <div style={{ marginBottom: '4px' }}>
-                              {(() => {
-                                const branchName = item.branch?.name || item.branch?.name_ar || item.branch?.nameAr || item.branch?.name_en || item.branch?.nameEn || '';
-                                const hallName = item.hall?.name || item.hall?.name_ar || item.hall?.nameAr || item.hall?.name_en || item.hall?.nameEn || '';
-                                if (branchName && hallName) {
-                                  return `${branchName} - ${hallName}`;
-                                } else if (branchName) {
-                                  return branchName;
-                                } else if (hallName) {
-                                  return hallName;
-                                }
-                                return 'غير محدد';
-                              })()}
-                            </div>
-                            <span style={{ color: '#64748b', fontSize: '12px' }}>
-                              {item.startTime ? new Date(item.startTime).toLocaleString('ar-SA', { calendar: 'gregory' }) : ''}
                             </span>
                           </div>
-                        }
-                      />
-                    </List.Item>
-                  )}
-                />
-              </Card>
-            </Col>
+                          <p className="mt-1 text-sm text-slate-600">{locationText}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {item.startTime
+                              ? new Date(item.startTime).toLocaleString('ar-SA', { calendar: 'gregory' })
+                              : ''}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-            {/* Quick Actions & Status Summary */}
-            <Col xs={24} md={8} lg={8}>
-              <Card 
-                className="custom-card"
-                title={
-                  <Space>
-                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                    {t('dashboard.status_summary') || 'Status Summary'}
-                  </Space>
-                }
-              >
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  {/* Today's Bookings */}
-                  <div style={{ 
-                    padding: '16px',
-                    backgroundColor: '#f6ffed',
-                    borderRadius: '8px',
-                    border: '1px solid #b7eb8f'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: '600', color: '#389e0d' }}>{t('dashboard.todays_events') || "Today's Events"}</div>
-                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>{t('dashboard.active_bookings') || 'Active bookings'}</div>
-                      </div>
-                      <div style={{ 
-                        fontSize: '24px', 
-                        fontWeight: 'bold',
-                        color: '#389e0d'
-                      }}>
-                        {overview?.bookings?.total || 0}
-                      </div>
+        <div className="space-y-6">
+          <Card className="border-slate-100 bg-white shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-900">
+                <CheckCircle className="h-5 w-5 text-emerald-600" />
+                {t('dashboard.status_summary') || 'ملخص الحالة'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-emerald-800">
+                      {t('dashboard.todays_events') || 'فعاليات اليوم'}
+                    </div>
+                    <div className="text-xs text-slate-600">
+                      {t('dashboard.active_bookings') || 'الحجوزات النشطة'}
                     </div>
                   </div>
-
-                  {/* Revenue This Week */}
-                  <div style={{ 
-                    padding: '16px',
-                    backgroundColor: '#e6f7ff',
-                    borderRadius: '8px',
-                    border: '1px solid #91d5ff'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: '600', color: '#0958d9' }}>{t('dashboard.this_week') || 'This Week'}</div>
-                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>{t('dashboard.revenue') || 'Revenue'}</div>
-                      </div>
-                      <div style={{ 
-                        fontSize: '20px', 
-                        fontWeight: 'bold',
-                        color: '#0958d9'
-                      }}>
-                        {Object.values(overview?.revenueByMethod || {}).reduce((a: number, b: any) => a + Number(b || 0), 0)} SAR
-                      </div>
+                  <div className="text-2xl font-bold text-emerald-700">
+                    {overview?.bookings?.total || 0}
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-blue-800">
+                      {t('dashboard.this_week') || 'هذا الأسبوع'}
+                    </div>
+                    <div className="text-xs text-slate-600">
+                      {t('dashboard.revenue') || 'الإيرادات'}
                     </div>
                   </div>
-                </Space>
-                
-                <Divider />
-                
-                <Space style={{ width: '100%', justifyContent: 'center' }}>
-                  <Button type="primary" ghost icon={<FileTextOutlined />} size="small">
-                    {t('dashboard.view_reports') || 'View Reports'}
-                  </Button>
-                  <Button type="default" icon={<RiseOutlined />} size="small">
-                    {t('dashboard.analytics') || 'Analytics'}
-                  </Button>
-                </Space>
-              </Card>
-            </Col>
-          </Row>
-
-          {/* Branch Images Gallery */}
-          {branchData?.images && branchData.images.length > 0 && (
-            <Row gutter={[24, 24]} style={{ marginTop: '32px' }}>
-              <Col xs={24}>
-                <Card className="custom-card" title={t('branch.images') || 'Branch Images'}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                    {branchData.images.map((imageUrl: string, index: number) => (
-                      <Image
-                        key={index}
-                        src={resolveFileUrlWithBust(imageUrl)}
-                        alt={`Branch Image ${index + 1}`}
-                        style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8 }}
-                        preview={{
-                          mask: <div style={{ color: 'white' }}>معاينة</div>
-                        }}
-                      />
-                    ))}
+                  <div className="text-xl font-bold text-blue-700">
+                    {totalRevenue} <span className="text-sm font-medium">SAR</span>
                   </div>
-                </Card>
-              </Col>
-            </Row>
-          )}
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-center gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-primary text-primary hover:bg-primary/5"
+                  onClick={() => {
+                    window.location.href = '/branch/reports'
+                  }}
+                >
+                  <FileText className="h-4 w-4" />
+                  {t('dashboard.view_reports') || 'عرض التقارير'}
+                </Button>
+                <Button variant="outline" size="sm">
+                  <TrendingUp className="h-4 w-4" />
+                  {t('dashboard.analytics') || 'التحليلات'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      {/* Branch Images */}
+      {branchData?.images && branchData.images.length > 0 && (
+        <Card className="border-slate-100 bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold text-slate-900">
+              {t('branch.images') || 'صور الفرع'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              {branchData.images.map((imageUrl: string, index: number) => (
+                <a
+                  key={index}
+                  href={resolveFileUrlWithBust(imageUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block overflow-hidden rounded-xl border border-slate-100 transition hover:opacity-90"
+                >
+                  <img
+                    src={resolveFileUrlWithBust(imageUrl)}
+                    alt={`Branch ${index + 1}`}
+                    className="h-28 w-28 object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
-
-

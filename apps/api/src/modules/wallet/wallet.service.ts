@@ -12,6 +12,10 @@ import {
   WalletTransactionType,
   WalletTransactionStatus,
 } from '../../database/entities/wallet-transaction.entity';
+import {
+  LoyaltyTransaction,
+  TransactionType,
+} from '../../database/entities/loyalty-transaction.entity';
 import { RechargeWalletDto } from './dto/recharge-wallet.dto';
 import { ListTransactionsDto } from './dto/list-transactions.dto';
 import { ConfigService } from '@nestjs/config';
@@ -27,6 +31,8 @@ export class WalletService {
     private readonly walletRepository: Repository<Wallet>,
     @InjectRepository(WalletTransaction)
     private readonly transactionRepository: Repository<WalletTransaction>,
+    @InjectRepository(LoyaltyTransaction)
+    private readonly loyaltyTransactionRepository: Repository<LoyaltyTransaction>,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
     private readonly tapService?: TapService,
@@ -54,25 +60,62 @@ export class WalletService {
 
     const { type, status, page = 1, pageSize = 20 } = query;
 
-    const qb = this.transactionRepository
+    const walletTxQb = this.transactionRepository
       .createQueryBuilder('tx')
-      .where('tx.userId = :userId', { userId })
-      .orderBy('tx.createdAt', 'DESC');
+      .where('tx.userId = :userId', { userId });
 
     if (type) {
-      qb.andWhere('tx.type = :type', { type });
+      walletTxQb.andWhere('tx.type = :type', { type });
     }
     if (status) {
-      qb.andWhere('tx.status = :status', { status });
+      walletTxQb.andWhere('tx.status = :status', { status });
     }
 
-    const [items, total] = await qb
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getManyAndCount();
+    const walletTxItems = await walletTxQb.orderBy('tx.createdAt', 'DESC').getMany();
+
+    const includeLoyaltyAsDeposit =
+      !type || type === WalletTransactionType.DEPOSIT;
+    const includeLoyaltyAsSuccess =
+      !status || status === WalletTransactionStatus.SUCCESS;
+
+    let loyaltyAsWalletItems: Array<Partial<WalletTransaction>> = [];
+    if (includeLoyaltyAsDeposit && includeLoyaltyAsSuccess) {
+      const loyaltyItems = await this.loyaltyTransactionRepository.find({
+        where: {
+          userId,
+          walletId: wallet.id,
+          type: TransactionType.BURN,
+        },
+        order: { createdAt: 'DESC' } as any,
+      });
+
+      loyaltyAsWalletItems = loyaltyItems
+        .filter((loyaltyTx) => Number(loyaltyTx.amountChange || 0) > 0)
+        .map((loyaltyTx) => ({
+          id: `loyalty-${loyaltyTx.id}`,
+          walletId: loyaltyTx.walletId,
+          userId: loyaltyTx.userId,
+          type: WalletTransactionType.DEPOSIT,
+          amount: Number(loyaltyTx.amountChange),
+          method: 'loyalty_points',
+          status: WalletTransactionStatus.SUCCESS,
+          reference: `loyalty_redeem_${loyaltyTx.id}`,
+          relatedBookingId: loyaltyTx.relatedBookingId || undefined,
+          failureReason: null,
+          createdAt: loyaltyTx.createdAt,
+        }));
+    }
+
+    const items = [...walletTxItems, ...loyaltyAsWalletItems].sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime(),
+    );
+    const total = items.length;
+    const start = (page - 1) * pageSize;
+    const pagedItems = items.slice(start, start + pageSize);
 
     return {
-      items,
+      items: pagedItems,
       total,
       page,
       pageSize,

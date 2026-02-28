@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Tag, message, DatePicker, Select, Row, Col, Statistic, Modal } from 'antd'
-import { useSearchParams } from 'react-router-dom'
 import { EyeOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
@@ -14,7 +13,6 @@ const { Option } = Select
 export default function BookingsList() {
   const { t } = useTranslation()
   const { me } = useAuth()
-  const [searchParams] = useSearchParams()
   const [bookings, setBookings] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedBooking, setSelectedBooking] = useState<any>(null)
@@ -28,8 +26,6 @@ export default function BookingsList() {
     pageSize: 10,
     total: 0,
   })
-  const hallIdFromUrl = searchParams.get('hallId') || null
-
   useEffect(() => {
     if (!me?.branchId) return
     loadBookings()
@@ -56,8 +52,7 @@ export default function BookingsList() {
 
       const data: any = await apiGet(`/bookings/branch/me?${params.toString()}`)
       const items = Array.isArray(data) ? data : (data?.bookings || [])
-      const filtered = hallIdFromUrl ? items.filter((b: any) => b?.hall?.id === hallIdFromUrl) : items
-      setBookings(filtered)
+      setBookings(items)
       setPagination(prev => ({ ...prev, total: (data?.total as number) || items.length }))
     } catch (error) {
       message.error(t('bookings.load_failed') || 'Failed to load bookings')
@@ -122,13 +117,12 @@ export default function BookingsList() {
       ),
     },
     {
-      title: t('bookings.hall') || 'Hall',
-      key: 'hall',
+      title: t('bookings.branch') || 'الفرع',
+      key: 'branch',
       render: (record: any) => (
-        <div>
-          <div style={{ fontWeight: 'bold' }}>{record.hall?.nameAr || record.hall?.nameEn}</div>
-          <div style={{ fontSize: '12px', color: '#666' }}>{record.hall?.branch?.nameAr}</div>
-        </div>
+        <span style={{ fontWeight: 'bold' }}>
+          {record.branch?.nameAr || record.branch?.nameEn || record.branch?.name || '-'}
+        </span>
       ),
     },
     {

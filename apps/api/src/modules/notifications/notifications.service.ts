@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { DeviceToken } from '../../database/entities/device-token.entity';
+import { Notification } from '../../database/entities/notification.entity';
 import { EncryptionService } from '../../utils/encryption.util';
 import { EmailProvider } from './providers/email.provider';
 import { WhatsAppProvider } from './providers/whatsapp.provider';
@@ -13,21 +14,21 @@ export type NotificationChannel = 'sms' | 'email' | 'push' | 'whatsapp';
 
 export interface EnqueueNotification {
   type:
-    | 'OTP'
-    | 'BOOKING_CONFIRMED'
-    | 'BOOKING_REMINDER'
-    | 'BOOKING_END'
-    | 'BOOKING_CANCELLED'
-    | 'PAYMENT_SUCCESS'
-    | 'TICKETS_ISSUED'
-    | 'TRIP_STATUS'
-    | 'EVENT_STATUS'
-    | 'PROMO'
-    | 'ADMIN_MESSAGE'
-    | 'LOYALTY_EARN'
-    | 'LOYALTY_REDEEM'
-    | 'RATING_REQUEST'
-    | 'WALLET_RECHARGED';
+  | 'OTP'
+  | 'BOOKING_CONFIRMED'
+  | 'BOOKING_REMINDER'
+  | 'BOOKING_END'
+  | 'BOOKING_CANCELLED'
+  | 'PAYMENT_SUCCESS'
+  | 'TICKETS_ISSUED'
+  | 'TRIP_STATUS'
+  | 'EVENT_STATUS'
+  | 'PROMO'
+  | 'ADMIN_MESSAGE'
+  | 'LOYALTY_EARN'
+  | 'LOYALTY_REDEEM'
+  | 'RATING_REQUEST'
+  | 'WALLET_RECHARGED';
   to: { phone?: string; email?: string; userId?: string };
   template?: string;
   data: Record<string, unknown>;
@@ -46,15 +47,31 @@ export class NotificationsService {
     @InjectQueue('notifications_whatsapp') private readonly whatsappQueue: Queue,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(DeviceToken) private readonly tokenRepo: Repository<DeviceToken>,
+    @InjectRepository(Notification) private readonly notificationRepo: Repository<Notification>,
     private readonly encryption: EncryptionService,
     private readonly emailProvider: EmailProvider,
     private readonly whatsappProvider: WhatsAppProvider,
-  ) {}
+  ) { }
 
   async enqueue(n: EnqueueNotification): Promise<void> {
     const resolved = await this.resolveRecipient(n.to);
     const lang = n.lang || resolved.lang || 'ar';
     const jobs: Promise<any>[] = [];
+
+    // Save to database if userId is provided
+    if (n.to.userId) {
+      const title = this.renderSubject(n, lang);
+      const body = this.renderTemplate(n, 'email', lang); // full body
+      const notification = this.notificationRepo.create({
+        userId: n.to.userId,
+        title,
+        body,
+        type: n.type,
+        data: n.data,
+        isRead: false,
+      });
+      await this.notificationRepo.save(notification);
+    }
 
     if (n.channels.includes('sms') && (n.to.phone || resolved.phone)) {
       const body = this.renderTemplate(n, 'sms', lang);
@@ -85,17 +102,17 @@ export class NotificationsService {
         jobs.push(
           this.whatsappQueue.add(
             'send',
-            { 
-              to: n.to.phone || resolved.phone!, 
+            {
+              to: n.to.phone || resolved.phone!,
               otp: String(n.data.otp),
-              lang 
+              lang
             },
-            { 
-              attempts: 5, 
-              backoff: { type: 'exponential', delay: 2000 }, 
+            {
+              attempts: 5,
+              backoff: { type: 'exponential', delay: 2000 },
               removeOnComplete: true,
-              ...(n.delayMs ? { delay: n.delayMs } : {}), 
-              ...(n.jobId ? { jobId: n.jobId } : {}) 
+              ...(n.delayMs ? { delay: n.delayMs } : {}),
+              ...(n.jobId ? { jobId: n.jobId } : {})
             },
           ),
         );
@@ -104,7 +121,7 @@ export class NotificationsService {
 
     if (n.channels.includes('push')) {
       // إذا لم يتم تحديد مستخدم، أرسل لجميع الأجهزة
-      const tokens = n.to.userId 
+      const tokens = n.to.userId
         ? await this.getUserTokens(n.to.userId, resolved.phone)
         : await this.getAllDeviceTokens();
       if (tokens.length) {
@@ -136,6 +153,50 @@ export class NotificationsService {
       ...jobIds.map((id) => this.pushQueue.removeJobs(id)),
       ...jobIds.map((id) => this.whatsappQueue.removeJobs(id)),
     ]);
+  }
+
+  async getUserNotifications(userId: string, page = 1, limit = 20, isRead?: boolean) {
+    const query = this.notificationRepo.createQueryBuilder('notification')
+      .where('notification.userId = :userId', { userId })
+      .orderBy('notification.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (isRead !== undefined) {
+      query.andWhere('notification.isRead = :isRead', { isRead });
+    }
+
+    const [items, total] = await query.getManyAndCount();
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getUnreadCount(userId: string): Promise<number> {
+    return this.notificationRepo.count({
+      where: { userId, isRead: false },
+    });
+  }
+
+  async markAsRead(id: string, userId: string): Promise<void> {
+    await this.notificationRepo.update({ id, userId }, { isRead: true });
+  }
+
+  async markAllAsRead(userId: string): Promise<void> {
+    await this.notificationRepo.update({ userId, isRead: false }, { isRead: true });
+  }
+
+  async deleteNotification(id: string, userId: string): Promise<void> {
+    await this.notificationRepo.delete({ id, userId });
+  }
+
+  async deleteAllNotifications(userId: string): Promise<void> {
+    await this.notificationRepo.delete({ userId });
   }
 
   private async resolveRecipient(to: { phone?: string; email?: string; userId?: string }): Promise<{ phone?: string; email?: string; lang?: 'ar' | 'en' }> {

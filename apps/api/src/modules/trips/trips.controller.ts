@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   ParseUUIDPipe,
   ParseIntPipe,
   Post,
@@ -10,9 +11,11 @@ import {
   UploadedFile,
   UseInterceptors,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiProduces, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -23,6 +26,9 @@ import { TripsService } from './trips.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateTripRequestDto } from './dto/create-trip-request.dto';
 import { SubmitTripRequestDto } from './dto/submit-trip-request.dto';
+import { RejectTripRequestDto } from './dto/reject-trip-request.dto';
+import { CancelTripRequestDto } from './dto/cancel-trip-request.dto';
+import { UpdateTripRequestDto } from './dto/update-trip-request.dto';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 
@@ -103,9 +109,41 @@ export class TripsController {
   approveRequest(
     @CurrentUser() user: any,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: { quotedPrice?: number; adminNotes?: string; rejectionReason?: string },
+    @Body() dto: { quotedPrice?: number; adminNotes?: string },
   ) {
     return this.tripsService.approveRequest(user.id, id, dto.quotedPrice, dto.adminNotes);
+  }
+
+  @Post('requests/:id/reject')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @ApiOperation({ summary: 'Reject trip request (Admin/Staff)' })
+  rejectRequest(
+    @CurrentUser() user: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RejectTripRequestDto,
+  ) {
+    return this.tripsService.rejectRequest(user.id, id, dto);
+  }
+
+  @Post('requests/:id/cancel')
+  @ApiOperation({ summary: 'Cancel trip request (User cancels own request)' })
+  cancelRequest(
+    @CurrentUser() user: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CancelTripRequestDto,
+  ) {
+    return this.tripsService.cancelRequest(user.id, id, dto);
+  }
+
+  @Patch('requests/:id')
+  @ApiOperation({ summary: 'Update a draft trip request (User)' })
+  updateRequest(
+    @CurrentUser() user: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateTripRequestDto,
+  ) {
+    return this.tripsService.updateRequest(user.id, id, dto);
   }
 
   @Post('requests/:id/upload')
@@ -129,8 +167,10 @@ export class TripsController {
     @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.tripsService.uploadParticipants(user.id, id, file);
+    return this.tripsService.uploadParticipants(user.id, id, file, user.roles);
   }
+
+
 
   @Post('requests/:id/invoice')
   @UseGuards(RolesGuard)

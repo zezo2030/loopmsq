@@ -7,11 +7,9 @@ import { NotificationsService } from '../notifications/notifications.service';
 
 type SmsConfig = {
   enabled: boolean;
-  provider: 'dreams';
-  dreamsApiUrl?: string;
-  dreamsUser?: string;
-  dreamsSecretKey?: string; // encrypted at rest
-  dreamsSender?: string;
+  provider: 'whatsapp';
+  whatsappAccessToken?: string; // encrypted at rest
+  whatsappPhoneNumberId?: string;
 };
 
 type OtpConfig = {
@@ -37,28 +35,32 @@ export class AdminConfigService {
   async getSmsConfig(mask = true): Promise<SmsConfig> {
     const cfg = (await this.redis.get(this.smsKey)) as SmsConfig | null;
     if (!cfg) {
-      return { enabled: false, provider: 'dreams' };
+      return { enabled: false, provider: 'whatsapp' };
     }
     if (!mask) return cfg;
     const masked: SmsConfig = { ...cfg };
-    if (masked.dreamsSecretKey) masked.dreamsSecretKey = '****';
+    if (masked.whatsappAccessToken) masked.whatsappAccessToken = '****';
     return masked;
   }
 
   async updateSmsConfig(dto: UpdateSmsConfigDto): Promise<SmsConfig> {
     const current = ((await this.redis.get(this.smsKey)) as SmsConfig | null) || {
       enabled: false,
-      provider: 'dreams',
+      provider: 'whatsapp',
     };
-    const next: SmsConfig = { ...current };
+    const next: SmsConfig = {
+      enabled: current.enabled ?? false,
+      provider: 'whatsapp',
+      whatsappAccessToken: current.whatsappAccessToken,
+      whatsappPhoneNumberId: current.whatsappPhoneNumberId,
+    };
 
     if (dto.enabled !== undefined) next.enabled = dto.enabled;
     if (dto.provider) next.provider = dto.provider;
-    if (dto.dreamsApiUrl !== undefined) next.dreamsApiUrl = dto.dreamsApiUrl;
-    if (dto.dreamsUser !== undefined) next.dreamsUser = dto.dreamsUser;
-    if (dto.dreamsSender !== undefined) next.dreamsSender = dto.dreamsSender;
-    if (dto.dreamsSecretKey)
-      next.dreamsSecretKey = this.encryption.encrypt(dto.dreamsSecretKey);
+    if (dto.whatsappPhoneNumberId !== undefined)
+      next.whatsappPhoneNumberId = dto.whatsappPhoneNumberId;
+    if (dto.whatsappAccessToken)
+      next.whatsappAccessToken = this.encryption.encrypt(dto.whatsappAccessToken);
 
     await this.redis.set(this.smsKey, next);
     return this.getSmsConfig(true);
@@ -66,12 +68,12 @@ export class AdminConfigService {
 
   async testSms(to: string, message: string): Promise<{ success: boolean }> {
     if (!to || !message) throw new BadRequestException('to and message required');
-    // Use notifications pipeline to send test SMS
+    // Use notifications pipeline to send test WhatsApp OTP
     await this.notifications.enqueue({
       type: 'OTP',
       to: { phone: to },
       data: { otp: message },
-      channels: ['sms'],
+      channels: ['whatsapp'],
       lang: 'ar',
     });
     return { success: true };

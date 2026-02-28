@@ -31,7 +31,9 @@ type EventRequest = {
   branchId: string
   branch?: {
     id: string
-    name: string
+    name?: string
+    name_ar?: string
+    nameAr?: string
     location?: string
   }
   hallId?: string
@@ -313,12 +315,12 @@ export default function EventsList() {
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
             <EnvironmentOutlined style={{ marginRight: '6px', color: '#1890ff' }} />
             <span style={{ fontWeight: '600', fontSize: '14px' }}>
-              {record.branch?.name || 'غير محدد'}
+              {record.branch?.name_ar || record.branch?.nameAr || record.branch?.name || 'غير محدد'}
             </span>
           </div>
-          {record.hall && (
-            <div style={{ color: '#8c8c8c', fontSize: '12px', marginBottom: '4px' }}>
-              {record.hall?.name || 'غير محدد'}
+          {record.branch?.location && (
+            <div style={{ color: '#8c8c8c', fontSize: '12px', marginBottom: '4px', marginLeft: '22px' }}>
+              {record.branch.location}
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', color: '#8c8c8c', fontSize: '12px' }}>

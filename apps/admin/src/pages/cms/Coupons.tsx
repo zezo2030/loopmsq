@@ -5,6 +5,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
 import dayjs from 'dayjs'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../shared/auth'
+import { useTranslation } from 'react-i18next'
 
 type Coupon = {
   id: string
@@ -18,6 +19,7 @@ type Coupon = {
 }
 
 export default function Coupons() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const location = useLocation()
   const { me } = useAuth()
@@ -37,40 +39,40 @@ export default function Coupons() {
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<Coupon>) => apiPost<Coupon>('/admin/coupons', body),
-    onSuccess: () => { message.success('Coupon created'); qc.invalidateQueries({ queryKey: ['coupons'] }); setOpen(false) },
+    onSuccess: () => { message.success(t('coupons.created')); qc.invalidateQueries({ queryKey: ['coupons'] }); setOpen(false) },
   })
   const updateMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Partial<Coupon> }) => apiPatch(`/admin/coupons/${id}`, body),
-    onSuccess: () => { message.success('Coupon updated'); qc.invalidateQueries({ queryKey: ['coupons'] }); setOpen(false); setEditing(null) },
+    onSuccess: () => { message.success(t('coupons.updated')); qc.invalidateQueries({ queryKey: ['coupons'] }); setOpen(false); setEditing(null) },
   })
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiDelete(`/admin/coupons/${id}`),
-    onSuccess: () => { message.success('Coupon removed'); qc.invalidateQueries({ queryKey: ['coupons'] }) },
+    onSuccess: () => { message.success(t('coupons.removed')); qc.invalidateQueries({ queryKey: ['coupons'] }) },
   })
 
   const previewMutation = useMutation({
     mutationFn: (body: { code: string; amount: number }) => apiPost('/coupons/preview', body),
     onSuccess: (res: any) => {
-      if (res.valid) message.success(`Valid. Final: ${res.finalAmount}`)
-      else message.error(`Invalid: ${res.reason}`)
+      if (res.valid) message.success(t('coupons.valid', { amount: res.finalAmount }))
+      else message.error(t('coupons.invalid', { reason: res.reason }))
     }
   })
 
   const columns = [
-    { title: 'Branch', dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
-    { title: 'Code', dataIndex: 'code' },
-    { title: 'Type', dataIndex: 'discountType' },
-    { title: 'Value', dataIndex: 'discountValue' },
-    { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
-    { title: 'Schedule', render: (_: any, r: Coupon) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
-    { title: 'Actions', render: (_: any, r: Coupon) => (
+    { title: t('coupons.branch'), dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
+    { title: t('coupons.code'), dataIndex: 'code' },
+    { title: t('coupons.type'), dataIndex: 'discountType' },
+    { title: t('coupons.value'), dataIndex: 'discountValue' },
+    { title: t('coupons.active'), dataIndex: 'isActive', render: (v: boolean) => (v ? t('coupons.yes') : t('coupons.no')) },
+    { title: t('coupons.schedule'), render: (_: any, r: Coupon) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
+    { title: t('coupons.actions'), render: (_: any, r: Coupon) => (
       <span style={{ display: 'flex', gap: 8 }}>
         <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue({
           ...r,
           range: [r.startsAt ? dayjs(r.startsAt) : null, r.endsAt ? dayjs(r.endsAt) : null]
-        }); setOpen(true) }}>Edit</Button>
-        <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ code: r.code }) }}>Preview</Button>
-        <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>Delete</Button>
+        }); setOpen(true) }}>{t('coupons.edit')}</Button>
+        <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ code: r.code }) }}>{t('coupons.preview')}</Button>
+        <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>{t('coupons.delete')}</Button>
       </span>
     )},
   ]
@@ -81,20 +83,20 @@ export default function Coupons() {
         {!isBranchMode && (
           <Select
             allowClear
-            placeholder="Filter by branch"
+            placeholder={t('coupons.filter_by_branch')}
             style={{ width: 240 }}
             value={branchFilter}
             onChange={(v) => setBranchFilter(v)}
             options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
           />
         )}
-        <Button onClick={() => { setPreviewOpen(true); previewForm.resetFields() }}>Preview Any Code</Button>
-        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>New Coupon</Button>
+        <Button onClick={() => { setPreviewOpen(true); previewForm.resetFields() }}>{t('coupons.preview_any_code')}</Button>
+        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('coupons.new_coupon')}</Button>
       </div>
       <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
 
       <Modal
-        title={editing ? 'Edit Coupon' : 'Create Coupon'}
+        title={editing ? t('coupons.edit_coupon') : t('coupons.create_coupon')}
         open={open}
         onCancel={() => { setOpen(false); setEditing(null) }}
         onOk={() => {
@@ -116,9 +118,9 @@ export default function Coupons() {
       >
         <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
           {!isBranchMode && (
-            <Form.Item name="branchId" label="Branch" rules={[{ required: true }]}> 
+            <Form.Item name="branchId" label={t('coupons.branch')} rules={[{ required: true }]}> 
               <Select
-                placeholder="Select branch"
+                placeholder={t('coupons.select_branch')}
                 options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
                 onChange={() => {
                   // Branch is set, backend will handle the rest
@@ -126,26 +128,26 @@ export default function Coupons() {
               />
             </Form.Item>
           )}
-          <Form.Item name="code" label="Code" rules={[{ required: true }]}>
+          <Form.Item name="code" label={t('coupons.code')} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="discountType" label="Discount Type" rules={[{ required: true }]}>
-            <Select options={[{ value: 'percentage', label: 'Percentage %' }, { value: 'fixed', label: 'Fixed' }]} />
+          <Form.Item name="discountType" label={t('coupons.discount_type')} rules={[{ required: true }]}>
+            <Select options={[{ value: 'percentage', label: t('coupons.percentage') }, { value: 'fixed', label: t('coupons.fixed') }]} />
           </Form.Item>
-          <Form.Item name="discountValue" label="Discount Value" rules={[{ required: true }]}>
+          <Form.Item name="discountValue" label={t('coupons.discount_value')} rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="range" label="Schedule">
+          <Form.Item name="range" label={t('coupons.schedule')}>
             <DatePicker.RangePicker showTime />
           </Form.Item>
-          <Form.Item name="isActive" label="Active" valuePropName="checked">
+          <Form.Item name="isActive" label={t('coupons.active')} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
-        title="Preview Discount"
+        title={t('coupons.preview_discount')}
         open={previewOpen}
         onCancel={() => setPreviewOpen(false)}
         onOk={() => {
@@ -155,10 +157,10 @@ export default function Coupons() {
         }}
       >
         <Form form={previewForm} layout="vertical">
-          <Form.Item name="code" label="Code" rules={[{ required: true }]}>
+          <Form.Item name="code" label={t('coupons.code')} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="amount" label="Amount" rules={[{ required: true }]}>
+          <Form.Item name="amount" label={t('coupons.amount')} rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
         </Form>

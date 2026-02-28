@@ -5,11 +5,21 @@ import { LoyaltyController } from './loyalty.controller';
 import { LoyaltyRule } from '../../database/entities/loyalty-rule.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { LoyaltyTransaction } from '../../database/entities/loyalty-transaction.entity';
+import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([LoyaltyRule, Wallet, LoyaltyTransaction]), UsersModule, NotificationsModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      LoyaltyRule,
+      Wallet,
+      LoyaltyTransaction,
+      WalletTransaction,
+    ]),
+    UsersModule,
+    NotificationsModule,
+  ],
   providers: [LoyaltyService],
   controllers: [LoyaltyController],
   exports: [LoyaltyService],

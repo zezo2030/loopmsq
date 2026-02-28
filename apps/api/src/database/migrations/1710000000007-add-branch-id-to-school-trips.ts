@@ -60,3 +60,7 @@ export class AddBranchIdToSchoolTrips1710000000007 implements MigrationInterface
 
 
 
+
+
+
+

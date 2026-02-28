@@ -2,42 +2,41 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateSmsConfigDto {
-  @ApiProperty({ description: 'Enable/disable SMS sending', required: false })
+  @ApiProperty({
+    description: 'Enable/disable WhatsApp OTP sending',
+    required: false,
+  })
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
 
   @ApiProperty({
-    description: 'SMS provider',
-    enum: ['dreams'],
+    description: 'Messaging provider',
+    enum: ['whatsapp'],
     required: false,
   })
   @IsOptional()
-  @IsIn(['dreams'])
-  provider?: 'dreams';
+  @IsIn(['whatsapp'])
+  provider?: 'whatsapp';
 
-  @ApiProperty({ description: 'Dreams API base URL', required: false, example: 'https://www.dreams.sa/index.php/api/sendsms/' })
+  @ApiProperty({
+    description: 'WhatsApp Cloud API access token',
+    required: false,
+  })
   @IsOptional()
   @IsString()
-  dreamsApiUrl?: string;
+  @MinLength(10)
+  whatsappAccessToken?: string;
 
-  @ApiProperty({ description: 'Dreams Account Username', required: false })
+  @ApiProperty({
+    description: 'WhatsApp Business phone number ID',
+    required: false,
+    example: '123456789012345',
+  })
   @IsOptional()
   @IsString()
-  @MinLength(3)
-  dreamsUser?: string;
-
-  @ApiProperty({ description: 'Dreams API Secret Key', required: false })
-  @IsOptional()
-  @IsString()
-  @MinLength(6)
-  dreamsSecretKey?: string;
-
-  @ApiProperty({ description: 'Dreams Sender (name or number)', required: false })
-  @IsOptional()
-  @IsString()
-  @MinLength(3)
-  dreamsSender?: string;
+  @MinLength(5)
+  whatsappPhoneNumberId?: string;
 }
 
 

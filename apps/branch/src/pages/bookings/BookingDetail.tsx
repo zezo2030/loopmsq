@@ -1,8 +1,9 @@
 import { Card, Descriptions, Tag, Button, Space, Divider, Typography, Row, Col, Statistic, Modal } from 'antd'
-import { CloseOutlined, UserOutlined, CalendarOutlined, DollarOutlined } from '@ant-design/icons'
+import { CloseOutlined, UserOutlined, CalendarOutlined, DollarOutlined, IdcardOutlined, ReloadOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { apiGet } from '../../api'
 
 const { Title, Text } = Typography
 
@@ -12,9 +13,20 @@ interface BookingDetailProps {
   onCancel: (bookingId: string) => void
 }
 
+type Ticket = {
+  id: string
+  status: 'valid' | 'used' | 'expired' | 'cancelled'
+  holderName?: string
+  validFrom?: string
+  validUntil?: string
+  scannedAt?: string
+}
+
 export default function BookingDetail({ booking, onClose, onCancel }: BookingDetailProps) {
   const { t } = useTranslation()
   const [showCancelModal, setShowCancelModal] = useState(false)
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [loadingTickets, setLoadingTickets] = useState(false)
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -34,6 +46,30 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
     onCancel(booking.id)
     setShowCancelModal(false)
     onClose()
+  }
+
+  const canShowTickets = booking?.status === 'confirmed' || booking?.status === 'completed'
+
+  useEffect(() => {
+    if (!canShowTickets || !booking?.id) {
+      setTickets([])
+      return
+    }
+    loadTickets()
+  }, [booking?.id, booking?.status])
+
+  async function loadTickets() {
+    if (!booking?.id) return
+    setLoadingTickets(true)
+    try {
+      const data = await apiGet<Ticket[]>(`/bookings/${booking.id}/tickets`)
+      setTickets(data || [])
+    } catch (error) {
+      console.error('Failed to load booking tickets:', error)
+      setTickets([])
+    } finally {
+      setLoadingTickets(false)
+    }
   }
 
   return (
@@ -206,6 +242,71 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
               </div>
             ))}
           </div>
+        </Card>
+      )}
+
+      {/* Tickets */}
+      {canShowTickets && (
+        <Card className="custom-card" style={{ marginTop: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <Title level={5} style={{ marginBottom: 0 }}>
+              <IdcardOutlined style={{ marginRight: '8px' }} />
+              التذاكر ({tickets.length})
+            </Title>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={loadTickets}
+              loading={loadingTickets}
+              size="small"
+            >
+              تحديث
+            </Button>
+          </div>
+          {loadingTickets ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: '#8c8c8c' }}>
+              جاري تحميل التذاكر...
+            </div>
+          ) : tickets.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: '#8c8c8c' }}>
+              لا توجد تذاكر متاحة
+            </div>
+          ) : (
+            <Row gutter={[12, 12]}>
+              {tickets.map((ticket) => (
+                <Col xs={24} sm={12} key={ticket.id}>
+                  <Card size="small" style={{ border: '1px solid #f0f0f0' }}>
+                    <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text strong>{ticket.holderName || `تذكرة #${ticket.id.slice(-6)}`}</Text>
+                        <Tag
+                          color={
+                            ticket.status === 'valid'
+                              ? 'green'
+                              : ticket.status === 'used'
+                                ? 'blue'
+                                : ticket.status === 'expired'
+                                  ? 'red'
+                                  : 'default'
+                          }
+                        >
+                          {ticket.status === 'valid'
+                            ? 'صالحة'
+                            : ticket.status === 'used'
+                              ? 'مستخدمة'
+                              : ticket.status === 'expired'
+                                ? 'منتهية'
+                                : 'ملغية'}
+                        </Tag>
+                      </div>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                        ID: {ticket.id.slice(0, 8)}...
+                      </Text>
+                    </Space>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          )}
         </Card>
       )}
 

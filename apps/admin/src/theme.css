@@ -61,11 +61,39 @@ body {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: 'Tajawal', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   background-color: var(--background-main);
   color: var(--text-primary);
   line-height: 1.6;
   font-size: 14px;
+}
+
+/* Arabic Font Support */
+[dir="rtl"] body,
+[dir="rtl"] * {
+  font-family: 'Tajawal', 'Cairo', 'Segoe UI', 'Arial', sans-serif !important;
+  font-weight: 400;
+}
+
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] h4,
+[dir="rtl"] h5,
+[dir="rtl"] h6 {
+  font-family: 'Tajawal', 'Cairo', 'Segoe UI', 'Arial', sans-serif !important;
+  font-weight: 700;
+}
+
+[dir="rtl"] .ant-typography,
+[dir="rtl"] .ant-card-head-title,
+[dir="rtl"] .ant-menu-item,
+[dir="rtl"] .ant-btn,
+[dir="rtl"] .ant-input,
+[dir="rtl"] .ant-select-selector,
+[dir="rtl"] .ant-table-thead > tr > th,
+[dir="rtl"] .ant-table-tbody > tr > td {
+  font-family: 'Tajawal', 'Cairo', 'Segoe UI', 'Arial', sans-serif !important;
 }
 
 #root {
@@ -878,4 +906,25 @@ body {
 .empty-state-description {
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+/* ============================================
+   REFERRALS TABS SPACING
+   ============================================ */
+.referrals-tabs .ant-tabs-nav-list {
+  gap: 16px !important;
+}
+
+.referrals-tabs .ant-tabs-tab {
+  margin: 0 !important;
+  padding: 8px 16px !important;
+}
+
+.referrals-tabs .ant-tabs-tab + .ant-tabs-tab {
+  margin-left: 16px !important;
+}
+
+[dir="rtl"] .referrals-tabs .ant-tabs-tab + .ant-tabs-tab {
+  margin-left: 0 !important;
+  margin-right: 16px !important;
 }

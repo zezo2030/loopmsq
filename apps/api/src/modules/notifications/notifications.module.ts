@@ -11,6 +11,7 @@ import { User } from '../../database/entities/user.entity';
 import { EncryptionService } from '../../utils/encryption.util';
 import { NotificationsController } from './notifications.controller';
 import { DeviceToken } from '../../database/entities/device-token.entity';
+import { Notification } from '../../database/entities/notification.entity';
 import { PushProvider } from './providers/push.provider';
 import { PushProcessor } from './processors/push.processor';
 import { WhatsAppProvider } from './providers/whatsapp.provider';
@@ -20,7 +21,7 @@ import { RedisService } from '../../utils/redis.service';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([User, DeviceToken]),
+    TypeOrmModule.forFeature([User, DeviceToken, Notification]),
     BullModule.registerQueue(
       { name: 'notifications_sms' },
       { name: 'notifications_email' },
@@ -32,6 +33,6 @@ import { RedisService } from '../../utils/redis.service';
   providers: [NotificationsService, SmsProcessor, EmailProcessor, PushProcessor, WhatsAppProcessor, SmsProvider, EmailProvider, PushProvider, WhatsAppProvider, EncryptionService, RedisService],
   exports: [NotificationsService, PushProvider],
 })
-export class NotificationsModule {}
+export class NotificationsModule { }
 
 

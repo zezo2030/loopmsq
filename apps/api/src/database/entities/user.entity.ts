@@ -16,6 +16,8 @@ import { Wallet } from './wallet.entity';
 import { Branch } from './branch.entity';
 import { SupportTicket } from './support-ticket.entity';
 import { SchoolTripRequest } from './school-trip-request.entity';
+import { DeviceToken } from './device-token.entity';
+import { Notification } from './notification.entity';
 
 @Entity('users')
 @Index(['email'], { unique: true, where: 'email IS NOT NULL' })
@@ -67,6 +69,9 @@ export class User {
 
   @OneToMany(() => SupportTicket, (ticket) => ticket.user)
   supportTickets: SupportTicket[];
+
+  @OneToMany(() => Notification, (notification) => notification.user)
+  notifications: Notification[];
 
   @OneToMany(() => SchoolTripRequest, (request) => request.requester)
   schoolTripRequests: SchoolTripRequest[];

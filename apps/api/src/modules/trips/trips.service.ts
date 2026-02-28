@@ -12,6 +12,9 @@ import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
 import { CreateTripRequestDto } from './dto/create-trip-request.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubmitTripRequestDto } from './dto/submit-trip-request.dto';
+import { RejectTripRequestDto } from './dto/reject-trip-request.dto';
+import { CancelTripRequestDto } from './dto/cancel-trip-request.dto';
+import { UpdateTripRequestDto } from './dto/update-trip-request.dto';
 
 @Injectable()
 export class TripsService {
@@ -52,7 +55,10 @@ export class TripsService {
   }
 
   async getRequest(user: any, id: string) {
-    const req = await this.tripRepo.findOne({ where: { id } });
+    const req = await this.tripRepo.findOne({
+      where: { id },
+      relations: ['branch', 'requester'],
+    });
     if (!req) throw new NotFoundException('Request not found');
     const isOwner = req.requesterId === user.id;
     const roles: string[] = user.roles || [];
@@ -116,11 +122,18 @@ export class TripsService {
     return { success: true, quotedPrice: req.quotedPrice };
   }
 
-  async uploadParticipants(userId: string, id: string, file: Express.Multer.File) {
+  async uploadParticipants(userId: string, id: string, file: Express.Multer.File, userRoles?: string[]) {
     const req = await this.tripRepo.findOne({ where: { id } });
     if (!req) throw new NotFoundException('Request not found');
-    if (req.requesterId !== userId && req.status !== TripRequestStatus.UNDER_REVIEW) {
+    const isOwner = req.requesterId === userId;
+    const roles = userRoles || [];
+    const isStaff = roles.includes('staff') || roles.includes('admin');
+    if (!isOwner && !isStaff) {
       throw new ForbiddenException('Not allowed');
+    }
+    // Only pending or under_review requests can have participants uploaded
+    if (req.status !== TripRequestStatus.PENDING && req.status !== TripRequestStatus.UNDER_REVIEW) {
+      throw new BadRequestException('Participants can only be uploaded for pending or under-review requests');
     }
     if (!file) throw new BadRequestException('File is required');
     const workbook = XLSX.readFile(file.path);
@@ -146,6 +159,17 @@ export class TripsService {
     req.excelFilePath = file.path;
     await this.tripRepo.save(req);
     return { count: participants.length };
+  }
+
+  async getTemplate(): Promise<Buffer> {
+    const ws = XLSX.utils.json_to_sheet([
+      { name: 'الطالب 1', age: 10, guardianName: 'ولي الأمر 1', guardianPhone: '0500000000' },
+      { name: 'الطالب 2', age: 11, guardianName: 'ولي الأمر 2', guardianPhone: '0500000001' },
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    return buf as Buffer;
   }
 
   async createInvoice(approverId: string, id: string, dto: InvoiceTripRequestDto) {
@@ -278,6 +302,82 @@ export class TripsService {
       channels: ['sms', 'push'],
     });
     return { success: true };
+  }
+
+  // ──── Reject trip request (Admin/Staff) ────
+  async rejectRequest(approverId: string, id: string, dto: RejectTripRequestDto) {
+    const req = await this.tripRepo.findOne({ where: { id } });
+    if (!req) throw new NotFoundException('Request not found');
+    if (req.status !== TripRequestStatus.UNDER_REVIEW && req.status !== TripRequestStatus.PENDING) {
+      throw new BadRequestException('Only pending or under-review requests can be rejected');
+    }
+    req.status = TripRequestStatus.REJECTED;
+    req.rejectionReason = dto.rejectionReason;
+    if (dto.adminNotes) req.adminNotes = dto.adminNotes;
+    req.approvedBy = approverId;
+    await this.tripRepo.save(req);
+
+    await this.notifications.enqueue({
+      type: 'TRIP_STATUS',
+      to: { userId: req.requesterId },
+      data: {
+        status: 'REJECTED',
+        rejectionReason: dto.rejectionReason,
+      },
+      channels: ['sms', 'push'],
+    });
+
+    return { success: true };
+  }
+
+  // ──── Cancel trip request (User cancels own request) ────
+  async cancelRequest(userId: string, id: string, dto: CancelTripRequestDto) {
+    const req = await this.tripRepo.findOne({ where: { id, requesterId: userId } });
+    if (!req) throw new NotFoundException('Request not found');
+
+    // Only pending, under_review, or approved requests can be cancelled by user
+    const cancellableStatuses = [
+      TripRequestStatus.PENDING,
+      TripRequestStatus.UNDER_REVIEW,
+      TripRequestStatus.APPROVED,
+    ];
+    if (!cancellableStatuses.includes(req.status)) {
+      throw new BadRequestException(
+        'Only pending, under-review, or approved requests can be cancelled',
+      );
+    }
+
+    req.status = TripRequestStatus.CANCELLED;
+    if (dto.reason) req.rejectionReason = dto.reason;
+    await this.tripRepo.save(req);
+
+    return { success: true };
+  }
+
+  // ──── Update draft trip request (User updates own pending request) ────
+  async updateRequest(userId: string, id: string, dto: UpdateTripRequestDto) {
+    const req = await this.tripRepo.findOne({ where: { id, requesterId: userId } });
+    if (!req) throw new NotFoundException('Request not found');
+    if (req.status !== TripRequestStatus.PENDING) {
+      throw new BadRequestException('Only pending (draft) requests can be updated');
+    }
+
+    // Apply partial updates
+    if (dto.branchId !== undefined) req.branchId = dto.branchId;
+    if (dto.schoolName !== undefined) req.schoolName = dto.schoolName;
+    if (dto.studentsCount !== undefined) req.studentsCount = dto.studentsCount;
+    if (dto.accompanyingAdults !== undefined) req.accompanyingAdults = dto.accompanyingAdults;
+    if (dto.preferredDate !== undefined) req.preferredDate = new Date(dto.preferredDate) as any;
+    if (dto.preferredTime !== undefined) req.preferredTime = dto.preferredTime;
+    if (dto.durationHours !== undefined) req.durationHours = dto.durationHours;
+    if (dto.contactPersonName !== undefined) req.contactPersonName = dto.contactPersonName;
+    if (dto.contactPhone !== undefined) req.contactPhone = dto.contactPhone;
+    if (dto.contactEmail !== undefined) req.contactEmail = dto.contactEmail;
+    if (dto.specialRequirements !== undefined) req.specialRequirements = dto.specialRequirements;
+    if (dto.addOns !== undefined) req.addOns = dto.addOns as any;
+
+    const saved = await this.tripRepo.save(req);
+    return saved;
   }
 
   async findUserRequests(
@@ -434,7 +534,7 @@ export class TripsService {
       where: { id: tripRequestId },
     });
     if (!tripRequest) throw new NotFoundException('Trip request not found');
-    
+
     const isOwner = tripRequest.requesterId === user.id;
     const roles: string[] = user.roles || [];
     const isStaff = roles.includes('staff') || roles.includes('admin');

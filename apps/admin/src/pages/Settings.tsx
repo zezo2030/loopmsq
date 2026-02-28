@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card, Form, Switch, Input, Button, message, Divider, Tabs, Space } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { getSmsConfig, getOtpConfig, updateSmsConfig, updateOtpConfig, testSms, type OtpConfig } from '../shared/api'
+import { getWhatsAppConfig, getOtpConfig, updateWhatsAppConfig, updateOtpConfig, testWhatsApp, type OtpConfig } from '../shared/api'
 
 export default function Settings() {
   const { t } = useTranslation()
@@ -16,19 +16,18 @@ export default function Settings() {
       const pixelId = localStorage.getItem('settings.pixelId') || ''
       form.setFieldsValue({ analyticsEnabled, gtmId, pixelEnabled, pixelId })
     } catch {}
-    // Load server configs for SMS & OTP
+    // Load server configs for WhatsApp & OTP
     ;(async () => {
       try {
-        const [sms, otp] = await Promise.all([
-          getSmsConfig().catch(() => null),
+        const [whatsapp, otp] = await Promise.all([
+          getWhatsAppConfig().catch(() => null),
           getOtpConfig().catch(() => null),
         ])
         const values: any = {}
-        if (sms) {
-          values.smsEnabled = sms.enabled
-          values.dreamsApiUrl = (sms as any).dreamsApiUrl || ''
-          values.dreamsUser = (sms as any).dreamsUser || ''
-          values.dreamsSender = (sms as any).dreamsSender || ''
+        if (whatsapp) {
+          values.smsEnabled = whatsapp.enabled
+          values.whatsappAccessToken = (whatsapp as any).whatsappAccessToken || ''
+          values.whatsappPhoneNumberId = (whatsapp as any).whatsappPhoneNumberId || ''
         }
         if (otp) {
           values.otpEnabled = otp.enabled
@@ -53,35 +52,32 @@ export default function Settings() {
 
       // Backend configs
       try {
-        // SMS Config - Dreams
+        // WhatsApp Config
         if (
           values.smsEnabled !== undefined ||
-          values.dreamsApiUrl ||
-          values.dreamsUser ||
-          values.dreamsSecretKey ||
-          values.dreamsSender
+          values.whatsappAccessToken ||
+          values.whatsappPhoneNumberId
         ) {
-          const smsPayload: any = { provider: 'dreams' }
+          const whatsappPayload: any = { provider: 'whatsapp' }
 
           if (values.smsEnabled !== undefined) {
-            smsPayload.enabled = values.smsEnabled
+            whatsappPayload.enabled = values.smsEnabled
           }
 
-          if (values.dreamsApiUrl) smsPayload.dreamsApiUrl = values.dreamsApiUrl
-          if (values.dreamsUser) smsPayload.dreamsUser = values.dreamsUser
-          if (values.dreamsSender) smsPayload.dreamsSender = values.dreamsSender
-
-          // فقط أضف Secret إذا كان مناسب وليس مخفي
+          if (values.whatsappPhoneNumberId) {
+            whatsappPayload.whatsappPhoneNumberId = values.whatsappPhoneNumberId
+          }
+          // Only send token when it's updated and not masked.
           if (
-            values.dreamsSecretKey &&
-            values.dreamsSecretKey !== '****' &&
-            String(values.dreamsSecretKey).length >= 6
+            values.whatsappAccessToken &&
+            values.whatsappAccessToken !== '****' &&
+            String(values.whatsappAccessToken).length >= 10
           ) {
-            smsPayload.dreamsSecretKey = values.dreamsSecretKey
+            whatsappPayload.whatsappAccessToken = values.whatsappAccessToken
           }
 
-          if (Object.keys(smsPayload).length > 1) {
-            await updateSmsConfig(smsPayload)
+          if (Object.keys(whatsappPayload).length > 1) {
+            await updateWhatsAppConfig(whatsappPayload)
           }
         }
 
@@ -112,17 +108,11 @@ export default function Settings() {
       <Form.Item name="smsEnabled" label={t('settings.enable_sms') || 'Enable SMS Service'} valuePropName="checked">
         <Switch />
       </Form.Item>
-      <Form.Item name="dreamsApiUrl" label={t('settings.dreams_api_url') || 'Dreams API URL'}>
-        <Input placeholder={'https://www.dreams.sa/index.php/api/sendsms/'} />
+      <Form.Item name="whatsappAccessToken" label={t('settings.whatsapp_access_token') || 'WhatsApp Access Token'}>
+        <Input.Password placeholder={t('settings.whatsapp_access_token_ph') || 'EAAB...'} />
       </Form.Item>
-      <Form.Item name="dreamsUser" label={t('settings.dreams_user') || 'Dreams Username'}>
-        <Input placeholder={t('settings.dreams_user_ph') || 'your_username'} />
-      </Form.Item>
-      <Form.Item name="dreamsSecretKey" label={t('settings.dreams_secret_key') || 'Dreams Secret Key'}>
-        <Input.Password placeholder={t('settings.dreams_secret_key_ph') || '****************'} />
-      </Form.Item>
-      <Form.Item name="dreamsSender" label={t('settings.dreams_sender') || 'Sender'}>
-        <Input placeholder={t('settings.dreams_sender_ph') || 'YourBrandOrNumber'} />
+      <Form.Item name="whatsappPhoneNumberId" label={t('settings.whatsapp_phone_number_id') || 'WhatsApp Phone Number ID'}>
+        <Input placeholder={t('settings.whatsapp_phone_number_id_ph') || '123456789012345'} />
       </Form.Item>
 
       <Divider />
@@ -143,17 +133,21 @@ export default function Settings() {
         <Input type="number" min={1} max={10} placeholder="3" />
       </Form.Item>
 
+      <Form.Item name="testPhone" label={t('settings.test_phone') || 'Test Phone Number'}>
+        <Input placeholder={t('settings.test_phone_ph') || '+966500000000'} />
+      </Form.Item>
+
       <Space>
         <Button type="primary" htmlType="submit" loading={loading}>{t('common.save') || 'Save'}</Button>
         <Button onClick={async () => {
           const v = form.getFieldsValue()
           try {
-            await testSms(v.testPhone, 'Test message')
-            message.success(t('settings.sms_test_success') || 'Test SMS sent')
+            await testWhatsApp(v.testPhone, '123456')
+            message.success(t('settings.whatsapp_test_success') || 'Test WhatsApp message sent')
           } catch (e: any) {
-            message.error(e?.message || (t('settings.sms_test_failed') || 'SMS test failed'))
+            message.error(e?.message || (t('settings.whatsapp_test_failed') || 'WhatsApp test failed'))
           }
-        }}>{t('settings.test_sms') || 'Test SMS'}</Button>
+        }}>{t('settings.test_whatsapp') || 'Test WhatsApp'}</Button>
       </Space>
     </Form>
   )
@@ -183,7 +177,7 @@ export default function Settings() {
         defaultActiveKey="analytics"
         items={[
           { key: 'analytics', label: t('settings.analytics_tab') || 'Analytics', children: analyticsTab },
-          { key: 'sms', label: t('settings.sms_tab') || 'SMS & OTP', children: smsOtpTab },
+          { key: 'sms', label: t('settings.sms_tab') || 'WhatsApp & OTP', children: smsOtpTab },
         ]}
       />
     </Card>

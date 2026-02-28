@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Form, Input, Modal, Switch, Table, message, Upload, Image, Space, Radio, Divider } from 'antd'
+import { Button, Form, Input, Modal, Switch, Table, message, Upload, Image, Space, Radio, Divider, Progress } from 'antd'
 import { UploadOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { resolveFileUrlWithBust } from '../../shared/url'
 import { useState } from 'react'
-import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
+import { apiDelete, apiGet, apiPatch, apiPost, getApiBase } from '../../api'
+import { useTranslation } from 'react-i18next'
 
 type Activity = {
   id: string
@@ -16,6 +17,7 @@ type Activity = {
 }
 
 export default function Activities() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { data, isLoading } = useQuery<Activity[]>({ 
     queryKey: ['activities'], 
@@ -25,11 +27,13 @@ export default function Activities() {
   const [editing, setEditing] = useState<Activity | null>(null)
   const [form] = Form.useForm()
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image')
+  const [uploadProgress, setUploadProgress] = useState<number>(0)
+  const [isUploading, setIsUploading] = useState(false)
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<Activity>) => apiPost<Activity>('/admin/activities', body),
     onSuccess: () => { 
-      message.success('Activity created'); 
+      message.success(t('activities.created')); 
       qc.invalidateQueries({ queryKey: ['activities'] }); 
       setOpen(false);
       form.resetFields();
@@ -39,7 +43,7 @@ export default function Activities() {
   const updateMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Partial<Activity> }) => apiPatch(`/admin/activities/${id}`, body),
     onSuccess: () => { 
-      message.success('Activity updated'); 
+      message.success(t('activities.updated')); 
       qc.invalidateQueries({ queryKey: ['activities'] }); 
       setOpen(false); 
       setEditing(null);
@@ -50,7 +54,7 @@ export default function Activities() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiDelete(`/admin/activities/${id}`),
     onSuccess: () => { 
-      message.success('Activity removed'); 
+      message.success(t('activities.removed')); 
       qc.invalidateQueries({ queryKey: ['activities'] }) 
     },
   })
@@ -62,7 +66,7 @@ export default function Activities() {
 
   const columns = [
     { 
-      title: 'Media', 
+      title: t('activities.media'), 
       dataIndex: 'imageUrl', 
       render: (_: any, r: Activity) => {
         if (r.videoUrl) {
@@ -82,7 +86,7 @@ export default function Activities() {
           return (
             <Space>
               <PlayCircleOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-              <span>{isCloudinary ? 'Cloudinary Video' : 'YouTube Video'}</span>
+              <span>{isCloudinary ? t('activities.cloudinary_video') : t('activities.youtube_video')}</span>
             </Space>
           )
         }
@@ -93,16 +97,16 @@ export default function Activities() {
       }
     },
     { 
-      title: 'URL', 
+      title: t('activities.url'), 
       render: (_: any, r: Activity) => {
         if (r.videoUrl) return <a href={r.videoUrl} target="_blank" rel="noopener noreferrer">{r.videoUrl}</a>
         if (r.imageUrl) return <span>{r.imageUrl}</span>
         return '-'
       }
     },
-    { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
+    { title: t('activities.active'), dataIndex: 'isActive', render: (v: boolean) => (v ? t('activities.yes') : t('activities.no')) },
     {
-      title: 'Actions', 
+      title: t('common.actions'), 
       render: (_: any, r: Activity) => (
         <span style={{ display: 'flex', gap: 8 }}>
           <Button 
@@ -119,14 +123,14 @@ export default function Activities() {
               setOpen(true) 
             }}
           >
-            Edit
+            {t('activities.edit')}
           </Button>
           <Button 
             size="small" 
             danger 
             onClick={() => deleteMutation.mutate(r.id)}
           >
-            Delete
+            {t('activities.delete')}
           </Button>
         </span>
       )
@@ -158,7 +162,7 @@ export default function Activities() {
   }
 
   return (
-    <div>
+    <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <Button 
           type="primary" 
@@ -169,7 +173,7 @@ export default function Activities() {
             setOpen(true) 
           }}
         >
-          New Activity
+          {t('activities.new_activity')}
         </Button>
       </div>
       <Table 
@@ -181,13 +185,15 @@ export default function Activities() {
       />
 
       <Modal
-        title={editing ? 'Edit Activity' : 'Create Activity'}
+        title={editing ? t('activities.edit_activity') : t('activities.create_activity')}
         open={open}
         onCancel={() => { 
           setOpen(false); 
           setEditing(null);
           form.resetFields();
           setMediaType('image');
+          setUploadProgress(0);
+          setIsUploading(false);
         }}
         onOk={handleSubmit}
         width={600}
@@ -195,9 +201,9 @@ export default function Activities() {
         <Form form={form} layout="vertical">
           <Form.Item 
             name="mediaType" 
-            label="Media Type"
+            label={t('activities.media_type')}
             initialValue="image"
-            rules={[{ required: true, message: 'Please select media type' }]}
+            rules={[{ required: true, message: t('activities.select_media_type') }]}
           >
             <Radio.Group 
               value={mediaType}
@@ -207,15 +213,17 @@ export default function Activities() {
                   imageUrl: null, 
                   videoUrl: null 
                 });
+                setUploadProgress(0);
+                setIsUploading(false);
               }}
             >
-              <Radio value="image">Image</Radio>
-              <Radio value="video">Video</Radio>
+              <Radio value="image">{t('activities.image')}</Radio>
+              <Radio value="video">{t('activities.video')}</Radio>
             </Radio.Group>
           </Form.Item>
 
           {mediaType === 'image' ? (
-            <Form.Item label="Image" required>
+            <Form.Item label={t('activities.image')} required>
               <Space direction="vertical" style={{ width: '100%' }}>
                 {form.getFieldValue('imageUrl') ? (
                   <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -236,25 +244,25 @@ export default function Activities() {
                     apiPost<{ imageUrl: string }>('/admin/activities/upload', fd)
                       .then((res) => {
                         form.setFieldsValue({ imageUrl: res.imageUrl })
-                        message.success('Image uploaded')
+                        message.success(t('activities.image_uploaded'))
                       })
-                      .catch(() => message.error('Upload failed'))
+                      .catch(() => message.error(t('activities.upload_failed')))
                     return false
                   }}
                 >
-                  <Button icon={<UploadOutlined />}>Upload Image</Button>
+                  <Button icon={<UploadOutlined />}>{t('activities.upload_image')}</Button>
                 </Upload>
                 <Form.Item 
                   name="imageUrl" 
                   hidden 
-                  rules={[{ required: true, message: 'Please upload an image' }]}
+                  rules={[{ required: true, message: t('activities.upload_image') }]}
                 >
                   <Input />
                 </Form.Item>
               </Space>
             </Form.Item>
           ) : (
-            <Form.Item label="Video" required>
+            <Form.Item label={t('activities.video')} required>
               <Space direction="vertical" style={{ width: '100%' }}>
                 {form.getFieldValue('videoUrl') ? (
                   <div>
@@ -275,52 +283,135 @@ export default function Activities() {
                   </div>
                 ) : null}
                 
+                {isUploading && (
+                  <div>
+                    <Progress 
+                      percent={uploadProgress} 
+                      status="active"
+                      format={(percent) => {
+                        const p = percent || 0
+                        if (p < 85) {
+                          return t('activities.upload_progress', { percent: p })
+                        } else if (p < 100) {
+                          return t('activities.processing') || 'جاري المعالجة...'
+                        } else {
+                          return t('activities.completed') || 'اكتمل!'
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                
                 <Upload
                   accept="video/*"
                   showUploadList={false}
                   beforeUpload={(file) => {
+                    setIsUploading(true)
+                    setUploadProgress(0)
+                    
                     const fd = new FormData()
                     fd.append('file', file)
-                    apiPost<{ videoUrl: string; coverUrl: string }>('/admin/activities/upload-video', fd)
-                      .then((res) => {
-                        form.setFieldsValue({ 
-                          videoUrl: res.videoUrl,
-                          videoCoverUrl: res.coverUrl || null
-                        })
-                        message.success('Video uploaded successfully' + (res.coverUrl ? ' (cover generated automatically)' : ''))
-                      })
-                      .catch((err) => {
-                        message.error(err.response?.data?.message || 'Upload failed')
-                      })
+                    
+                    const xhr = new XMLHttpRequest()
+                    
+                    // تتبع تقدم رفع الملف من المتصفح إلى السيرفر (0-85%)
+                    xhr.upload.addEventListener('progress', (e) => {
+                      if (e.lengthComputable) {
+                        // نعرض 85% كحد أقصى لأن السيرفر يحتاج وقت لرفع الملف إلى Cloudinary
+                        const percentComplete = Math.round((e.loaded / e.total) * 85)
+                        setUploadProgress(percentComplete)
+                      }
+                    })
+                    
+                    xhr.addEventListener('load', () => {
+                      if (xhr.status === 200 || xhr.status === 201) {
+                        try {
+                          const res = JSON.parse(xhr.responseText)
+                          // عند استلام الاستجابة، نكمل إلى 100% (السيرفر أكمل رفع الملف إلى Cloudinary)
+                          setUploadProgress(100)
+                          form.setFieldsValue({ 
+                            videoUrl: res.videoUrl,
+                            videoCoverUrl: res.coverUrl || null
+                          })
+                          setTimeout(() => {
+                            setIsUploading(false)
+                            setUploadProgress(0)
+                          }, 800)
+                          message.success(res.coverUrl ? t('activities.video_uploaded_with_cover') : t('activities.video_uploaded'))
+                        } catch (err) {
+                          setIsUploading(false)
+                          setUploadProgress(0)
+                          message.error(t('activities.upload_failed'))
+                        }
+                      } else {
+                        setIsUploading(false)
+                        setUploadProgress(0)
+                        try {
+                          const errorRes = JSON.parse(xhr.responseText)
+                          message.error(errorRes.message || t('activities.upload_failed'))
+                        } catch {
+                          message.error(t('activities.upload_failed'))
+                        }
+                      }
+                    })
+                    
+                    // عند بدء رفع الملف، نعرض 5% فوراً
+                    xhr.addEventListener('loadstart', () => {
+                      setUploadProgress(5)
+                    })
+                    
+                    xhr.addEventListener('error', () => {
+                      setIsUploading(false)
+                      setUploadProgress(0)
+                      message.error(t('activities.upload_failed'))
+                    })
+                    
+                    xhr.addEventListener('abort', () => {
+                      setIsUploading(false)
+                      setUploadProgress(0)
+                    })
+                    
+                    const apiBaseUrl = getApiBase()
+                    xhr.open('POST', `${apiBaseUrl}/admin/activities/upload-video`)
+                    
+                    const token = localStorage.getItem('accessToken') || localStorage.getItem('admin_token') || localStorage.getItem('token')
+                    if (token) {
+                      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+                    }
+                    
+                    xhr.send(fd)
+                    
                     return false
                   }}
                 >
-                  <Button icon={<UploadOutlined />}>Upload Video</Button>
+                  <Button icon={<UploadOutlined />} disabled={isUploading}>
+                    {isUploading ? t('activities.uploading') : t('activities.upload_video')}
+                  </Button>
                 </Upload>
                 
-                <Divider>OR</Divider>
+                <Divider>{t('activities.or')}</Divider>
                 
                 <Form.Item 
                   name="videoUrl" 
                   rules={[
-                    { required: true, message: 'Please upload a video or enter video URL' },
+                    { required: true, message: t('activities.video_url_required') },
                     {
                       pattern: /^https?:\/\/.+/,
-                      message: 'Please enter a valid URL',
+                      message: t('activities.enter_valid_url'),
                     },
                   ]}
                 >
                   <Input 
-                    placeholder="Or enter YouTube/Video URL: https://..." 
+                    placeholder={t('activities.enter_video_url')}
                     onChange={(e) => {
                       form.setFieldsValue({ videoUrl: e.target.value });
                     }}
                   />
                 </Form.Item>
 
-                <Divider>Video Cover (Optional)</Divider>
+                <Divider>{t('activities.video_cover')}</Divider>
 
-                <Form.Item label="Video Cover">
+                <Form.Item label={t('activities.video_cover')}>
                   <Space direction="vertical" style={{ width: '100%' }}>
                     {form.getFieldValue('videoCoverUrl') ? (
                       <div>
@@ -342,15 +433,15 @@ export default function Activities() {
                         apiPost<{ coverUrl: string }>('/admin/activities/upload-video-cover', fd)
                           .then((res) => {
                             form.setFieldsValue({ videoCoverUrl: res.coverUrl })
-                            message.success('Cover uploaded successfully')
+                            message.success(t('activities.cover_uploaded'))
                           })
                           .catch((err) => {
-                            message.error(err.response?.data?.message || 'Upload failed')
+                            message.error(err.response?.data?.message || t('activities.upload_failed'))
                           })
                         return false
                       }}
                     >
-                      <Button icon={<UploadOutlined />}>Upload Cover Image</Button>
+                      <Button icon={<UploadOutlined />}>{t('activities.upload_cover')}</Button>
                     </Upload>
                     
                     {form.getFieldValue('videoCoverUrl') && (
@@ -359,10 +450,10 @@ export default function Activities() {
                         danger
                         onClick={() => {
                           form.setFieldsValue({ videoCoverUrl: null })
-                          message.info('Cover removed')
+                          message.info(t('activities.cover_removed'))
                         }}
                       >
-                        Remove Cover
+                        {t('activities.remove_cover')}
                       </Button>
                     )}
                     
@@ -380,7 +471,7 @@ export default function Activities() {
 
           <Form.Item 
             name="isActive" 
-            label="Active" 
+            label={t('activities.active')}
             valuePropName="checked" 
             initialValue={true}
           >

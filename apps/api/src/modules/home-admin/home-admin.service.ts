@@ -15,7 +15,7 @@ export class HomeAdminService {
     @InjectRepository(Activity) private readonly activityRepo: Repository<Activity>,
     @InjectRepository(OrganizingBranch) private readonly organizingBranchRepo: Repository<OrganizingBranch>,
     private readonly redis: RedisService,
-  ) {}
+  ) { }
 
   // Banner
   listBanners() {
@@ -51,7 +51,7 @@ export class HomeAdminService {
     if (!dto.branchId) {
       throw new Error('branchId is required');
     }
-    
+
     // Create offer linked to branch (halls are now merged into branches)
     const entity = this.offerRepo.create({
       ...dto,
@@ -62,7 +62,7 @@ export class HomeAdminService {
   }
   async updateOffer(id: string, dto: Partial<Offer>) {
     // Update offer (halls are now merged into branches, no need for hallId)
-    const res = await this.offerRepo.update(id, dto);
+    const res = await this.offerRepo.update(id, dto as any);
     await this.redis.del('home:v1');
     return res;
   }
@@ -147,11 +147,11 @@ export class HomeAdminService {
       // Check if videoUrl exists in current entity or in dto
       const currentActivity = await this.activityRepo.findOne({ where: { id } as any });
       const hasVideoUrl = dto.videoUrl || currentActivity?.videoUrl;
-      
+
       if (dto.videoCoverUrl && !hasVideoUrl) {
         throw new BadRequestException('videoCoverUrl can only be set when videoUrl is provided');
       }
-      
+
       if (dto.videoCoverUrl) {
         try {
           const url = new URL(dto.videoCoverUrl);
@@ -250,11 +250,11 @@ export class HomeAdminService {
       // Check if videoUrl exists in current entity or in dto
       const currentOrganizingBranch = await this.organizingBranchRepo.findOne({ where: { id } as any });
       const hasVideoUrl = dto.videoUrl || currentOrganizingBranch?.videoUrl;
-      
+
       if (dto.videoCoverUrl && !hasVideoUrl) {
         throw new BadRequestException('videoCoverUrl can only be set when videoUrl is provided');
       }
-      
+
       if (dto.videoCoverUrl) {
         try {
           const url = new URL(dto.videoCoverUrl);

@@ -11,7 +11,6 @@ type Addon = {
   defaultQuantity: number
   isActive: boolean
   branchId?: string | null
-  hallId?: string | null
 }
 
 export default function Addons() {
@@ -20,11 +19,10 @@ export default function Addons() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Addon | null>(null)
   const [form] = Form.useForm<Partial<Addon>>()
-  const [filters, setFilters] = useState<{ branchId?: string; hallId?: string; isActive?: boolean }>({})
+  const [filters, setFilters] = useState<{ branchId?: string; isActive?: boolean }>({})
 
-  // Load branches and halls for selects
+  // Load branches for selects
   type Branch = { id: string; name_ar: string; name_en: string }
-  type Hall = { id: string; name_ar: string; name_en: string; branchId: string }
 
   const { data: branches } = useQuery<Branch[]>({
     queryKey: ['branches-select'],
@@ -34,30 +32,13 @@ export default function Addons() {
     },
   })
 
-  const { data: halls } = useQuery<Hall[]>({
-    queryKey: ['halls-select'],
-    queryFn: async () => {
-      const res = await apiGet<any>('/content/halls')
-      return Array.isArray(res) ? res : (res.items || res.halls || [])
-    },
-  })
-
-  const filteredHallsForFilter = useMemo(() => {
-    if (!halls) return []
-    if (!filters.branchId) return halls
-    return halls.filter(h => h.branchId === filters.branchId)
-  }, [halls, filters.branchId])
-
   const branchOptions = useMemo(() => (branches || []).map(b => ({ value: b.id, label: b.name_ar || b.name_en || b.id })), [branches])
-  const hallsOptionsAll = useMemo(() => (halls || []).map(h => ({ value: h.id, label: h.name_ar || h.name_en || h.id, branchId: h.branchId })), [halls])
-  const hallsOptionsForFilter = useMemo(() => (filteredHallsForFilter || []).map(h => ({ value: h.id, label: h.name_ar || h.name_en || h.id })), [filteredHallsForFilter])
 
   const { data, isLoading } = useQuery<Addon[]>({
     queryKey: ['addons', filters],
     queryFn: async () => {
       const params = new URLSearchParams()
       if (filters.branchId) params.set('branchId', filters.branchId)
-      if (filters.hallId) params.set('hallId', filters.hallId)
       if (typeof filters.isActive === 'boolean') params.set('isActive', String(filters.isActive))
       return apiGet(`/content/admin/addons${params.toString() ? `?${params}` : ''}`)
     },
@@ -81,8 +62,11 @@ export default function Addons() {
     { title: t('common.price') || 'Price', dataIndex: 'price', render: (v: number) => Number(v).toFixed(2) },
     { title: t('addons.default_qty') || 'Default Qty', dataIndex: 'defaultQuantity' },
     { title: t('common.active') || 'Active', dataIndex: 'isActive', render: (v: boolean) => v ? t('common.yes') || 'Yes' : t('common.no') || 'No' },
-    { title: 'Branch', dataIndex: 'branchId', render: (v?: string) => v || '-' },
-    { title: 'Hall', dataIndex: 'hallId', render: (v?: string) => v || '-' },
+    { title: t('addons.branch') || 'Branch', dataIndex: 'branchId', render: (v?: string) => {
+      if (!v) return '-'
+      const branch = branches?.find(b => b.id === v)
+      return branch ? (branch.name_ar || branch.name_en || v) : v
+    }},
     {
       title: t('common.actions') || 'Actions',
       render: (_: any, row: Addon) => (
@@ -113,20 +97,10 @@ export default function Addons() {
             <Select
               allowClear
               showSearch
-              placeholder={t('menu.branch') || 'Branch'}
+              placeholder={t('addons.branch') || 'Branch'}
               style={{ width: 240 }}
               options={branchOptions}
-              onChange={(v) => setFilters(prev => ({ ...prev, branchId: v || undefined, hallId: undefined }))}
-              filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
-            />
-            <Select
-              allowClear
-              showSearch
-              placeholder={t('halls.hall') || 'Hall'}
-              style={{ width: 240 }}
-              options={hallsOptionsForFilter}
-              value={filters.hallId}
-              onChange={(v) => setFilters(prev => ({ ...prev, hallId: v || undefined }))}
+              onChange={(v) => setFilters(prev => ({ ...prev, branchId: v || undefined }))}
               filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
             />
             <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('addons.new') || 'New Add-on'}</Button>
@@ -161,37 +135,14 @@ export default function Addons() {
             <Switch />
           </Form.Item>
           {/* Branch select */}
-          <Form.Item name="branchId" label={t('menu.branch') || 'Branch'}>
+          <Form.Item name="branchId" label={t('addons.branch') || 'Branch'}>
             <Select
               allowClear
               showSearch
-              placeholder={t('users.select_branch') || 'Select branch (optional)'}
+              placeholder={t('addons.select_branch') || 'Select branch (optional)'}
               options={branchOptions}
-              onChange={() => {
-                form.setFieldValue('hallId', undefined)
-              }}
               filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
             />
-          </Form.Item>
-          {/* Hall select depends on branchId */}
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.branchId !== cur.branchId}>
-            {() => {
-              const selectedBranchId = form.getFieldValue('branchId') as string | undefined
-              const hallOptions = selectedBranchId
-                ? hallsOptionsAll.filter(h => h.branchId === selectedBranchId).map(({ value, label }) => ({ value, label }))
-                : hallsOptionsAll.map(({ value, label }) => ({ value, label }))
-              return (
-                <Form.Item name="hallId" label={t('halls.hall') || 'Hall'}>
-                  <Select
-                    allowClear
-                    showSearch
-                    placeholder={t('halls.hall') || 'Select hall (optional)'}
-                    options={hallOptions}
-                    filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
-                  />
-                </Form.Item>
-              )
-            }}
           </Form.Item>
         </Form>
       </Modal>

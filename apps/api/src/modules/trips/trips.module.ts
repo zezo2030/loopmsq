@@ -6,6 +6,7 @@ import { Ticket } from '../../database/entities/ticket.entity';
 import { User } from '../../database/entities/user.entity';
 import { Payment } from '../../database/entities/payment.entity';
 import { TripsController } from './trips.controller';
+import { TripsPublicController } from './trips-public.controller';
 import { TripsService } from './trips.service';
 import { UsersModule } from '../users/users.module';
 import { PaymentsModule } from '../payments/payments.module';
@@ -22,9 +23,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
     BookingsModule,
     NotificationsModule,
   ],
-  controllers: [TripsController],
+  controllers: [TripsController, TripsPublicController],
   providers: [TripsService, RedisService, QRCodeService],
 })
-export class TripsModule {}
+export class TripsModule { }
 
 

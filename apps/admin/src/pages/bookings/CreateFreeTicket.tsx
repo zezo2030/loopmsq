@@ -43,7 +43,7 @@ export default function CreateFreeTicket() {
   
   // Watch form values for slots fetching
   const selectedDate = Form.useWatch('date', form)
-  const selectedHallId = Form.useWatch('hallId', form)
+  const selectedBranchId = Form.useWatch('branchId', form)
   const selectedDuration = Form.useWatch('durationHours', form) || 2
   const selectedPersons = Form.useWatch('persons', form) || 1
 
@@ -70,30 +70,18 @@ export default function CreateFreeTicket() {
     },
   })
 
-  // Load halls based on selected branch
-  const selectedBranchId = Form.useWatch('branchId', form)
-  const { data: halls, isLoading: hallsLoading } = useQuery<any[]>({
-    queryKey: ['halls', selectedBranchId],
-    queryFn: async () => {
-      if (!selectedBranchId) return []
-      const res = await apiGet<any>(`/content/halls?branchId=${selectedBranchId}`)
-      return Array.isArray(res) ? res : (res.items || res.halls || [])
-    },
-    enabled: !!selectedBranchId,
-  })
-
-  // Load available time slots for selected hall, date, and duration
+  // Load available time slots for selected branch, date, and duration
   const { data: slotsData, isLoading: slotsLoading } = useQuery<{ slots: TimeSlot[]; slotMinutes: number }>({
-    queryKey: ['hall-slots', selectedHallId, selectedDate?.format('YYYY-MM-DD'), selectedDuration, selectedPersons],
+    queryKey: ['branch-slots', selectedBranchId, selectedDate?.format('YYYY-MM-DD'), selectedDuration, selectedPersons],
     queryFn: async () => {
-      if (!selectedHallId || !selectedDate) return { slots: [], slotMinutes: 60 }
+      if (!selectedBranchId || !selectedDate) return { slots: [], slotMinutes: 60 }
       const dateStr = selectedDate.format('YYYY-MM-DD')
       const res = await apiGet<{ slots: TimeSlot[]; slotMinutes: number }>(
-        `/content/halls/${selectedHallId}/slots?date=${dateStr}&durationHours=${selectedDuration}&persons=${selectedPersons}`
+        `/content/branches/${selectedBranchId}/slots?date=${dateStr}&durationHours=${selectedDuration}&persons=${selectedPersons}`
       )
       return res
     },
-    enabled: !!selectedHallId && !!selectedDate,
+    enabled: !!selectedBranchId && !!selectedDate,
   })
 
   const availableSlots = slotsData?.slots?.filter(slot => slot.available) || []
@@ -108,17 +96,12 @@ export default function CreateFreeTicket() {
     value: b.id,
   }))
 
-  const hallOptions = (halls || []).map((h: any) => ({
-    label: `${h?.name_ar || h?.name_en || h?.name || ''} (سعة: ${h?.capacity || 0})`,
-    value: h.id,
-  }))
-
   async function handleSubmit(values: any) {
     setLoading(true)
     try {
       // Validate that time slot is available
-      if (!values.date || !values.hallId || !values.time) {
-        message.error('يرجى اختيار التاريخ والقاعة والوقت')
+      if (!values.date || !values.branchId || !values.time) {
+        message.error('يرجى اختيار التاريخ والفرع والوقت')
         setLoading(false)
         return
       }
@@ -151,7 +134,6 @@ export default function CreateFreeTicket() {
       const payload = {
         userId: values.userId,
         branchId: values.branchId,
-        hallId: values.hallId,
         startTime: startTime,
         durationHours: values.durationHours,
         persons: values.persons,
@@ -257,39 +239,8 @@ export default function CreateFreeTicket() {
                         (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
                       }
                       notFoundContent={branchesLoading ? 'جاري التحميل...' : 'لا يوجد فروع'}
-                    />
-                  </Form.Item>
-                </Col>
-
-                {/* Hall Selection */}
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="hallId"
-                    label={
-                      <span>
-                        القاعة <span style={{ color: '#ff4d4f' }}>*</span>
-                      </span>
-                    }
-                    rules={[{ required: true, message: 'يرجى اختيار القاعة' }]}
-                  >
-                    <Select
-                      showSearch
-                      placeholder="اختر القاعة"
-                      options={hallOptions}
-                      loading={hallsLoading}
-                      disabled={!selectedBranchId}
-                      filterOption={(input, option) =>
-                        (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-                      }
-                      notFoundContent={
-                        !selectedBranchId
-                          ? 'يرجى اختيار الفرع أولاً'
-                          : hallsLoading
-                          ? 'جاري التحميل...'
-                          : 'لا يوجد قاعات'
-                      }
                       onChange={() => {
-                        // Reset date and time when hall changes
+                        // Reset date and time when branch changes
                         form.setFieldValue('date', undefined)
                         form.setFieldValue('time', undefined)
                       }}
@@ -329,8 +280,8 @@ export default function CreateFreeTicket() {
                           if (!value) {
                             return Promise.reject(new Error('يرجى اختيار الوقت'))
                           }
-                          if (!selectedDate || !selectedHallId) {
-                            return Promise.reject(new Error('يرجى اختيار التاريخ والقاعة أولاً'))
+                          if (!selectedDate || !selectedBranchId) {
+                            return Promise.reject(new Error('يرجى اختيار التاريخ والفرع أولاً'))
                           }
                           
                           // value is in format "HH:mm"
@@ -355,7 +306,7 @@ export default function CreateFreeTicket() {
                       },
                     ]}
                   >
-                    {selectedDate && selectedHallId ? (
+                    {selectedDate && selectedBranchId ? (
                       <Select
                         placeholder={slotsLoading ? 'جاري تحميل الأوقات المتاحة...' : 'اختر الوقت المتاح'}
                         loading={slotsLoading}
@@ -400,15 +351,15 @@ export default function CreateFreeTicket() {
                       <TimePicker
                         style={{ width: '100%' }}
                         format="HH:mm"
-                        placeholder="اختر التاريخ والقاعة أولاً"
+                        placeholder="اختر التاريخ والفرع أولاً"
                         disabled
                       />
                     )}
                   </Form.Item>
-                  {selectedDate && selectedHallId && availableSlots.length === 0 && !slotsLoading && (
+                  {selectedDate && selectedBranchId && availableSlots.length === 0 && !slotsLoading && (
                     <Alert
                       message="لا توجد أوقات متاحة"
-                      description="لا توجد فتحات متاحة للقاعة المحددة في هذا التاريخ. يرجى اختيار تاريخ آخر."
+                      description="لا توجد فتحات متاحة للفرع المحدد في هذا التاريخ. يرجى اختيار تاريخ آخر."
                       type="warning"
                       showIcon
                       style={{ marginTop: '8px' }}

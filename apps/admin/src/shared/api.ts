@@ -71,12 +71,11 @@ async function safeText(resp: Response): Promise<string | null> {
 }
 
 // Admin Config APIs
-export type SmsConfigMasked = {
+export type WhatsAppConfigMasked = {
   enabled: boolean
-  provider: 'dreams'
-  dreamsApiUrl?: string
-  dreamsUser?: string
-  dreamsSender?: string
+  provider: 'whatsapp'
+  whatsappAccessToken?: string
+  whatsappPhoneNumberId?: string
 }
 
 export type OtpConfig = {
@@ -87,16 +86,16 @@ export type OtpConfig = {
   rateMaxAttempts: number
 }
 
-export async function getSmsConfig(): Promise<SmsConfigMasked> {
-  return apiGet('/admin/config/sms')
+export async function getWhatsAppConfig(): Promise<WhatsAppConfigMasked> {
+  return apiGet('/admin/config/whatsapp')
 }
 
-export async function updateSmsConfig(body: Partial<{ enabled: boolean; provider: 'dreams'; dreamsApiUrl: string; dreamsUser: string; dreamsSecretKey: string; dreamsSender: string }>): Promise<SmsConfigMasked> {
-  return apiPut('/admin/config/sms', body)
+export async function updateWhatsAppConfig(body: Partial<{ enabled: boolean; provider: 'whatsapp'; whatsappAccessToken: string; whatsappPhoneNumberId: string }>): Promise<WhatsAppConfigMasked> {
+  return apiPut('/admin/config/whatsapp', body)
 }
 
-export async function testSms(to: string, message: string): Promise<{ success: boolean }> {
-  return apiPost('/admin/config/sms/test', { to, message })
+export async function testWhatsApp(to: string, message: string): Promise<{ success: boolean }> {
+  return apiPost('/admin/config/whatsapp/test', { to, message })
 }
 
 export async function getOtpConfig(): Promise<OtpConfig> {
