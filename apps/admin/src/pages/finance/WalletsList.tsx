@@ -8,6 +8,9 @@ import { useTranslation } from 'react-i18next'
 interface WalletItem {
   id: string
   userId: string
+  user?: {
+    name?: string
+  }
   balance: number
   loyaltyPoints: number
   totalEarned: number
@@ -76,7 +79,11 @@ export default function WalletsList() {
   })
 
   const columns = [
-    { title: t('wallets.user_id'), dataIndex: 'userId', key: 'userId' },
+    {
+      title: t('common.name'),
+      key: 'userName',
+      render: (_: any, r: WalletItem) => r.user?.name || r.userId,
+    },
     { title: t('wallets.balance'), dataIndex: 'balance', key: 'balance' },
     { title: t('wallets.points'), dataIndex: 'loyaltyPoints', key: 'loyaltyPoints' },
     { title: t('wallets.total_earned'), dataIndex: 'totalEarned', key: 'totalEarned' },

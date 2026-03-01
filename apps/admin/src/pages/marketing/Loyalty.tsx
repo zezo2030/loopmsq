@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Card, Tabs, Form, InputNumber, Switch, Button, Table, Space, Input, message, Descriptions, Alert, Modal, Typography, Divider, Row, Col, Statistic } from 'antd'
-import { EditOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { EditOutlined, InfoCircleOutlined, AppstoreOutlined, HistoryOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPost, apiPatch } from '../../api'
 import { useTranslation } from 'react-i18next'
@@ -11,6 +11,7 @@ export default function Loyalty() {
   const { t } = useTranslation()
   const [form] = Form.useForm()
   const [editForm] = Form.useForm()
+  const [activeTab, setActiveTab] = useState<'all' | 'history'>('all')
   const [userId, setUserId] = useState<string>('')
   const [editingRule, setEditingRule] = useState<any>(null)
   const [editModalVisible, setEditModalVisible] = useState(false)
@@ -128,6 +129,20 @@ export default function Loyalty() {
   ]
 
   const example = activeRule ? calculateExample(Number(activeRule.earnRate), Number(activeRule.redeemRate)) : null
+  const tabLabelStyle = (isActive: boolean) => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '10px 14px',
+    borderRadius: 12,
+    border: `1px solid ${isActive ? '#1677ff' : '#d9d9d9'}`,
+    background: isActive ? 'rgba(22,119,255,0.10)' : '#fff',
+    color: isActive ? '#1677ff' : 'rgba(0,0,0,0.85)',
+    fontWeight: 600,
+    transition: 'all 0.2s ease',
+  })
+  const tabMetaStyle = { display: 'flex', flexDirection: 'column' as const, lineHeight: 1.2 }
+  const tabSubTextStyle = { fontSize: 12, color: 'rgba(0,0,0,0.45)', fontWeight: 400 }
 
   return (
     <div>
@@ -225,10 +240,21 @@ export default function Loyalty() {
         )}
 
         <Tabs
+          activeKey={activeTab}
+          onChange={(key) => setActiveTab(key as 'all' | 'history')}
+          tabBarStyle={{ marginBottom: 20, borderBottom: 'none' }}
           items={[
             {
               key: 'all',
-              label: t('marketing.all_rules') || 'All Rules',
+              label: (
+                <div style={tabLabelStyle(activeTab === 'all')}>
+                  <AppstoreOutlined />
+                  <div style={tabMetaStyle}>
+                    <span>{t('marketing.all_rules') || 'All Rules'}</span>
+                    <span style={tabSubTextStyle}>{`${rulesQuery.data?.length || 0} ${t('marketing.all_rules') || 'rules'}`}</span>
+                  </div>
+                </div>
+              ),
               children: (
                 <>
                   <Table 
@@ -311,7 +337,15 @@ export default function Loyalty() {
             },
             {
               key: 'history',
-              label: t('marketing.user_history') || 'User History',
+              label: (
+                <div style={tabLabelStyle(activeTab === 'history')}>
+                  <HistoryOutlined />
+                  <div style={tabMetaStyle}>
+                    <span>{t('marketing.user_history') || 'User History'}</span>
+                    <span style={tabSubTextStyle}>{t('marketing.user_wallet_info') || 'Wallet & transactions'}</span>
+                  </div>
+                </div>
+              ),
               children: (
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Input 
