@@ -1,4 +1,12 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { FavoritesService } from './favorites.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -10,13 +18,19 @@ export class FavoritesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async add(@CurrentUser() user: any, @Body() body: { entityType: 'branch' | 'hall'; entityId: string }) {
+  async add(
+    @CurrentUser() user: any,
+    @Body() body: { entityType: 'branch' | 'hall'; entityId: string },
+  ) {
     return this.favorites.add(user.id, body.entityType, body.entityId);
   }
 
   @Delete()
   @HttpCode(HttpStatus.OK)
-  async remove(@CurrentUser() user: any, @Body() body: { entityType: 'branch' | 'hall'; entityId: string }) {
+  async remove(
+    @CurrentUser() user: any,
+    @Body() body: { entityType: 'branch' | 'hall'; entityId: string },
+  ) {
     return this.favorites.remove(user.id, body.entityType, body.entityId);
   }
 
@@ -25,5 +39,3 @@ export class FavoritesController {
     return this.favorites.list(user.id);
   }
 }
-
-

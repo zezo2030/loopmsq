@@ -27,21 +27,3 @@ export class CompleteRegistrationDto {
   @IsString()
   language?: string = 'ar';
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

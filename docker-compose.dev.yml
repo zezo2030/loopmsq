@@ -74,10 +74,11 @@ services:
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       WHATSAPP_OTP_TEMPLATE_NAME: ${WHATSAPP_OTP_TEMPLATE_NAME:-ver_number}
       WHATSAPP_OTP_LANGUAGE: ${WHATSAPP_OTP_LANGUAGE:-}
-      # TAP Configuration
-      TAP_SECRET_KEY: ${TAP_SECRET_KEY:-}
-      TAP_PUBLIC_KEY: ${TAP_PUBLIC_KEY:-}
-      TAP_API_BASE: ${TAP_API_BASE:-}
+      # Moyasar Configuration
+      MOYASAR_SECRET_KEY: ${MOYASAR_SECRET_KEY:-}
+      MOYASAR_PUBLIC_KEY: ${MOYASAR_PUBLIC_KEY:-}
+      MOYASAR_API_BASE: ${MOYASAR_API_BASE:-https://api.moyasar.com/v1}
+      PAYMENTS_BYPASS: ${PAYMENTS_BYPASS:-true}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-}
       # Firebase Configuration (للإشعارات الفورية)
       FIREBASE_PROJECT_ID: events-f1ff2

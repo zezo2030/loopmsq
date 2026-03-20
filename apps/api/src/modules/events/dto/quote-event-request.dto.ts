@@ -8,5 +8,3 @@ export class QuoteEventRequestDto {
   @Min(0)
   basePrice?: number;
 }
-
-

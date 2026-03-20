@@ -50,7 +50,11 @@ export class WalletTransaction {
   @Column({ type: 'varchar', length: 50, nullable: true })
   method: string;
 
-  @Column({ type: 'enum', enum: WalletTransactionStatus, default: WalletTransactionStatus.SUCCESS })
+  @Column({
+    type: 'enum',
+    enum: WalletTransactionStatus,
+    default: WalletTransactionStatus.SUCCESS,
+  })
   status: WalletTransactionStatus;
 
   @Column({ type: 'varchar', length: 255, nullable: true })

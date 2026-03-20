@@ -15,7 +15,15 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiProduces, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiProduces,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -37,10 +45,10 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 @UseGuards(AuthGuard('jwt'))
 @Controller('trips')
 export class TripsController {
-  constructor(private readonly tripsService: TripsService) { }
+  constructor(private readonly tripsService: TripsService) {}
 
   @Get('requests')
-  @ApiOperation({ summary: 'Get user\'s trip requests' })
+  @ApiOperation({ summary: "Get user's trip requests" })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'status', required: false, type: String })
@@ -56,10 +64,7 @@ export class TripsController {
   @Post('requests')
   @ApiOperation({ summary: 'Create school trip request (user)' })
   @ApiResponse({ status: 201, description: 'Request created' })
-  createRequest(
-    @CurrentUser() user: any,
-    @Body() dto: CreateTripRequestDto,
-  ) {
+  createRequest(@CurrentUser() user: any, @Body() dto: CreateTripRequestDto) {
     return this.tripsService.createRequest(user.id, dto);
   }
 
@@ -85,10 +90,7 @@ export class TripsController {
 
   @Get('requests/:id')
   @ApiOperation({ summary: 'Get trip request (owner or admin/staff)' })
-  getRequest(
-    @CurrentUser() user: any,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  getRequest(@CurrentUser() user: any, @Param('id', ParseUUIDPipe) id: string) {
     return this.tripsService.getRequest(user, id);
   }
 
@@ -111,7 +113,12 @@ export class TripsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: { quotedPrice?: number; adminNotes?: string },
   ) {
-    return this.tripsService.approveRequest(user.id, id, dto.quotedPrice, dto.adminNotes);
+    return this.tripsService.approveRequest(
+      user.id,
+      id,
+      dto.quotedPrice,
+      dto.adminNotes,
+    );
   }
 
   @Post('requests/:id/reject')
@@ -170,8 +177,6 @@ export class TripsController {
     return this.tripsService.uploadParticipants(user.id, id, file, user.roles);
   }
 
-
-
   @Post('requests/:id/invoice')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.STAFF)
@@ -223,9 +228,10 @@ export class TripsController {
   @ApiResponse({ status: 200, description: 'Tickets retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Trip request not found' })
-  async getTripTickets(@CurrentUser() user: any, @Param('id', ParseUUIDPipe) id: string) {
+  async getTripTickets(
+    @CurrentUser() user: any,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.tripsService.getTripTickets(id, user);
   }
 }
-
-

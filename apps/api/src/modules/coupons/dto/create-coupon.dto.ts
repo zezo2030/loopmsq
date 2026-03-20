@@ -1,4 +1,14 @@
-import { IsBoolean, IsDateString, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateCouponDto {
   @IsUUID()
@@ -27,5 +37,3 @@ export class CreateCouponDto {
   @IsBoolean()
   isActive?: boolean;
 }
-
-

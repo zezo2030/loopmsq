@@ -12,4 +12,3 @@ export const getBookingSlotMinutes = (configService: ConfigService): number => {
 
   return 60;
 };
-

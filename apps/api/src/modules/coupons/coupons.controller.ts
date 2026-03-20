@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards, Query, ForbiddenException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+  Query,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CouponsService } from './coupons.service';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
@@ -51,7 +64,11 @@ export class CouponsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  update(@Param('id') id: string, @Body() body: UpdateCouponDto, @CurrentUser() me: User) {
+  update(
+    @Param('id') id: string,
+    @Body() body: UpdateCouponDto,
+    @CurrentUser() me: User,
+  ) {
     if (me?.roles?.includes(UserRole.BRANCH_MANAGER)) {
       if (!me.branchId) throw new ForbiddenException('No branch assigned');
       if ((body as any).branchId && (body as any).branchId !== me.branchId) {
@@ -77,12 +94,18 @@ export class CouponsController {
   // Public preview
   @Post('coupons/preview')
   @HttpCode(HttpStatus.OK)
-  preview(@Body() body: { code: string; amount: number; branchId?: string; hallId?: string | null }) {
+  preview(
+    @Body()
+    body: {
+      code: string;
+      amount: number;
+      branchId?: string;
+      hallId?: string | null;
+    },
+  ) {
     return this.coupons.preview(body.code, body.amount, {
       branchId: body.branchId,
       hallId: null, // No longer used
     });
   }
 }
-
-

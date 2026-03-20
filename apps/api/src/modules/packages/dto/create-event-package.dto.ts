@@ -1,4 +1,15 @@
-import { IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateEventPackageDto {
   @IsString()
@@ -63,5 +74,3 @@ export class CreateEventPackageDto {
   @IsBoolean()
   isActive?: boolean;
 }
-
-

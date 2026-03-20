@@ -16,7 +16,9 @@ describe('Packages (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
 
     repo = app.get<Repository<EventPackage>>(getRepositoryToken(EventPackage));
@@ -43,8 +45,6 @@ describe('Packages (e2e)', () => {
       .send({ packageId: p.id, persons: 10, durationHours: 3 })
       .expect(201);
     expect(res.body.valid).toBe(true);
-    expect(res.body.total).toBe(100 + (2 * 10) + (10 * 3));
+    expect(res.body.total).toBe(100 + 2 * 10 + 10 * 3);
   });
 });
-
-

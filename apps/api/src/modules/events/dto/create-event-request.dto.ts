@@ -1,5 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, Length, Min, ValidateNested, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
+  ValidateNested,
+  IsUUID,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class AddOnDto {
@@ -64,5 +75,3 @@ export class CreateEventRequestDto {
   @Length(0, 1000)
   notes?: string;
 }
-
-

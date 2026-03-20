@@ -46,12 +46,7 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
         name_en: branch.nameEn || branch.name_en,
         capacity: branch.capacity,
         isDecorated: branch.isDecorated,
-        price_basePrice: branch.priceConfig?.basePrice,
         price_hourlyRate: branch.priceConfig?.hourlyRate,
-        price_pricePerPerson: branch.priceConfig?.pricePerPerson,
-        price_weekendMultiplier: branch.priceConfig?.weekendMultiplier,
-        price_holidayMultiplier: branch.priceConfig?.holidayMultiplier,
-        price_decorationPrice: branch.priceConfig?.decorationPrice,
         description_ar: branch.descriptionAr || branch.description_ar,
         description_en: branch.descriptionEn || branch.description_en,
         features: branch.hallFeatures || branch.features,
@@ -69,12 +64,7 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
       capacity: Number(values.capacity || 0),
       isDecorated: !!values.isDecorated,
       hallPriceConfig: {
-        basePrice: Number(values.price_basePrice || 0),
         hourlyRate: Number(values.price_hourlyRate || 0),
-        pricePerPerson: Number(values.price_pricePerPerson || 0),
-        weekendMultiplier: Number(values.price_weekendMultiplier || 1),
-        holidayMultiplier: Number(values.price_holidayMultiplier || 1),
-        decorationPrice: values.price_decorationPrice != null ? Number(values.price_decorationPrice) : undefined,
       },
       descriptionAr: values.description_ar || null,
       descriptionEn: values.description_en || null,
@@ -137,36 +127,8 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
         </Row>
 
         <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item name="price_basePrice" label={t('branches.base_price') || 'Base Price'}>
-              <InputNumber min={0} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
+          <Col span={12}>
             <Form.Item name="price_hourlyRate" label={t('branches.hourly_rate') || 'Hourly Rate'}>
-              <InputNumber min={0} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item name="price_pricePerPerson" label={t('branches.price_per_person') || 'Per Person'}>
-              <InputNumber min={0} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item name="price_weekendMultiplier" label={t('branches.weekend_multiplier') || 'Weekend Multiplier'}>
-              <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item name="price_holidayMultiplier" label={t('branches.holiday_multiplier') || 'Holiday Multiplier'}>
-              <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item name="price_decorationPrice" label={t('branches.decoration_price') || 'Decoration Price'}>
               <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
@@ -182,6 +144,9 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
             </Form.Item>
           </Col>
         </Row>
+        <div style={{ color: '#6b7280', marginBottom: 16 }}>
+          {t('branches.addons_priced_separately') || 'Add-ons are priced separately during booking.'}
+        </div>
 
         <Form.Item name="features" label={t('branches.features') || 'المزايا'}>
           <Select mode="tags" placeholder={t('branches.features_ph') || 'أدخل المزايا'} />

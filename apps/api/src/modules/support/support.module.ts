@@ -7,11 +7,13 @@ import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SupportTicket]), UsersModule, NotificationsModule],
+  imports: [
+    TypeOrmModule.forFeature([SupportTicket]),
+    UsersModule,
+    NotificationsModule,
+  ],
   controllers: [SupportController],
   providers: [SupportService],
   exports: [SupportService],
 })
 export class SupportModule {}
-
-

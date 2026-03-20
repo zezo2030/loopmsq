@@ -23,5 +23,3 @@ export class ListWalletsDto {
   @Max(100)
   pageSize?: number = 20;
 }
-
-

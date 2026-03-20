@@ -30,9 +30,19 @@ import { RedisService } from '../../utils/redis.service';
     ),
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService, SmsProcessor, EmailProcessor, PushProcessor, WhatsAppProcessor, SmsProvider, EmailProvider, PushProvider, WhatsAppProvider, EncryptionService, RedisService],
+  providers: [
+    NotificationsService,
+    SmsProcessor,
+    EmailProcessor,
+    PushProcessor,
+    WhatsAppProcessor,
+    SmsProvider,
+    EmailProvider,
+    PushProvider,
+    WhatsAppProvider,
+    EncryptionService,
+    RedisService,
+  ],
   exports: [NotificationsService, PushProvider],
 })
-export class NotificationsModule { }
-
-
+export class NotificationsModule {}

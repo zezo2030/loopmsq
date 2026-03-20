@@ -65,5 +65,3 @@ export class TicketsController {
     return this.ticketsService.createShareToken(user.id, id, dto);
   }
 }
-
-

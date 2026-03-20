@@ -26,8 +26,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? (exception.getResponse() as any)?.message || exception.message
         : exception instanceof Error
-        ? exception.message
-        : 'Internal server error';
+          ? exception.message
+          : 'Internal server error';
 
     const errorResponse = {
       statusCode: status,
@@ -53,4 +53,3 @@ export class AllExceptionsFilter implements ExceptionFilter {
     response.status(status).json(errorResponse);
   }
 }
-

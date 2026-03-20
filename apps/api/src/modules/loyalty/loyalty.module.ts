@@ -25,5 +25,3 @@ import { NotificationsModule } from '../notifications/notifications.module';
   exports: [LoyaltyService],
 })
 export class LoyaltyModule {}
-
-

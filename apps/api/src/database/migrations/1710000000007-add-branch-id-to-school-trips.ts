@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddBranchIdToSchoolTrips1710000000007 implements MigrationInterface {
+export class AddBranchIdToSchoolTrips1710000000007
+  implements MigrationInterface
+{
   name = 'AddBranchIdToSchoolTrips1710000000007';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -39,28 +41,3 @@ export class AddBranchIdToSchoolTrips1710000000007 implements MigrationInterface
     `);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

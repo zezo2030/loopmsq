@@ -71,7 +71,9 @@ export class WalletService {
       walletTxQb.andWhere('tx.status = :status', { status });
     }
 
-    const walletTxItems = await walletTxQb.orderBy('tx.createdAt', 'DESC').getMany();
+    const walletTxItems = await walletTxQb
+      .orderBy('tx.createdAt', 'DESC')
+      .getMany();
 
     const includeLoyaltyAsDeposit =
       !type || type === WalletTransactionType.DEPOSIT;
@@ -108,7 +110,7 @@ export class WalletService {
 
     const items = [...walletTxItems, ...loyaltyAsWalletItems].sort(
       (a: any, b: any) =>
-        new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime(),
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
     const total = items.length;
     const start = (page - 1) * pageSize;
@@ -125,7 +127,9 @@ export class WalletService {
   async rechargeWallet(userId: string, dto: RechargeWalletDto) {
     const { amount, method } = dto;
 
-    this.logger.log(`Recharge wallet request: userId=${userId}, amount=${amount}, method=${method}`);
+    this.logger.log(
+      `Recharge wallet request: userId=${userId}, amount=${amount}, method=${method}`,
+    );
 
     const wallet = await this.walletRepository.findOne({
       where: { userId },
@@ -151,8 +155,10 @@ export class WalletService {
       const savedTransaction = await queryRunner.manager.save(transaction);
 
       // Bypass payments if keys are missing or explicitly enabled
-      const bypass = !this.configService.get<string>('TAP_SECRET_KEY') ||
-        (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() === 'true';
+      const bypass =
+        !this.configService.get<string>('TAP_SECRET_KEY') ||
+        (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() ===
+          'true';
 
       let chargeResult: any = null;
       let success = false;
@@ -163,7 +169,9 @@ export class WalletService {
         success = true;
         savedTransaction.reference = `bypass_${savedTransaction.id}`;
         savedTransaction.status = WalletTransactionStatus.SUCCESS;
-        this.logger.log(`Bypass mode: Wallet recharge succeeded for userId=${userId}`);
+        this.logger.log(
+          `Bypass mode: Wallet recharge succeeded for userId=${userId}`,
+        );
       } else {
         // Process payment through gateway
         if (!this.tapService) {
@@ -176,30 +184,44 @@ export class WalletService {
             currency: 'SAR',
             capture: true,
             threeDS: 'required',
-            source: { payment_method: method === 'credit_card' ? 'card' : 'card' },
+            source: {
+              payment_method: method === 'credit_card' ? 'card' : 'card',
+            },
             description: `Wallet recharge ${wallet.id}`,
-            metadata: { walletId: wallet.id, transactionId: savedTransaction.id },
+            metadata: {
+              walletId: wallet.id,
+              transactionId: savedTransaction.id,
+            },
           });
 
           chargeResult = charge;
           const chargeStatus = charge.status?.toUpperCase();
-          success = ['CAPTURED', 'AUTHORIZED', 'SUCCEEDED'].includes(chargeStatus || '');
+          success = ['CAPTURED', 'AUTHORIZED', 'SUCCEEDED'].includes(
+            chargeStatus || '',
+          );
 
           if (success) {
             savedTransaction.reference = charge.id;
             savedTransaction.status = WalletTransactionStatus.SUCCESS;
-            this.logger.log(`Wallet recharge succeeded: userId=${userId}, chargeId=${charge.id}`);
+            this.logger.log(
+              `Wallet recharge succeeded: userId=${userId}, chargeId=${charge.id}`,
+            );
           } else {
             failureReason = `Payment gateway returned status: ${chargeStatus}`;
             savedTransaction.failureReason = failureReason;
             savedTransaction.status = WalletTransactionStatus.FAILED;
-            this.logger.warn(`Wallet recharge failed: userId=${userId}, reason=${failureReason}`);
+            this.logger.warn(
+              `Wallet recharge failed: userId=${userId}, reason=${failureReason}`,
+            );
           }
         } catch (error: any) {
           failureReason = error.message || 'Payment gateway error';
           savedTransaction.failureReason = failureReason;
           savedTransaction.status = WalletTransactionStatus.FAILED;
-          this.logger.error(`Wallet recharge error: userId=${userId}, error=${failureReason}`, error.stack);
+          this.logger.error(
+            `Wallet recharge error: userId=${userId}, error=${failureReason}`,
+            error.stack,
+          );
         }
       }
 
@@ -239,7 +261,10 @@ export class WalletService {
       };
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
-      this.logger.error(`Wallet recharge transaction error: userId=${userId}`, error.stack);
+      this.logger.error(
+        `Wallet recharge transaction error: userId=${userId}`,
+        error.stack,
+      );
       throw error;
     } finally {
       await queryRunner.release();
@@ -247,7 +272,9 @@ export class WalletService {
   }
 
   async deductWallet(userId: string, amount: number, bookingId: string) {
-    this.logger.log(`Deduct wallet: userId=${userId}, amount=${amount}, bookingId=${bookingId}`);
+    this.logger.log(
+      `Deduct wallet: userId=${userId}, amount=${amount}, bookingId=${bookingId}`,
+    );
 
     const wallet = await this.walletRepository.findOne({
       where: { userId },
@@ -259,7 +286,9 @@ export class WalletService {
 
     if (balance < deductAmount) {
       const errorMsg = 'Insufficient wallet balance';
-      this.logger.warn(`Wallet deduction failed: userId=${userId}, balance=${balance}, required=${deductAmount}`);
+      this.logger.warn(
+        `Wallet deduction failed: userId=${userId}, balance=${balance}, required=${deductAmount}`,
+      );
       throw new BadRequestException(errorMsg);
     }
 
@@ -290,7 +319,9 @@ export class WalletService {
 
       await queryRunner.commitTransaction();
 
-      this.logger.log(`Wallet deduction succeeded: userId=${userId}, amount=${deductAmount}, newBalance=${wallet.balance}`);
+      this.logger.log(
+        `Wallet deduction succeeded: userId=${userId}, amount=${deductAmount}, newBalance=${wallet.balance}`,
+      );
 
       return {
         success: true,
@@ -300,7 +331,10 @@ export class WalletService {
       };
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
-      this.logger.error(`Wallet deduction transaction error: userId=${userId}`, error.stack);
+      this.logger.error(
+        `Wallet deduction transaction error: userId=${userId}`,
+        error.stack,
+      );
       throw error;
     } finally {
       await queryRunner.release();

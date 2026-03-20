@@ -8,5 +8,3 @@ export class SubmitTripRequestDto {
   @Length(0, 500)
   note?: string;
 }
-
-

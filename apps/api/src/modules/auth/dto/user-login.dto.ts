@@ -14,5 +14,3 @@ export class UserLoginDto {
   @MinLength(6)
   password: string;
 }
-
-

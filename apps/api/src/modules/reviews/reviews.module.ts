@@ -12,5 +12,3 @@ import { Booking } from '../../database/entities/booking.entity';
   exports: [ReviewsService],
 })
 export class ReviewsModule {}
-
-

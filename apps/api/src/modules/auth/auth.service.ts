@@ -22,6 +22,8 @@ import { RegisterSendOtpDto } from './dto/register-send-otp.dto';
 import { RegisterVerifyOtpDto } from './dto/register-verify-otp.dto';
 import { UserLoginDto } from './dto/user-login.dto';
 import { CompleteRegistrationDto } from './dto/complete-registration.dto';
+import { ForgotPasswordSendOtpDto } from './dto/forgot-password-send-otp.dto';
+import { ForgotPasswordResetDto } from './dto/forgot-password-reset.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -48,7 +50,7 @@ export class AuthService {
     const normalizedPhone = this.normalizePhone(sendOtpDto.phone);
 
     // Read OTP config from Redis
-    const otpCfg = ((await this.redisService.get('config:otp')) as any) || {
+    const otpCfg = (await this.redisService.get('config:otp')) || {
       enabled: true,
       length: 6,
       expirySeconds: 300,
@@ -76,9 +78,7 @@ export class AuthService {
     const otp = this.generateOtp(otpCfg.length || 6);
 
     // Log OTP to console for development/testing
-    this.logger.log(
-      `📱 [OTP] Phone: ${normalizedPhone} | OTP Code: ${otp}`,
-    );
+    this.logger.log(`📱 [OTP] Phone: ${normalizedPhone} | OTP Code: ${otp}`);
     console.log(
       `\n🔐 ========================================\n📱 OTP Code for ${normalizedPhone}\n🔑 Code: ${otp}\n⏰ Expires in: ${otpCfg.expirySeconds || 300} seconds\n========================================\n`,
     );
@@ -123,7 +123,7 @@ export class AuthService {
     }
 
     // Read OTP config from Redis
-    const otpCfg = ((await this.redisService.get('config:otp')) as any) || {
+    const otpCfg = (await this.redisService.get('config:otp')) || {
       enabled: true,
       length: 6,
       expirySeconds: 300,
@@ -428,7 +428,10 @@ export class AuthService {
     };
   }
 
-  async updateLanguage(userId: string, language: string): Promise<{ message: string }> {
+  async updateLanguage(
+    userId: string,
+    language: string,
+  ): Promise<{ message: string }> {
     // Validate language
     if (!language || !['ar', 'en'].includes(language)) {
       throw new BadRequestException('Invalid language. Must be "ar" or "en"');
@@ -446,9 +449,10 @@ export class AuthService {
     await this.userRepository.save(user);
 
     return {
-      message: language === 'ar' 
-        ? 'تم تحديث اللغة بنجاح' 
-        : 'Language updated successfully'
+      message:
+        language === 'ar'
+          ? 'تم تحديث اللغة بنجاح'
+          : 'Language updated successfully',
     };
   }
 
@@ -623,6 +627,112 @@ export class AuthService {
         language: userWithWallet.language,
         wallet: userWithWallet.wallet || null,
       },
+    };
+  }
+
+  async forgotPasswordSendOtp(
+    dto: ForgotPasswordSendOtpDto,
+  ): Promise<{ success: boolean; message: string }> {
+    const language = dto.language ?? 'ar';
+    const lang: 'ar' | 'en' = language === 'en' ? 'en' : 'ar';
+    const normalizedPhone = this.normalizePhone(dto.phone);
+
+    const user = await this.findUserByDecryptedPhone(normalizedPhone);
+    if (!user || !user.passwordHash) {
+      throw new BadRequestException(
+        language === 'ar'
+          ? 'رقم الهاتف غير مسجل أو لا يوجد كلمة مرور'
+          : 'Phone number not registered or no password set',
+      );
+    }
+
+    const otpCfg = (await this.redisService.get('config:otp')) || {
+      enabled: true,
+      length: 6,
+      expirySeconds: 300,
+      rateTtlSeconds: 300,
+      rateMaxAttempts: 3,
+    };
+    if (otpCfg.enabled === false) {
+      throw new BadRequestException('OTP is disabled by configuration');
+    }
+
+    const rateLimitKey = `otp_reset_rate_phone:${normalizedPhone}`;
+    const attempts = await this.redisService.incrementRateLimit(
+      rateLimitKey,
+      Number(otpCfg.rateTtlSeconds) || 300,
+    );
+    if (attempts > Number(otpCfg.rateMaxAttempts || 3)) {
+      throw new BadRequestException(
+        language === 'ar'
+          ? 'طلبات كثيرة. حاول لاحقاً.'
+          : 'Too many requests. Please try again later.',
+      );
+    }
+
+    const otp = this.generateOtp(otpCfg.length || 6);
+    this.logger.log(
+      `📱 [RESET PASSWORD OTP] Phone: ${normalizedPhone} | OTP: ${otp}`,
+    );
+    console.log(
+      `\n🔐 [RESET PASSWORD] ${normalizedPhone} → OTP: ${otp}\n`,
+    );
+
+    await this.redisService.setResetOTP(
+      normalizedPhone,
+      otp,
+      Number(otpCfg.expirySeconds) || 300,
+    );
+
+    await this.notifications.enqueue({
+      type: 'OTP',
+      to: { phone: normalizedPhone },
+      data: { otp },
+      lang,
+      channels: ['whatsapp'],
+    });
+
+    const message =
+      language === 'ar'
+        ? 'تم إرسال رمز التحقق لإعادة تعيين كلمة المرور عبر واتساب'
+        : 'Reset password OTP sent via WhatsApp';
+
+    return { success: true, message };
+  }
+
+  async forgotPasswordReset(dto: ForgotPasswordResetDto): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const normalizedPhone = this.normalizePhone(dto.phone);
+    const normalizedOtp = this.normalizeOtp(dto.otp);
+
+    const storedOtp = await this.redisService.getResetOTP(normalizedPhone);
+    if (!storedOtp || storedOtp !== normalizedOtp) {
+      throw new UnauthorizedException(
+        'Invalid or expired OTP. Please request a new code.',
+      );
+    }
+
+    const user = await this.findUserByDecryptedPhone(normalizedPhone);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 12);
+    user.passwordHash = passwordHash;
+    await this.userRepository.save(user);
+
+    await this.redisService.deleteResetOTP(normalizedPhone);
+
+    this.logger.log(`Password reset successfully for user ${user.id}`);
+
+    return {
+      success: true,
+      message:
+        user.language === 'en'
+          ? 'Password reset successfully. You can now log in.'
+          : 'تم إعادة تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.',
     };
   }
 

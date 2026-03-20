@@ -44,7 +44,9 @@ export class AdminConfigService {
   }
 
   async updateSmsConfig(dto: UpdateSmsConfigDto): Promise<SmsConfig> {
-    const current = ((await this.redis.get(this.smsKey)) as SmsConfig | null) || {
+    const current = ((await this.redis.get(
+      this.smsKey,
+    )) as SmsConfig | null) || {
       enabled: false,
       provider: 'whatsapp',
     };
@@ -60,14 +62,17 @@ export class AdminConfigService {
     if (dto.whatsappPhoneNumberId !== undefined)
       next.whatsappPhoneNumberId = dto.whatsappPhoneNumberId;
     if (dto.whatsappAccessToken)
-      next.whatsappAccessToken = this.encryption.encrypt(dto.whatsappAccessToken);
+      next.whatsappAccessToken = this.encryption.encrypt(
+        dto.whatsappAccessToken,
+      );
 
     await this.redis.set(this.smsKey, next);
     return this.getSmsConfig(true);
   }
 
   async testSms(to: string, message: string): Promise<{ success: boolean }> {
-    if (!to || !message) throw new BadRequestException('to and message required');
+    if (!to || !message)
+      throw new BadRequestException('to and message required');
     // Use notifications pipeline to send test WhatsApp OTP
     await this.notifications.enqueue({
       type: 'OTP',
@@ -106,5 +111,3 @@ export class AdminConfigService {
     return next;
   }
 }
-
-

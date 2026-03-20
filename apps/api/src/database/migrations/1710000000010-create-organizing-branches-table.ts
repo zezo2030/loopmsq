@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateOrganizingBranchesTable1710000000010 implements MigrationInterface {
+export class CreateOrganizingBranchesTable1710000000010
+  implements MigrationInterface
+{
   name = 'CreateOrganizingBranchesTable1710000000010';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -55,8 +57,3 @@ export class CreateOrganizingBranchesTable1710000000010 implements MigrationInte
     await queryRunner.dropTable('organizing_branches');
   }
 }
-
-
-
-
-

@@ -8,7 +8,14 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, LessThanOrEqual, MoreThanOrEqual, IsNull, Between } from 'typeorm';
+import {
+  Repository,
+  DataSource,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  IsNull,
+  Between,
+} from 'typeorm';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
@@ -64,11 +71,7 @@ export class BookingsService {
     const millis = start.getUTCMilliseconds();
     const minutes = start.getUTCMinutes();
 
-    if (
-      seconds !== 0 ||
-      millis !== 0 ||
-      minutes % this.slotMinutes !== 0
-    ) {
+    if (seconds !== 0 || millis !== 0 || minutes % this.slotMinutes !== 0) {
       throw new BadRequestException(
         `Start time must align with ${this.slotMinutes}-minute slots (e.g. 17:00, 18:00).`,
       );
@@ -86,7 +89,7 @@ export class BookingsService {
   }> {
     try {
       this.logger.log(`Getting quote for branch: ${quoteDto.branchId}`);
-      
+
       const {
         branchId,
         startTime,
@@ -95,7 +98,7 @@ export class BookingsService {
         addOns: rawAddOns,
         couponCode,
       } = quoteDto;
-      
+
       // Ensure addOns is always an array (handle null/undefined)
       const addOns = Array.isArray(rawAddOns) ? rawAddOns : [];
 
@@ -122,64 +125,26 @@ export class BookingsService {
         },
         timestamp: Date.now(),
       };
-      fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(logData),
-      }).catch(() => {});
-      // #endregion
-
-      // Prevent quoting in the past
-      if (requestedStart.getTime() <= now.getTime()) {
-        // #region agent log
-        const logData2 = {
-          sessionId: 'debug-session',
-          runId: 'run1',
-          hypothesisId: 'F',
-          location: 'bookings.service.ts:106',
-          message: 'Server validation failed - time in past',
-          data: {
-            startTimeString: startTime,
-            nowISO: now.toISOString(),
-            requestedStartISO: requestedStart.toISOString(),
-            nowTimeMs: nowTime,
-            requestedTimeMs: requestedTime,
-            timeDiffMs: timeDiffMs,
-          },
-          timestamp: Date.now(),
-        };
-        fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
+      fetch(
+        'http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0',
+        {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(logData2),
-        }).catch(() => {});
-        // #endregion
-        throw new BadRequestException('Cannot book in the past');
-      }
+          body: JSON.stringify(logData),
+        },
+      ).catch(() => {});
+      // #endregion
 
-      this.ensureSlotAlignment(requestedStart);
+      // في النظام الجديد لا نعتمد على تاريخ/وقت محدد للحجز نفسه،
+      // لذا لا نمنع الاقتباس في الماضي ولا نفرض محاذاة للسلوْت.
 
       // Find branch
       const branch = await this.contentService.findBranchById(branchId);
       this.logger.log(`Found branch: ${branch.name_en}`);
 
       if (!branch.priceConfig) {
-        throw new BadRequestException('Branch does not have pricing configuration');
-      }
-
-      // Check availability
-      this.logger.log(`Checking availability for branch: ${branch.id}`);
-      const isAvailable = await this.contentService.checkBranchAvailability(
-        branch.id,
-        new Date(startTime),
-        durationHours,
-        persons,
-      );
-      this.logger.log(`Branch availability: ${isAvailable}`);
-
-      if (!isAvailable) {
-        throw new ConflictException(
-          'Selected branch is not available for the specified time',
+        throw new BadRequestException(
+          'Branch does not have pricing configuration',
         );
       }
 
@@ -194,11 +159,13 @@ export class BookingsService {
       this.logger.log(`Pricing calculated: ${JSON.stringify(pricing)}`);
 
       // Calculate add-ons cost (lookup real prices from content service)
-      const availableAddOns = await this.contentService.getBranchAddOns(branch.id);
-      const addOnIdToPrice = new Map(availableAddOns.map((a) => [a.id, a.price]));
+      const availableAddOns = await this.contentService.getBranchAddOns(
+        branch.id,
+      );
+      const addOnById = new Map(availableAddOns.map((a) => [a.id, a]));
 
       const addOnsCost = addOns.reduce((total, addOn) => {
-        const addOnPrice = addOnIdToPrice.get(addOn.id) ?? 0;
+        const addOnPrice = addOnById.get(addOn.id)?.price ?? 0;
         return total + addOnPrice * addOn.quantity;
       }, 0);
 
@@ -224,23 +191,29 @@ export class BookingsService {
         this.logger.log(`Discount applied: ${discount}`);
       }
 
-      const totalPrice = Math.max(0, subtotalBeforeDiscounts - offerDiscount - discount);
+      const totalPrice = Math.max(
+        0,
+        subtotalBeforeDiscounts - offerDiscount - discount,
+      );
 
       const result = {
         branchId: branch.id,
         branchName: branch.name_en,
         pricing,
         addOns: addOns.map((addOn) => {
-          const price = addOnIdToPrice.get(addOn.id) ?? 0;
+          const resolvedAddOn = addOnById.get(addOn.id);
+          const price = resolvedAddOn?.price ?? 0;
           return {
             ...addOn,
+            name: resolvedAddOn?.name,
             price,
             total: price * addOn.quantity,
           };
         }),
         discount: Math.round((offerDiscount + discount) * 100) / 100,
         totalPrice: Math.round(totalPrice * 100) / 100,
-        available: isAvailable,
+        // في النظام الجديد لا نقيّد بتوفر يوم/وقت معيّن، لذلك نُبقي الحقل متاحاً دائماً
+        available: true,
       };
 
       this.logger.log(`Quote result: ${JSON.stringify(result)}`);
@@ -268,15 +241,10 @@ export class BookingsService {
 
     this.logger.log(`Creating booking for branchId: ${branchId}`);
 
-    // Prevent booking in the past
-    const nowForCreate = new Date();
-    const startForCreate = new Date(startTime);
-    if (startForCreate.getTime() <= nowForCreate.getTime()) {
-      throw new BadRequestException('Cannot book in the past');
-    }
-    this.ensureSlotAlignment(startForCreate);
+    // في النظام الجديد لا نعتمد على تاريخ/وقت ثابت للحجز نفسه،
+    // لذلك لا نمنع الحجز في الماضي ولا نفرض محاذاة للسلوْت.
 
-    // Get quote first to validate and calculate pricing
+    // Get quote first to validate and calculate pricing using the new pricing model
     const quote = await this.getQuote({
       branchId,
       startTime,
@@ -299,6 +267,13 @@ export class BookingsService {
 
     try {
       // Create booking
+      const resolvedAddOns = (quote.addOns ?? []).map((addOn) => ({
+        id: addOn.id,
+        name: addOn.name,
+        price: addOn.price,
+        quantity: addOn.quantity,
+      }));
+
       const booking = queryRunner.manager.create(Booking, {
         userId,
         branchId,
@@ -307,7 +282,7 @@ export class BookingsService {
         persons,
         totalPrice: quote.totalPrice,
         status: BookingStatus.PENDING,
-        addOns,
+        addOns: resolvedAddOns,
         couponCode,
         discountAmount: quote.discount,
         specialRequests,
@@ -316,7 +291,9 @@ export class BookingsService {
 
       this.logger.log(`Booking created with branchId: ${booking.branchId}`);
       const savedBooking = await queryRunner.manager.save(booking);
-      this.logger.log(`Booking saved with ID: ${savedBooking.id}, branchId: ${savedBooking.branchId}`);
+      this.logger.log(
+        `Booking saved with ID: ${savedBooking.id}, branchId: ${savedBooking.branchId}`,
+      );
 
       await queryRunner.commitTransaction();
 
@@ -325,27 +302,32 @@ export class BookingsService {
       // Clear cache
       await this.redisService.del(`user:${userId}:bookings`);
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run1',
-          hypothesisId: 'H1',
-          location: 'bookings.service.ts:createBooking',
-          message: 'Cleared bookings cache after creation',
-          data: {
-            cacheKeyCleared: `user:${userId}:bookings`,
-            userId,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
+      fetch(
+        'http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'run1',
+            hypothesisId: 'H1',
+            location: 'bookings.service.ts:createBooking',
+            message: 'Cleared bookings cache after creation',
+            data: {
+              cacheKeyCleared: `user:${userId}:bookings`,
+              userId,
+            },
+            timestamp: Date.now(),
+          }),
+        },
+      ).catch(() => {});
       // #endregion
 
       // Schedule reminders: 24h and 2h before start, and at end time
       const startDate = new Date(startTime);
-      const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
+      const endDate = new Date(
+        startDate.getTime() + durationHours * 60 * 60 * 1000,
+      );
       const now = new Date();
       const ms24h = startDate.getTime() - now.getTime() - 24 * 60 * 60 * 1000;
       const ms2h = startDate.getTime() - now.getTime() - 2 * 60 * 60 * 1000;
@@ -439,26 +421,29 @@ export class BookingsService {
     const cached = await this.redisService.get(cacheKey);
     if (cached) {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run1',
-          hypothesisId: 'H1',
-          location: 'bookings.service.ts:findUserBookings:cache-hit',
-          message: 'Returning cached bookings',
-          data: {
-            cacheKey,
-            page,
-            limit,
-            userId,
-            total: cached?.total ?? null,
-            count: cached?.bookings?.length ?? null,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
+      fetch(
+        'http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'run1',
+            hypothesisId: 'H1',
+            location: 'bookings.service.ts:findUserBookings:cache-hit',
+            message: 'Returning cached bookings',
+            data: {
+              cacheKey,
+              page,
+              limit,
+              userId,
+              total: cached?.total ?? null,
+              count: cached?.bookings?.length ?? null,
+            },
+            timestamp: Date.now(),
+          }),
+        },
+      ).catch(() => {});
       // #endregion
       return cached;
     }
@@ -471,11 +456,14 @@ export class BookingsService {
       take: limit,
     });
 
-    const statusCounts = bookings.reduce((acc, b) => {
-      const s = (b as any)?.status ?? 'unknown';
-      acc[s] = (acc[s] ?? 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const statusCounts = bookings.reduce(
+      (acc, b) => {
+        const s = (b as any)?.status ?? 'unknown';
+        acc[s] = (acc[s] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0', {
@@ -484,9 +472,9 @@ export class BookingsService {
       body: JSON.stringify({
         sessionId: 'debug-session',
         runId: 'run1',
-          hypothesisId: 'H2',
-          location: 'bookings.service.ts:findUserBookings:db',
-          message: 'Fetched bookings from DB and caching (time/status sample)',
+        hypothesisId: 'H2',
+        location: 'bookings.service.ts:findUserBookings:db',
+        message: 'Fetched bookings from DB and caching (time/status sample)',
         data: {
           cacheKey,
           page,
@@ -494,9 +482,11 @@ export class BookingsService {
           userId,
           total,
           count: bookings.length,
-            sampleStatus: bookings[0]?.status ?? null,
-            sampleStartUTC: bookings[0]?.startTime ?? null,
-            sampleStartLocal: bookings[0]?.startTime ? new Date(bookings[0].startTime).toISOString() : null,
+          sampleStatus: bookings[0]?.status ?? null,
+          sampleStartUTC: bookings[0]?.startTime ?? null,
+          sampleStartLocal: bookings[0]?.startTime
+            ? new Date(bookings[0].startTime).toISOString()
+            : null,
         },
         timestamp: Date.now(),
       }),
@@ -558,7 +548,9 @@ export class BookingsService {
       where.status = status as any;
     }
 
-    this.logger.log(`Finding bookings for branch ${branchId} with filters: ${JSON.stringify(where)}`);
+    this.logger.log(
+      `Finding bookings for branch ${branchId} with filters: ${JSON.stringify(where)}`,
+    );
 
     const [bookings, total] = await this.bookingRepository.findAndCount({
       where,
@@ -569,19 +561,28 @@ export class BookingsService {
     } as any);
 
     // Log bookings with missing branch data for debugging and try to fix them
-    const bookingsWithoutBranch = bookings.filter(b => !b.branch);
+    const bookingsWithoutBranch = bookings.filter((b) => !b.branch);
     if (bookingsWithoutBranch.length > 0) {
-      this.logger.warn(`Found ${bookingsWithoutBranch.length} bookings without branch data in branch ${branchId}: ${bookingsWithoutBranch.map(b => b.id).join(', ')}`);
-      
+      this.logger.warn(
+        `Found ${bookingsWithoutBranch.length} bookings without branch data in branch ${branchId}: ${bookingsWithoutBranch.map((b) => b.id).join(', ')}`,
+      );
+
       // Try to load branch data manually for each booking
       for (const booking of bookingsWithoutBranch) {
         if (booking.branchId) {
           try {
-            const branch = await this.contentService.findBranchById(booking.branchId);
+            const branch = await this.contentService.findBranchById(
+              booking.branchId,
+            );
             booking.branch = branch;
-            this.logger.log(`Successfully loaded branch manually for booking ${booking.id}`);
+            this.logger.log(
+              `Successfully loaded branch manually for booking ${booking.id}`,
+            );
           } catch (error) {
-            this.logger.error(`Failed to load branch ${booking.branchId} for booking ${booking.id}`, error);
+            this.logger.error(
+              `Failed to load branch ${booking.branchId} for booking ${booking.id}`,
+              error,
+            );
           }
         }
       }
@@ -594,13 +595,24 @@ export class BookingsService {
   async findAllBookings(
     page: number = 1,
     limit: number = 10,
-    filters?: { status?: string; branchId?: string; from?: string; to?: string },
+    filters?: {
+      status?: string;
+      branchId?: string;
+      from?: string;
+      to?: string;
+    },
   ): Promise<{
     bookings: Booking[];
     total: number;
     page: number;
     totalPages: number;
-    stats: { total: number; confirmed: number; pending: number; cancelled: number; totalRevenue: number };
+    stats: {
+      total: number;
+      confirmed: number;
+      pending: number;
+      cancelled: number;
+      totalRevenue: number;
+    };
   }> {
     const where: any = {};
     if (filters?.status) where.status = filters.status as any;
@@ -620,19 +632,28 @@ export class BookingsService {
     } as any);
 
     // Log bookings with missing branch data for debugging and try to fix them
-    const bookingsWithoutBranch = bookings.filter(b => !b.branch);
+    const bookingsWithoutBranch = bookings.filter((b) => !b.branch);
     if (bookingsWithoutBranch.length > 0) {
-      this.logger.warn(`Found ${bookingsWithoutBranch.length} bookings without branch data: ${bookingsWithoutBranch.map(b => b.id).join(', ')}`);
-      
+      this.logger.warn(
+        `Found ${bookingsWithoutBranch.length} bookings without branch data: ${bookingsWithoutBranch.map((b) => b.id).join(', ')}`,
+      );
+
       // Try to load branch data manually for each booking
       for (const booking of bookingsWithoutBranch) {
         if (booking.branchId) {
           try {
-            const branch = await this.contentService.findBranchById(booking.branchId);
+            const branch = await this.contentService.findBranchById(
+              booking.branchId,
+            );
             booking.branch = branch;
-            this.logger.log(`Successfully loaded branch manually for booking ${booking.id}`);
+            this.logger.log(
+              `Successfully loaded branch manually for booking ${booking.id}`,
+            );
           } catch (error) {
-            this.logger.error(`Failed to load branch ${booking.branchId} for booking ${booking.id}`, error);
+            this.logger.error(
+              `Failed to load branch ${booking.branchId} for booking ${booking.id}`,
+              error,
+            );
           }
         }
       }
@@ -640,15 +661,23 @@ export class BookingsService {
 
     // Stats
     const [confirmed, pending, cancelled] = await Promise.all([
-      this.bookingRepository.count({ where: { ...where, status: 'confirmed' as any } }),
-      this.bookingRepository.count({ where: { ...where, status: 'pending' as any } }),
-      this.bookingRepository.count({ where: { ...where, status: 'cancelled' as any } }),
+      this.bookingRepository.count({
+        where: { ...where, status: 'confirmed' as any },
+      }),
+      this.bookingRepository.count({
+        where: { ...where, status: 'pending' as any },
+      }),
+      this.bookingRepository.count({
+        where: { ...where, status: 'cancelled' as any },
+      }),
     ]);
     const revenueRows = await this.bookingRepository.find({
       where: { ...where, status: 'confirmed' as any },
       select: ['totalPrice'] as any,
     } as any);
-    const totalRevenue = revenueRows.map((r: any) => Number(r.totalPrice || 0)).reduce((a: number, b: number) => a + b, 0);
+    const totalRevenue = revenueRows
+      .map((r: any) => Number(r.totalPrice || 0))
+      .reduce((a: number, b: number) => a + b, 0);
 
     return {
       bookings,
@@ -659,7 +688,12 @@ export class BookingsService {
     };
   }
 
-  async findBookingById(id: string, userIdOrRequesterId?: string, requesterBranchId?: string, isRequesterBranchManager?: boolean): Promise<Booking> {
+  async findBookingById(
+    id: string,
+    userIdOrRequesterId?: string,
+    requesterBranchId?: string,
+    isRequesterBranchManager?: boolean,
+  ): Promise<Booking> {
     const where: any = { id };
     if (userIdOrRequesterId && !isRequesterBranchManager) {
       // End-user scope by userId
@@ -670,7 +704,9 @@ export class BookingsService {
       relations: ['user', 'branch', 'tickets', 'payments'],
     });
 
-    this.logger.log(`Found booking ${id}: branchId=${booking?.branchId}, userId=${booking?.userId}, status=${booking?.status}`);
+    this.logger.log(
+      `Found booking ${id}: branchId=${booking?.branchId}, userId=${booking?.userId}, status=${booking?.status}`,
+    );
 
     if (!booking) {
       throw new NotFoundException('Booking not found');
@@ -682,7 +718,11 @@ export class BookingsService {
       throw new NotFoundException('Booking not found');
     }
 
-    if (isRequesterBranchManager && requesterBranchId && booking.branchId !== requesterBranchId) {
+    if (
+      isRequesterBranchManager &&
+      requesterBranchId &&
+      booking.branchId !== requesterBranchId
+    ) {
       // Hide existence outside branch
       throw new NotFoundException('Booking not found');
     }
@@ -696,7 +736,12 @@ export class BookingsService {
     requesterBranchId?: string,
     isRequesterBranchManager?: boolean,
   ): Promise<Ticket[]> {
-    const booking = await this.findBookingById(bookingId, userIdOrRequesterId, requesterBranchId, isRequesterBranchManager);
+    const booking = await this.findBookingById(
+      bookingId,
+      userIdOrRequesterId,
+      requesterBranchId,
+      isRequesterBranchManager,
+    );
 
     return this.ticketRepository.find({
       where: { bookingId: booking.id },
@@ -717,7 +762,8 @@ export class BookingsService {
 
     // Resolve ephemeral QR token mapping from Redis if exists, else hash directly
     const mappedHash = await this.redisService.get(`share:qr:${qrToken}`);
-    const qrTokenHash = mappedHash || this.qrCodeService.generateQRTokenHash(qrToken);
+    const qrTokenHash =
+      mappedHash || this.qrCodeService.generateQRTokenHash(qrToken);
     const ticket = await this.ticketRepository.findOne({
       where: { qrTokenHash },
       relations: ['booking', 'booking.branch', 'booking.user'],
@@ -763,14 +809,23 @@ export class BookingsService {
       };
     }
 
-    // Check if ticket is valid for current time
+    // Validity window in the new system:
+    // - The ticket becomes valid from the FIRST scan (validFrom = now)
+    // - It remains valid for booking.durationHours from that moment
     const now = new Date();
-    const bookingStart = new Date(ticket.booking.startTime);
-    const bookingEnd = new Date(
-      bookingStart.getTime() + ticket.booking.durationHours * 60 * 60 * 1000,
-    );
 
-    if (now < bookingStart || now > bookingEnd) {
+    if (!ticket.validFrom || !ticket.validUntil) {
+      const bookingDurationMs =
+        (ticket.booking?.durationHours ?? 0) * 60 * 60 * 1000;
+      const effectiveDurationMs =
+        bookingDurationMs > 0 ? bookingDurationMs : 60 * 60 * 1000; // fallback 1h
+
+      ticket.validFrom = now;
+      ticket.validUntil = new Date(now.getTime() + effectiveDurationMs);
+      await this.ticketRepository.save(ticket);
+    }
+
+    if (now < ticket.validFrom || now > ticket.validUntil) {
       return {
         success: false,
         ticket,
@@ -821,20 +876,24 @@ export class BookingsService {
         where,
         relations: ['payments'],
       });
-      
+
       if (!booking) {
         this.logger.warn(`Booking ${bookingId} not found for hard delete`);
         throw new NotFoundException('Booking not found');
       }
-      
+
       // If branchId is undefined, booking may already be partially deleted
       if (!booking.branchId) {
-        this.logger.warn(`Booking ${bookingId} has no branchId - may already be deleted`);
+        this.logger.warn(
+          `Booking ${bookingId} has no branchId - may already be deleted`,
+        );
         // Still proceed with deletion to clean up any remaining data
       }
     }
 
-    this.logger.log(`Hard deleting booking ${bookingId} with ${booking.payments?.length || 0} payments`);
+    this.logger.log(
+      `Hard deleting booking ${bookingId} with ${booking.payments?.length || 0} payments`,
+    );
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -847,7 +906,7 @@ export class BookingsService {
         .from(Ticket)
         .where('bookingId = :bookingId', { bookingId: booking.id })
         .execute();
-      
+
       this.logger.log(`Deleted ${ticketsResult.affected || 0} tickets`);
 
       // Then, delete all related payments
@@ -857,7 +916,7 @@ export class BookingsService {
         .from(Payment)
         .where('bookingId = :bookingId', { bookingId: booking.id })
         .execute();
-      
+
       this.logger.log(`Deleted ${paymentsResult.affected || 0} payments`);
 
       // Finally, delete the booking itself
@@ -875,43 +934,60 @@ export class BookingsService {
       }
 
       await queryRunner.commitTransaction();
-      
-      this.logger.log(`Successfully committed deletion of booking ${bookingId}`);
+
+      this.logger.log(
+        `Successfully committed deletion of booking ${bookingId}`,
+      );
 
       // Verify deletion by trying to find the booking
       const verifyBooking = await this.bookingRepository.findOne({
         where: { id: booking.id },
       });
-      
+
       if (verifyBooking) {
-        this.logger.error(`Booking ${bookingId} still exists after deletion attempt!`);
-        throw new Error(`Failed to delete booking ${bookingId} - booking still exists in database`);
+        this.logger.error(
+          `Booking ${bookingId} still exists after deletion attempt!`,
+        );
+        throw new Error(
+          `Failed to delete booking ${bookingId} - booking still exists in database`,
+        );
       }
-      
-      this.logger.log(`Verified: Booking ${bookingId} successfully deleted from database`);
+
+      this.logger.log(
+        `Verified: Booking ${bookingId} successfully deleted from database`,
+      );
 
       // Cancel scheduled notifications and clear caches
       try {
         await this.notifications.cancelScheduledForBooking(booking.id);
       } catch (e) {
-        this.logger.warn(`Failed to cancel notifications for booking ${booking.id}: ${e}`);
+        this.logger.warn(
+          `Failed to cancel notifications for booking ${booking.id}: ${e}`,
+        );
       }
-      
+
       if (booking.userId) {
         try {
           await this.redisService.del(`user:${booking.userId}:bookings`);
         } catch (e) {
-          this.logger.warn(`Failed to clear cache for user ${booking.userId}: ${e}`);
+          this.logger.warn(
+            `Failed to clear cache for user ${booking.userId}: ${e}`,
+          );
         }
       }
 
       // Realtime notify deletion (optional: using updated event)
       try {
-        this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: 'DELETED' as any });
+        this.realtime?.emitBookingUpdated(booking.id, {
+          bookingId: booking.id,
+          status: 'DELETED' as any,
+        });
       } catch (e) {
-        this.logger.warn(`Failed to emit realtime event for booking ${booking.id}: ${e}`);
+        this.logger.warn(
+          `Failed to emit realtime event for booking ${booking.id}: ${e}`,
+        );
       }
-      
+
       this.logger.log(`Successfully hard deleted booking ${bookingId}`);
       return { success: true };
     } catch (e) {
@@ -930,7 +1006,8 @@ export class BookingsService {
     // Accept ephemeral share tokens (resolve to qrTokenHash if present)
     const redis = this.redisService.getClient();
     const mappedHash = await redis.get(`share:qr:${token}`);
-    const qrTokenHash = mappedHash || this.qrCodeService.generateQRTokenHash(token);
+    const qrTokenHash =
+      mappedHash || this.qrCodeService.generateQRTokenHash(token);
     const ticket = await this.ticketRepository.findOne({
       where: { qrTokenHash },
       relations: ['booking', 'booking.branch', 'booking.user'],
@@ -971,7 +1048,7 @@ export class BookingsService {
     }>;
   }> {
     const now = new Date();
-    
+
     // Get all scans for this staff
     const allScans = await this.ticketRepository.find({
       where: { staffId },
@@ -980,11 +1057,25 @@ export class BookingsService {
     } as any);
 
     // Filter scans that have been scanned (scannedAt is not null)
-    const scannedTickets = allScans.filter(ticket => ticket.scannedAt !== null);
+    const scannedTickets = allScans.filter(
+      (ticket) => ticket.scannedAt !== null,
+    );
 
     // Calculate today's date boundaries
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const todayEnd = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
 
     // Calculate week start (7 days ago)
     const weekStart = new Date(now);
@@ -995,27 +1086,30 @@ export class BookingsService {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Count scans by period
-    const todayScans = scannedTickets.filter(ticket => {
-      const scanDate = new Date(ticket.scannedAt!);
+    const todayScans = scannedTickets.filter((ticket) => {
+      const scanDate = new Date(ticket.scannedAt);
       return scanDate >= todayStart && scanDate <= todayEnd;
     });
 
-    const weekScans = scannedTickets.filter(ticket => {
-      const scanDate = new Date(ticket.scannedAt!);
+    const weekScans = scannedTickets.filter((ticket) => {
+      const scanDate = new Date(ticket.scannedAt);
       return scanDate >= weekStart;
     });
 
-    const monthScans = scannedTickets.filter(ticket => {
-      const scanDate = new Date(ticket.scannedAt!);
+    const monthScans = scannedTickets.filter((ticket) => {
+      const scanDate = new Date(ticket.scannedAt);
       return scanDate >= monthStart;
     });
 
     // Get recent scans (last 10)
-    const recentScans = scannedTickets.slice(0, 10).map(ticket => ({
+    const recentScans = scannedTickets.slice(0, 10).map((ticket) => ({
       id: ticket.id,
-      scannedAt: ticket.scannedAt!,
+      scannedAt: ticket.scannedAt,
       bookingId: ticket.bookingId,
-      branch: ticket.booking?.branch?.name_ar || ticket.booking?.branch?.name_en || undefined,
+      branch:
+        ticket.booking?.branch?.name_ar ||
+        ticket.booking?.branch?.name_en ||
+        undefined,
       holderName: ticket.holderName || undefined,
     }));
 
@@ -1038,7 +1132,12 @@ export class BookingsService {
     // Try to find booking, handle case where branchId might be undefined
     let booking: Booking;
     try {
-      booking = await this.findBookingById(bookingId, userIdOrRequesterId, requesterBranchId, isRequesterBranchManager);
+      booking = await this.findBookingById(
+        bookingId,
+        userIdOrRequesterId,
+        requesterBranchId,
+        isRequesterBranchManager,
+      );
     } catch (error) {
       // If booking not found via findBookingById (e.g., branchId undefined), try direct query
       const where: any = { id: bookingId };
@@ -1049,18 +1148,20 @@ export class BookingsService {
         where,
         relations: ['payments'],
       });
-      
+
       if (!foundBooking) {
         this.logger.warn(`Booking ${bookingId} not found for cancellation`);
         throw new NotFoundException('Booking not found');
       }
-      
+
       // If branchId is undefined, booking may already be partially deleted
       if (!foundBooking.branchId) {
-        this.logger.warn(`Booking ${bookingId} has no branchId - treating as already deleted`);
+        this.logger.warn(
+          `Booking ${bookingId} has no branchId - treating as already deleted`,
+        );
         throw new NotFoundException('Booking not found');
       }
-      
+
       booking = foundBooking;
     }
 
@@ -1075,23 +1176,31 @@ export class BookingsService {
     // Check if booking has any completed payment
     // Ensure payments array exists and check for completed status
     const payments = booking.payments || [];
-    const hasCompletedPayment = payments.length > 0 && 
-      payments.some(
-        (payment) => payment.status === PaymentStatus.COMPLETED,
-      );
+    const hasCompletedPayment =
+      payments.length > 0 &&
+      payments.some((payment) => payment.status === PaymentStatus.COMPLETED);
 
-    this.logger.log(`Cancel booking ${bookingId}: payments count=${payments.length}, hasCompleted=${hasCompletedPayment}`);
+    this.logger.log(
+      `Cancel booking ${bookingId}: payments count=${payments.length}, hasCompleted=${hasCompletedPayment}`,
+    );
 
     // If no completed payment, delete the booking completely (hard delete)
     if (!hasCompletedPayment) {
-      this.logger.log(`Deleting unpaid booking: ${bookingId} by user ${userIdOrRequesterId} (no completed payment found)`);
-      
+      this.logger.log(
+        `Deleting unpaid booking: ${bookingId} by user ${userIdOrRequesterId} (no completed payment found)`,
+      );
+
       // Save booking info before deletion for response
       const bookingInfo = { ...booking };
-      
+
       // Delete the booking
-      await this.deleteBookingHard(bookingId, userIdOrRequesterId, requesterBranchId, isRequesterBranchManager);
-      
+      await this.deleteBookingHard(
+        bookingId,
+        userIdOrRequesterId,
+        requesterBranchId,
+        isRequesterBranchManager,
+      );
+
       // Return deleted booking info with cancelled status for API compatibility
       return {
         ...bookingInfo,
@@ -1141,7 +1250,9 @@ export class BookingsService {
 
       await queryRunner.commitTransaction();
 
-      this.logger.log(`Booking cancelled: ${bookingId} by user ${userIdOrRequesterId}`);
+      this.logger.log(
+        `Booking cancelled: ${bookingId} by user ${userIdOrRequesterId}`,
+      );
 
       // Clear cache
       await this.redisService.del(`user:${userIdOrRequesterId}:bookings`);
@@ -1158,7 +1269,10 @@ export class BookingsService {
       });
 
       // realtime
-      this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: booking.status });
+      this.realtime?.emitBookingUpdated(booking.id, {
+        bookingId: booking.id,
+        status: booking.status,
+      });
       return booking;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1203,13 +1317,19 @@ export class BookingsService {
   }
 
   async issueTicketsForBooking(bookingId: string): Promise<Ticket[]> {
-    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    const booking = await this.bookingRepository.findOne({
+      where: { id: bookingId },
+    });
     if (!booking) throw new NotFoundException('Booking not found');
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const tickets = await this.generateTickets(queryRunner, booking, booking.persons);
+      const tickets = await this.generateTickets(
+        queryRunner,
+        booking,
+        booking.persons,
+      );
       await queryRunner.commitTransaction();
       return tickets;
     } catch (e) {
@@ -1227,10 +1347,14 @@ export class BookingsService {
     hallId?: string | null,
   ): Promise<number> {
     try {
-      const preview = await this.couponsService.preview(couponCode, totalAmount, {
-        branchId,
-        hallId: null, // No longer used
-      });
+      const preview = await this.couponsService.preview(
+        couponCode,
+        totalAmount,
+        {
+          branchId,
+          hallId: null, // No longer used
+        },
+      );
 
       if (!preview.valid) {
         this.logger.warn(
@@ -1260,33 +1384,45 @@ export class BookingsService {
       const offers = await this.offerRepository.find({
         where: [
           { branchId, isActive: true, startsAt: IsNull(), endsAt: IsNull() },
-          { branchId, isActive: true, startsAt: LessThanOrEqual(at), endsAt: IsNull() },
-          { branchId, isActive: true, startsAt: IsNull(), endsAt: MoreThanOrEqual(at) },
-          { branchId, isActive: true, startsAt: LessThanOrEqual(at), endsAt: MoreThanOrEqual(at) },
+          {
+            branchId,
+            isActive: true,
+            startsAt: LessThanOrEqual(at),
+            endsAt: IsNull(),
+          },
+          {
+            branchId,
+            isActive: true,
+            startsAt: IsNull(),
+            endsAt: MoreThanOrEqual(at),
+          },
+          {
+            branchId,
+            isActive: true,
+            startsAt: LessThanOrEqual(at),
+            endsAt: MoreThanOrEqual(at),
+          },
         ] as any,
         order: { createdAt: 'DESC' } as any,
       });
       let best = 0;
       for (const o of offers) {
-        const d = o.discountType === 'percentage'
-          ? (amount * Number(o.discountValue)) / 100
-          : Number(o.discountValue);
+        const d =
+          o.discountType === 'percentage'
+            ? (amount * Number(o.discountValue)) / 100
+            : Number(o.discountValue);
         if (d > best) best = d;
       }
       return Math.min(best, amount);
     } catch (e) {
-      this.logger.error('Failed to calculate offer discount', e as any);
+      this.logger.error('Failed to calculate offer discount', e);
       return 0;
     }
   }
 
   async getBookingPricing(bookingId: string): Promise<{
-    basePrice: number;
+    hourlyRate: number;
     hourlyPrice: number;
-    personsPrice: number;
-    pricePerPerson: number;
-    multiplier: number;
-    decorationPrice: number;
     totalPrice: number;
   }> {
     const booking = await this.bookingRepository.findOne({
@@ -1329,7 +1465,7 @@ export class BookingsService {
     // For branch managers: ensure target user is in the same branch (if they have a branch)
     // Note: Regular users might not have branchId, so we allow creating tickets for any user
     // but the booking will be created for the manager's branch
-    
+
     const startTime = new Date(dto.startTime);
     if (startTime.getTime() <= new Date().getTime()) {
       throw new BadRequestException('Cannot create ticket for past time');
@@ -1338,7 +1474,7 @@ export class BookingsService {
 
     // Use manager's branch ID
     const branchId = managerBranchId;
-    
+
     try {
       const branch = await this.contentService.findBranchById(branchId);
       if (branch.id !== managerBranchId) {

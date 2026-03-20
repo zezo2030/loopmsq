@@ -7,8 +7,6 @@ import {
   ParseUUIDPipe,
   Post,
   UseGuards,
-  Req,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -27,16 +25,11 @@ import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { WebhookEventDto } from './dto/webhook-event.dto';
 import { RefundDto } from './dto/refund.dto';
 import { ListPaymentsDto } from './dto/list-payments.dto';
-import { TapService } from '../../integrations/tap/tap.service';
-import type { Request } from 'express';
 
 @ApiTags('payments')
 @Controller('payments')
 export class PaymentsController {
-  constructor(
-    private readonly paymentsService: PaymentsService,
-    private readonly tapService: TapService,
-  ) {}
+  constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post('intent')
   @UseGuards(AuthGuard('jwt'))
@@ -66,12 +59,7 @@ export class PaymentsController {
   @Post('webhook')
   @ApiOperation({ summary: 'Payment gateway webhook (no auth)' })
   @ApiResponse({ status: 200, description: 'Webhook processed' })
-  async handleWebhook(@Body() dto: WebhookEventDto, @Req() req: Request) {
-    const signature = (req.headers['tap-signature'] || req.headers['x-tap-signature']) as string | undefined;
-    const rawBody: any = (req as any).body;
-    const raw = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : JSON.stringify(dto || {});
-    const ok = this.tapService.verifyWebhookSignature(raw, signature);
-    if (!ok) throw new UnauthorizedException('Invalid webhook signature');
+  async handleWebhook(@Body() dto: WebhookEventDto) {
     return this.paymentsService.handleWebhook(dto);
   }
 
@@ -91,7 +79,7 @@ export class PaymentsController {
     // Use intent:// scheme for Android and loopmsq:// for iOS
     const deepLinkUrl = `loopmsq://payment/success?id=${paymentId}`;
     const intentUrl = `intent://payment/success?id=${paymentId}#Intent;scheme=loopmsq;package=com.company.kinetic;end`;
-    
+
     return `
       <!DOCTYPE html>
       <html>
@@ -246,11 +234,7 @@ export class PaymentsController {
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get payment by ID (Admin only)' })
-  async getPaymentByIdAdmin(
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  async getPaymentByIdAdmin(@Param('id', ParseUUIDPipe) id: string) {
     return this.paymentsService.getPaymentByIdAdmin(id);
   }
 }
-
-

@@ -14,7 +14,12 @@ import { EncryptionService } from '../../utils/encryption.util';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([Wallet, WalletTransaction, LoyaltyTransaction, User]),
+    TypeOrmModule.forFeature([
+      Wallet,
+      WalletTransaction,
+      LoyaltyTransaction,
+      User,
+    ]),
     NotificationsModule,
   ],
   controllers: [WalletController],

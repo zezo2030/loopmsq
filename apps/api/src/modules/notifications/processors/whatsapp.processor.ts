@@ -7,31 +7,10 @@ export class WhatsAppProcessor {
   constructor(private readonly whatsappProvider: WhatsAppProvider) {}
 
   @Process('send')
-  async handleSend(job: Job<{ to: string; otp: string; lang: 'ar' | 'en' }>): Promise<void> {
+  async handleSend(
+    job: Job<{ to: string; otp: string; lang: 'ar' | 'en' }>,
+  ): Promise<void> {
     const { to, otp, lang } = job.data;
     await this.whatsappProvider.sendOTP(to, otp, lang);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

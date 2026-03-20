@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('event_packages')
 export class EventPackage {
@@ -50,7 +57,9 @@ export class EventPackage {
   isActive: boolean;
 
   @Column({ type: 'json', nullable: true })
-  items: { id?: string; name: string; price?: number; quantity?: number }[] | null;
+  items:
+    | { id?: string; name: string; price?: number; quantity?: number }[]
+    | null;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -58,5 +67,3 @@ export class EventPackage {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-

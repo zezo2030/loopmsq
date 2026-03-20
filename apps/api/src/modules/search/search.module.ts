@@ -12,5 +12,3 @@ import { Payment } from '../../database/entities/payment.entity';
   providers: [SearchService],
 })
 export class SearchModule {}
-
-

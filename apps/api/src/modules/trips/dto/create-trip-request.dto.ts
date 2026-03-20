@@ -1,5 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsDateString, IsEmail, IsEnum, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsEmail,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaymentMethod } from '../../../database/entities/payment.entity';
 
@@ -33,7 +46,9 @@ export class CreateTripRequestDto {
   @Length(2, 200)
   schoolName: string;
 
-  @ApiPropertyOptional({ description: 'Students count (optional, will be set from Excel file)' })
+  @ApiPropertyOptional({
+    description: 'Students count (optional, will be set from Excel file)',
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -97,5 +112,3 @@ export class CreateTripRequestDto {
   @IsEnum(PaymentMethod)
   paymentMethod?: PaymentMethod;
 }
-
-

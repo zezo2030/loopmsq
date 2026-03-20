@@ -10,5 +10,3 @@ export class WebhookEventDto {
   @IsObject()
   data: Record<string, any>;
 }
-
-

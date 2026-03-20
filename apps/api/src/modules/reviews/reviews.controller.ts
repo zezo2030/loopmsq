@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ReviewsService } from './reviews.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -13,7 +22,10 @@ export class ReviewsController {
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
-  async create(@CurrentUser() user: any, @Body() body: { bookingId: string; rating: number; comment?: string }) {
+  async create(
+    @CurrentUser() user: any,
+    @Body() body: { bookingId: string; rating: number; comment?: string },
+  ) {
     return this.reviews.create(user.id, body);
   }
 
@@ -24,5 +36,3 @@ export class ReviewsController {
     return this.reviews.get(user.id, bookingId);
   }
 }
-
-

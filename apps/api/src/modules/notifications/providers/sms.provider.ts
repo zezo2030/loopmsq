@@ -28,7 +28,12 @@ export class SmsProvider {
       const secretKey = this.configService.get<string>('DREAMS_SECRET_KEY');
       const sender = this.configService.get<string>('DREAMS_SENDER');
 
-      const hash = [apiUrl || '', user || '', secretKey || '', sender || ''].join('|');
+      const hash = [
+        apiUrl || '',
+        user || '',
+        secretKey || '',
+        sender || '',
+      ].join('|');
       if (this.lastConfigHash !== hash) {
         this.lastConfigHash = hash;
         if (apiUrl && user && secretKey) {
@@ -88,5 +93,3 @@ export class SmsProvider {
     this.logger.log(`[SMS] to=${to} body=${body}`);
   }
 }
-
-

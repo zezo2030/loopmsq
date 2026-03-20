@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+  Unique,
+} from 'typeorm';
 
 @Entity('favorites')
 @Unique('uniq_user_entity', ['userId', 'entityType', 'entityId'])
@@ -19,5 +26,3 @@ export class Favorite {
   @CreateDateColumn()
   createdAt: Date;
 }
-
-

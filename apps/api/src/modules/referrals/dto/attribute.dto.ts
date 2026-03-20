@@ -6,5 +6,3 @@ export class AttributeReferralDto {
   @IsString()
   code: string;
 }
-
-

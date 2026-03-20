@@ -50,4 +50,3 @@ export class CreateFreeTicketDto {
   @IsString()
   notes?: string;
 }
-

@@ -54,16 +54,19 @@ export class SampleDataSeeder implements OnModuleInit {
         amenities: ['مواقف سيارات', 'مطعم', 'صالة انتظار', 'واي فاي مجاني'],
         // Hall data merged into branch
         priceConfig: {
-          basePrice: 500,
           hourlyRate: 200,
-          pricePerPerson: 5,
-          weekendMultiplier: 1.5,
-          holidayMultiplier: 2.0,
-          decorationPrice: 300,
         },
         isDecorated: true,
-        hallFeatures: ['نظام صوت متطور', 'بروجكتر عالي الدقة', 'تكييف مركزي', 'منصة متحركة'],
-        hallImages: ['https://example.com/hall1.jpg', 'https://example.com/hall2.jpg'],
+        hallFeatures: [
+          'نظام صوت متطور',
+          'بروجكتر عالي الدقة',
+          'تكييف مركزي',
+          'منصة متحركة',
+        ],
+        hallImages: [
+          'https://example.com/hall1.jpg',
+          'https://example.com/hall2.jpg',
+        ],
         hallStatus: 'available',
       });
 

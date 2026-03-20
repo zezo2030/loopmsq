@@ -1,8 +1,14 @@
 import { DataSource } from 'typeorm';
 
 // #region agent log
-const DEBUG_LOG_ENDPOINT = 'http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0';
-function debugLog(location: string, message: string, data: any, hypothesisId?: string) {
+const DEBUG_LOG_ENDPOINT =
+  'http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0';
+function debugLog(
+  location: string,
+  message: string,
+  data: any,
+  hypothesisId?: string,
+) {
   fetch(DEBUG_LOG_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -30,16 +36,28 @@ function getEnumArray(enumValue: any): any[] | undefined {
   return undefined;
 }
 
-export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> {
+export async function logEnumColumnsInfo(
+  dataSource: DataSource,
+): Promise<void> {
   try {
     // #region agent log
-    debugLog('debug-typeorm-enums.ts:logEnumColumnsInfo', 'Starting enum columns analysis', {}, 'A');
+    debugLog(
+      'debug-typeorm-enums.ts:logEnumColumnsInfo',
+      'Starting enum columns analysis',
+      {},
+      'A',
+    );
     // #endregion
 
     const entityMetadatas = dataSource.entityMetadatas;
-    
+
     // #region agent log
-    debugLog('debug-typeorm-enums.ts:logEnumColumnsInfo', 'Entity metadatas count', { count: entityMetadatas.length }, 'A');
+    debugLog(
+      'debug-typeorm-enums.ts:logEnumColumnsInfo',
+      'Entity metadatas count',
+      { count: entityMetadatas.length },
+      'A',
+    );
     // #endregion
 
     for (const metadata of entityMetadatas) {
@@ -56,7 +74,9 @@ export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> 
             enumType: typeof (col as any).enum,
             enumName: (col as any).enumName,
             isArray: Array.isArray((col as any).enum),
-            enumLength: Array.isArray((col as any).enum) ? (col as any).enum.length : undefined,
+            enumLength: Array.isArray((col as any).enum)
+              ? (col as any).enum.length
+              : undefined,
           },
           'A',
         );
@@ -80,12 +100,15 @@ export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> 
               enumType: typeof (col as any).enum,
               enumName: (col as any).enumName,
               isArray: Array.isArray((col as any).enum),
-              enumLength: Array.isArray((col as any).enum) ? (col as any).enum.length : undefined,
+              enumLength: Array.isArray((col as any).enum)
+                ? (col as any).enum.length
+                : undefined,
               enumValues: Array.isArray((col as any).enum)
                 ? (col as any).enum
-                : typeof (col as any).enum === 'object' && (col as any).enum !== null
-                ? Object.values((col as any).enum)
-                : undefined,
+                : typeof (col as any).enum === 'object' &&
+                    (col as any).enum !== null
+                  ? Object.values((col as any).enum)
+                  : undefined,
             })),
           },
           'A',
@@ -96,7 +119,7 @@ export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> 
         for (const col of enumColumns) {
           const enumValue = (col as any).enum;
           const columnMetadata = col as any;
-          
+
           // #region agent log
           debugLog(
             `debug-typeorm-enums.ts:logEnumColumnsInfo:${metadata.name}:${col.propertyName}`,
@@ -107,14 +130,33 @@ export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> 
               enum: enumValue,
               enumType: typeof enumValue,
               isArray: Array.isArray(enumValue),
-              enumLength: Array.isArray(enumValue) ? enumValue.length : undefined,
+              enumLength: Array.isArray(enumValue)
+                ? enumValue.length
+                : undefined,
               enumName: columnMetadata.enumName,
               hasEnumName: !!columnMetadata.enumName,
-              isEnumObject: typeof enumValue === 'object' && enumValue !== null && !Array.isArray(enumValue),
-              enumObjectKeys: typeof enumValue === 'object' && enumValue !== null && !Array.isArray(enumValue) ? Object.keys(enumValue) : undefined,
-              enumObjectValues: typeof enumValue === 'object' && enumValue !== null && !Array.isArray(enumValue) ? Object.values(enumValue) : undefined,
+              isEnumObject:
+                typeof enumValue === 'object' &&
+                enumValue !== null &&
+                !Array.isArray(enumValue),
+              enumObjectKeys:
+                typeof enumValue === 'object' &&
+                enumValue !== null &&
+                !Array.isArray(enumValue)
+                  ? Object.keys(enumValue)
+                  : undefined,
+              enumObjectValues:
+                typeof enumValue === 'object' &&
+                enumValue !== null &&
+                !Array.isArray(enumValue)
+                  ? Object.values(enumValue)
+                  : undefined,
               // Check TypeORM's internal enum array conversion
-              enumArray: columnMetadata.enum ? (Array.isArray(columnMetadata.enum) ? columnMetadata.enum : Object.values(columnMetadata.enum)) : undefined,
+              enumArray: columnMetadata.enum
+                ? Array.isArray(columnMetadata.enum)
+                  ? columnMetadata.enum
+                  : Object.values(columnMetadata.enum)
+                : undefined,
             },
             'B',
           );
@@ -137,7 +179,11 @@ export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> 
           }
 
           // Hypothesis D: Check if enum is object vs array mismatch
-          if (typeof enumValue === 'object' && enumValue !== null && !Array.isArray(enumValue)) {
+          if (
+            typeof enumValue === 'object' &&
+            enumValue !== null &&
+            !Array.isArray(enumValue)
+          ) {
             const enumValues = Object.values(enumValue);
             // #region agent log
             debugLog(
@@ -151,12 +197,14 @@ export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> 
                 enumValuesLength: enumValues.length,
                 // Try to simulate what TypeORM does
                 simulatedArray: enumValues,
-                simulatedArrayLength: enumValues ? enumValues.length : undefined,
+                simulatedArrayLength: enumValues
+                  ? enumValues.length
+                  : undefined,
               },
               'D',
             );
             // #endregion
-            
+
             // Hypothesis E: Check if enum values array would be undefined
             if (!enumValues || enumValues.length === 0) {
               // #region agent log
@@ -173,7 +221,7 @@ export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> 
               // #endregion
             }
           }
-          
+
           // Hypothesis F: Check column metadata for enum array property
           const enumArray = getEnumArray(columnMetadata.enum);
           // #region agent log
@@ -185,14 +233,18 @@ export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> 
               enumArray: enumArray,
               enumArrayType: typeof enumArray,
               enumArrayIsArray: Array.isArray(enumArray),
-              enumArrayLength: Array.isArray(enumArray) ? enumArray.length : (enumArray ? 'not-array' : 'undefined'),
+              enumArrayLength: Array.isArray(enumArray)
+                ? enumArray.length
+                : enumArray
+                  ? 'not-array'
+                  : 'undefined',
               // Check if this would cause the error
               wouldCauseLengthError: enumArray === undefined,
             },
             'F',
           );
           // #endregion
-          
+
           // Hypothesis G: Simulate what OrmUtils.isArraysEqual would receive
           const enumArray1 = getEnumArray(enumValue);
           // #region agent log
@@ -202,7 +254,9 @@ export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> 
             {
               propertyName: col.propertyName,
               enumArray1: enumArray1,
-              enumArray1Length: enumArray1 ? enumArray1.length : 'UNDEFINED - THIS WOULD CAUSE ERROR',
+              enumArray1Length: enumArray1
+                ? enumArray1.length
+                : 'UNDEFINED - THIS WOULD CAUSE ERROR',
               // This is what would be passed to isArraysEqual
               wouldFail: enumArray1 === undefined,
             },
@@ -214,12 +268,21 @@ export async function logEnumColumnsInfo(dataSource: DataSource): Promise<void> 
     }
 
     // #region agent log
-    debugLog('debug-typeorm-enums.ts:logEnumColumnsInfo', 'Finished enum columns analysis', {}, 'A');
+    debugLog(
+      'debug-typeorm-enums.ts:logEnumColumnsInfo',
+      'Finished enum columns analysis',
+      {},
+      'A',
+    );
     // #endregion
   } catch (error) {
     // #region agent log
-    debugLog('debug-typeorm-enums.ts:logEnumColumnsInfo', 'Error during enum analysis', { error: error?.message, stack: (error as Error)?.stack }, 'A');
+    debugLog(
+      'debug-typeorm-enums.ts:logEnumColumnsInfo',
+      'Error during enum analysis',
+      { error: error?.message, stack: (error as Error)?.stack },
+      'A',
+    );
     // #endregion
   }
 }
-

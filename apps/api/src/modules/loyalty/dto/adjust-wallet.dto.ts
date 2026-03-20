@@ -2,12 +2,16 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class AdjustWalletDto {
-  @ApiPropertyOptional({ description: 'Amount to add/subtract to wallet balance' })
+  @ApiPropertyOptional({
+    description: 'Amount to add/subtract to wallet balance',
+  })
   @IsOptional()
   @IsNumber()
   balanceDelta?: number;
 
-  @ApiPropertyOptional({ description: 'Points to add/subtract to loyalty points' })
+  @ApiPropertyOptional({
+    description: 'Points to add/subtract to loyalty points',
+  })
   @IsOptional()
   @IsNumber()
   pointsDelta?: number;
@@ -17,5 +21,3 @@ export class AdjustWalletDto {
   @IsString()
   reason?: string;
 }
-
-

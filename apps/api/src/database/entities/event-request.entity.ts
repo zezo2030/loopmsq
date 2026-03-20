@@ -61,16 +61,27 @@ export class EventRequest {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
-  @Column({ type: 'enum', enum: EventRequestStatus, default: EventRequestStatus.DRAFT })
+  @Column({
+    type: 'enum',
+    enum: EventRequestStatus,
+    default: EventRequestStatus.DRAFT,
+  })
   status: EventRequestStatus;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   quotedPrice: number;
 
-  @Column({ 
-    type: 'enum', 
-    enum: ['credit_card', 'debit_card', 'mada', 'wallet', 'bank_transfer', 'cash'],
-    nullable: true 
+  @Column({
+    type: 'enum',
+    enum: [
+      'credit_card',
+      'debit_card',
+      'mada',
+      'wallet',
+      'bank_transfer',
+      'cash',
+    ],
+    nullable: true,
   })
   paymentMethod?: PaymentMethod;
 
@@ -84,5 +95,3 @@ export class EventRequest {
   @JoinColumn({ name: 'requesterId' })
   requester: User;
 }
-
-

@@ -14,7 +14,13 @@ import { RealtimeModule } from '../../realtime/realtime.module';
 import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Booking, Ticket, User, Offer]), ContentModule, CouponsModule, NotificationsModule, RealtimeModule],
+  imports: [
+    TypeOrmModule.forFeature([Booking, Ticket, User, Offer]),
+    ContentModule,
+    CouponsModule,
+    NotificationsModule,
+    RealtimeModule,
+  ],
   controllers: [BookingsController],
   providers: [BookingsService, QRCodeService, RedisService],
   exports: [BookingsService],

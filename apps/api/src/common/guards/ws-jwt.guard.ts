@@ -4,7 +4,10 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class WsJwtGuard implements CanActivate {
-  constructor(private readonly jwtService: JwtService, private readonly config: ConfigService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean | Promise<boolean> {
     const client = context.switchToWs().getClient();
@@ -12,14 +15,19 @@ export class WsJwtGuard implements CanActivate {
 
     // Try headers.authorization or query.token
     const headerAuth: string | undefined = handshake.headers?.authorization;
-    const queryToken: string | undefined = handshake.query?.token as string | undefined;
+    const queryToken: string | undefined = handshake.query?.token as
+      | string
+      | undefined;
     const token = this.extractToken(headerAuth) || queryToken;
 
     if (!token) return false;
 
     try {
       const secret = this.config.get<string>('JWT_SECRET');
-      const payload = this.jwtService.verify(token, secret ? { secret } : undefined);
+      const payload = this.jwtService.verify(
+        token,
+        secret ? { secret } : undefined,
+      );
       // attach user to socket for downstream usage
       client.user = payload;
       return true;
@@ -35,5 +43,3 @@ export class WsJwtGuard implements CanActivate {
     return null;
   }
 }
-
-

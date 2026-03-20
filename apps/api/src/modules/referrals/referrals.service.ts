@@ -1,9 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { ReferralCode } from '../../database/entities/referral-code.entity';
 import { ReferralAttribution } from '../../database/entities/referral-attribution.entity';
-import { ReferralEarning, ReferralEarningStatus } from '../../database/entities/referral-earning.entity';
+import {
+  ReferralEarning,
+  ReferralEarningStatus,
+} from '../../database/entities/referral-earning.entity';
 import { AttributeReferralDto } from './dto/attribute.dto';
 import { CreateReferralCodeDto } from './dto/create-code.dto';
 import { ListCodesDto } from './dto/list-codes.dto';
@@ -18,15 +25,25 @@ const REFERRAL_REWARD = 20; // fixed currency reward (SAR) to referrer upon appr
 @Injectable()
 export class ReferralsService {
   constructor(
-    @InjectRepository(ReferralCode) private readonly codeRepo: Repository<ReferralCode>,
-    @InjectRepository(ReferralAttribution) private readonly attrRepo: Repository<ReferralAttribution>,
-    @InjectRepository(ReferralEarning) private readonly earnRepo: Repository<ReferralEarning>,
+    @InjectRepository(ReferralCode)
+    private readonly codeRepo: Repository<ReferralCode>,
+    @InjectRepository(ReferralAttribution)
+    private readonly attrRepo: Repository<ReferralAttribution>,
+    @InjectRepository(ReferralEarning)
+    private readonly earnRepo: Repository<ReferralEarning>,
     private readonly loyalty: LoyaltyService,
   ) {}
 
   async createCode(dto: CreateReferralCodeDto) {
-    const existing = await this.codeRepo.findOne({ where: { userId: dto.userId } });
-    const code = existing ?? this.codeRepo.create({ userId: dto.userId, code: await this.generateCode() });
+    const existing = await this.codeRepo.findOne({
+      where: { userId: dto.userId },
+    });
+    const code =
+      existing ??
+      this.codeRepo.create({
+        userId: dto.userId,
+        code: await this.generateCode(),
+      });
     if (dto.isActive != null) code.isActive = dto.isActive;
     return this.codeRepo.save(code);
   }
@@ -35,7 +52,8 @@ export class ReferralsService {
     // Simple readable code: 8 chars A-Z0-9
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
-    for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    for (let i = 0; i < 8; i++)
+      code += chars[Math.floor(Math.random() * chars.length)];
     const exists = await this.codeRepo.findOne({ where: { code } });
     return exists ? this.generateCode() : code;
   }
@@ -66,21 +84,32 @@ export class ReferralsService {
 
   async attribute(userId: string, dto: AttributeReferralDto) {
     // التحقق من صحة الكود
-    const code = await this.codeRepo.findOne({ where: { code: dto.code, isActive: true } });
+    const code = await this.codeRepo.findOne({
+      where: { code: dto.code, isActive: true },
+    });
     if (!code) throw new NotFoundException('Invalid code');
-    
+
     // منع المستخدم من استخدام كود دعوته الخاص
-    if (code.userId === userId) throw new BadRequestException('Self-referral not allowed');
-    
+    if (code.userId === userId)
+      throw new BadRequestException('Self-referral not allowed');
+
     // منع المستخدم من إدخال كود دعوة أكثر من مرة واحدة
     // كل مستخدم يمكنه إدخال كود دعوة مرة واحدة فقط (محمي على مستوى قاعدة البيانات أيضاً)
-    const existing = await this.attrRepo.findOne({ where: { refereeId: userId } });
+    const existing = await this.attrRepo.findOne({
+      where: { refereeId: userId },
+    });
     if (existing) {
-      throw new BadRequestException('You have already used a referral code. Each user can only use one referral code.');
+      throw new BadRequestException(
+        'You have already used a referral code. Each user can only use one referral code.',
+      );
     }
-    
+
     // إنشاء attribution جديد
-    const attr = this.attrRepo.create({ refereeId: userId, referrerId: code.userId, code: code.code });
+    const attr = this.attrRepo.create({
+      refereeId: userId,
+      referrerId: code.userId,
+      code: code.code,
+    });
     await this.attrRepo.save(attr);
     return { attributed: true, referrerId: code.userId };
   }
@@ -101,11 +130,16 @@ export class ReferralsService {
   async approveEarning(id: string, _: ApproveEarningDto) {
     const earning = await this.earnRepo.findOne({ where: { id } });
     if (!earning) throw new NotFoundException('Earning not found');
-    if (earning.status !== ReferralEarningStatus.PENDING) throw new BadRequestException('Not pending');
+    if (earning.status !== ReferralEarningStatus.PENDING)
+      throw new BadRequestException('Not pending');
     earning.status = ReferralEarningStatus.APPROVED;
     await this.earnRepo.save(earning);
     // Credit referrer wallet as BONUS points equivalent (using loyalty adjust)
-    await this.loyalty.adjustWallet(earning.referrerId, { balanceDelta: earning.amount, pointsDelta: 0, reason: 'Referral reward' });
+    await this.loyalty.adjustWallet(earning.referrerId, {
+      balanceDelta: earning.amount,
+      pointsDelta: 0,
+      reason: 'Referral reward',
+    });
     return { success: true };
   }
 
@@ -114,11 +148,13 @@ export class ReferralsService {
     // المكافأة: 20 ريال (REFERRAL_REWARD) - يتم منحها بعد موافقة الادمن
     const attr = await this.attrRepo.findOne({ where: { refereeId } });
     if (!attr) return { created: false };
-    
+
     // التأكد من عدم إنشاء earning مكرر لنفس الدفع
-    const existing = await this.earnRepo.findOne({ where: { refereeId, sourcePaymentId: paymentId } });
+    const existing = await this.earnRepo.findOne({
+      where: { refereeId, sourcePaymentId: paymentId },
+    });
     if (existing) return { created: false };
-    
+
     // إنشاء earning جديد بحالة PENDING (يحتاج موافقة الادمن)
     const earning = this.earnRepo.create({
       referrerId: attr.referrerId,
@@ -131,5 +167,3 @@ export class ReferralsService {
     return { created: true, earningId: earning.id };
   }
 }
-
-

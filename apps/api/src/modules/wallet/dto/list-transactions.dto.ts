@@ -1,7 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
-import { WalletTransactionType, WalletTransactionStatus } from '../../../database/entities/wallet-transaction.entity';
+import {
+  WalletTransactionType,
+  WalletTransactionStatus,
+} from '../../../database/entities/wallet-transaction.entity';
 
 export class ListTransactionsDto {
   @ApiPropertyOptional({ enum: WalletTransactionType })

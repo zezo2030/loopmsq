@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Ticket } from '../../database/entities/ticket.entity';
@@ -12,15 +16,24 @@ import { ShareTicketDto } from './dto/share-ticket.dto';
 export class TicketsService {
   constructor(
     @InjectRepository(Ticket) private readonly ticketRepo: Repository<Ticket>,
-    @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
     private readonly qrCodeService: QRCodeService,
     private readonly redisService: RedisService,
   ) {}
 
-  private async ensureOwner(userId: string, ticketId: string): Promise<{ ticket: Ticket; booking: Booking }> {
-    const ticket = await this.ticketRepo.findOne({ where: { id: ticketId }, relations: ['booking'] });
+  private async ensureOwner(
+    userId: string,
+    ticketId: string,
+  ): Promise<{ ticket: Ticket; booking: Booking }> {
+    const ticket = await this.ticketRepo.findOne({
+      where: { id: ticketId },
+      relations: ['booking'],
+    });
     if (!ticket) throw new NotFoundException('Ticket not found');
-    const booking = await this.bookingRepo.findOne({ where: { id: ticket.bookingId } });
+    const booking = await this.bookingRepo.findOne({
+      where: { id: ticket.bookingId },
+    });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.userId !== userId) throw new ForbiddenException('Not allowed');
     return { ticket, booking };
@@ -29,21 +42,21 @@ export class TicketsService {
   async getTicketQR(userId: string, ticketId: string) {
     const { ticket, booking } = await this.ensureOwner(userId, ticketId);
     const token = this.qrCodeService.generateQRToken(booking.id, ticket.id);
-    
+
     // Generate the hash from the token we're using
     const qrTokenHash = this.qrCodeService.generateQRTokenHash(token);
-    
+
     // Update the ticket's qrTokenHash in database to match the token we're using
     // This ensures the QR code will work even after Redis cache expires
     if (ticket.qrTokenHash !== qrTokenHash) {
       ticket.qrTokenHash = qrTokenHash;
       await this.ticketRepo.save(ticket);
     }
-    
+
     // Store ephemeral mapping for 5 minutes (for faster lookups)
     const redis = this.redisService.getClient();
     await redis.setex(`share:qr:${token}`, 300, qrTokenHash);
-    
+
     const qrDataUrl = await this.qrCodeService.generateQRCode(token);
     return { qr: qrDataUrl, ttlSeconds: 300 };
   }
@@ -56,7 +69,11 @@ export class TicketsService {
     return { token, ttlSeconds: 3600 };
   }
 
-  async createShareToken(userId: string, ticketId: string, dto: ShareTicketDto) {
+  async createShareToken(
+    userId: string,
+    ticketId: string,
+    dto: ShareTicketDto,
+  ) {
     const { ticket, booking } = await this.ensureOwner(userId, ticketId);
     const ttl = Math.max(60, Math.min(86400, dto.ttlSeconds || 900));
     const token = this.qrCodeService.generateQRToken(booking.id, ticket.id);
@@ -73,5 +90,3 @@ export class TicketsService {
     return { success: true };
   }
 }
-
-

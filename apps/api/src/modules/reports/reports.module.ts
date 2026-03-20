@@ -13,5 +13,3 @@ import { Branch } from '../../database/entities/branch.entity';
   providers: [ReportsService],
 })
 export class ReportsModule {}
-
-

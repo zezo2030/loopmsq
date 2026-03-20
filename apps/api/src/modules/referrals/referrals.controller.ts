@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ReferralsService } from './referrals.service';
 import { CreateReferralCodeDto } from './dto/create-code.dto';
@@ -21,7 +31,9 @@ export class ReferralsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create or update referral code for user (Admin only)' })
+  @ApiOperation({
+    summary: 'Create or update referral code for user (Admin only)',
+  })
   async createCode(@Body() dto: CreateReferralCodeDto) {
     return this.referrals.createCode(dto);
   }
@@ -48,7 +60,10 @@ export class ReferralsController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Attribute referral to current user' })
-  async attribute(@CurrentUser() user: User, @Body() dto: AttributeReferralDto) {
+  async attribute(
+    @CurrentUser() user: User,
+    @Body() dto: AttributeReferralDto,
+  ) {
     return this.referrals.attribute(user.id, dto);
   }
 
@@ -66,10 +81,10 @@ export class ReferralsController {
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Approve referral earning and credit wallet (Admin only)' })
+  @ApiOperation({
+    summary: 'Approve referral earning and credit wallet (Admin only)',
+  })
   async approve(@Param('id') id: string, @Body() dto: ApproveEarningDto) {
     return this.referrals.approveEarning(id, dto);
   }
 }
-
-

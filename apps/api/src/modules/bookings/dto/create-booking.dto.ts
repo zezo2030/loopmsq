@@ -24,17 +24,21 @@ class AddOnDto {
   @ApiProperty({
     description: 'Add-on name',
     example: 'Decoration Package',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  name: string;
+  name?: string;
 
   @ApiProperty({
     description: 'Add-on price',
     example: 150.0,
+    required: false,
   })
+  @IsOptional()
   @IsInt()
   @Min(0)
-  price: number;
+  price?: number;
 
   @ApiProperty({
     description: 'Quantity',

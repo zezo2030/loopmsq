@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { LoyaltyService } from './loyalty.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -46,7 +57,15 @@ export class LoyaltyController {
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create loyalty rule (Admin only)' })
-  async createRule(@Body() body: { earnRate?: number; redeemRate?: number; minRedeemPoints?: number; isActive?: boolean }) {
+  async createRule(
+    @Body()
+    body: {
+      earnRate?: number;
+      redeemRate?: number;
+      minRedeemPoints?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.loyalty.createRule(body);
   }
 
@@ -66,7 +85,16 @@ export class LoyaltyController {
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update loyalty rule (Admin only)' })
-  async updateRule(@Param('id') id: string, @Body() body: { earnRate?: number; redeemRate?: number; minRedeemPoints?: number; isActive?: boolean }) {
+  async updateRule(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      earnRate?: number;
+      redeemRate?: number;
+      minRedeemPoints?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.loyalty.updateRule(id, body);
   }
 
@@ -86,7 +114,10 @@ export class LoyaltyController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Adjust wallet balance/points (Admin only)' })
-  async adjustWallet(@Param('userId') userId: string, @Body() body: AdjustWalletDto) {
+  async adjustWallet(
+    @Param('userId') userId: string,
+    @Body() body: AdjustWalletDto,
+  ) {
     return this.loyalty.adjustWallet(userId, body);
   }
 
@@ -99,5 +130,3 @@ export class LoyaltyController {
     return this.loyalty.getSummary(userId);
   }
 }
-
-

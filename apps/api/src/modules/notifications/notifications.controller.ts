@@ -1,8 +1,23 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { ApiTags } from '@nestjs/swagger';
-import { NotificationsService, NotificationChannel } from './notifications.service';
+import {
+  NotificationsService,
+  NotificationChannel,
+} from './notifications.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DeviceToken } from '../../database/entities/device-token.entity';
@@ -19,9 +34,10 @@ import { User } from '../../database/entities/user.entity';
 export class NotificationsController {
   constructor(
     private readonly notifications: NotificationsService,
-    @InjectRepository(DeviceToken) private readonly tokenRepo: Repository<DeviceToken>,
+    @InjectRepository(DeviceToken)
+    private readonly tokenRepo: Repository<DeviceToken>,
     private readonly pushProvider: PushProvider,
-  ) { }
+  ) {}
 
   @Post('promo')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -101,8 +117,17 @@ export class NotificationsController {
 
   @Post('register-device')
   @HttpCode(HttpStatus.OK)
-  async registerDevice(@Body() body: { userId?: string; token: string; platform?: 'android' | 'ios' }) {
-    const exists = await this.tokenRepo.findOne({ where: { token: body.token } });
+  async registerDevice(
+    @Body()
+    body: {
+      userId?: string;
+      token: string;
+      platform?: 'android' | 'ios';
+    },
+  ) {
+    const exists = await this.tokenRepo.findOne({
+      where: { token: body.token },
+    });
     if (exists) {
       // Update existing token
       if (body.userId) {
@@ -120,7 +145,7 @@ export class NotificationsController {
       userId: body.userId || null,
       token: body.token,
       platform: body.platform || 'android',
-      provider: 'fcm'
+      provider: 'fcm',
     });
     await this.tokenRepo.save(rec);
     return { success: true };
@@ -143,17 +168,19 @@ export class NotificationsController {
     const deviceCount = await this.tokenRepo.count();
     return {
       initialized: status.initialized,
-      status: status.initialized ? 'ACTIVE' : (status.error ? 'FAILED' : 'NOT CONFIGURED'),
+      status: status.initialized
+        ? 'ACTIVE'
+        : status.error
+          ? 'FAILED'
+          : 'NOT CONFIGURED',
       projectId: status.projectId,
       error: status.error,
       registeredDevices: deviceCount,
       message: status.initialized
         ? 'Firebase integration is active and push notifications are enabled'
-        : (status.error
+        : status.error
           ? `Firebase integration failed: ${status.error}`
-          : 'Firebase is not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY to enable.'),
+          : 'Firebase is not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY to enable.',
     };
   }
 }
-
-

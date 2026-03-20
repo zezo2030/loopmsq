@@ -64,6 +64,7 @@ const navItems: Array<{
       { key: 'cms-coupons', href: '/admin/cms/coupons', labelKey: 'cms.coupons' },
       { key: 'cms-activities', href: '/admin/cms/activities', labelKey: 'cms.activities' },
       { key: 'cms-organizing-branches', href: '/admin/cms/organizing-branches', labelKey: 'cms.organizingBranches' },
+      { key: 'cms-intro-video', href: '/admin/cms/intro-video', labelKey: 'cms.introVideo' },
     ],
   },
   {

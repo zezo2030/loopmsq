@@ -7,7 +7,7 @@ import { Coupon } from '../../database/entities/coupon.entity';
 export class CouponsService {
   constructor(
     @InjectRepository(Coupon) private readonly repo: Repository<Coupon>,
-  ) { }
+  ) {}
 
   list(filter?: { branchId?: string }) {
     const where: any = {};
@@ -46,7 +46,11 @@ export class CouponsService {
       return { valid: false, reason: 'NOT_FOUND' };
     }
 
-    if (found.branchId && options?.branchId && found.branchId !== options.branchId) {
+    if (
+      found.branchId &&
+      options?.branchId &&
+      found.branchId !== options.branchId
+    ) {
       return { valid: false, reason: 'WRONG_BRANCH' };
     }
 
@@ -69,5 +73,3 @@ export class CouponsService {
     return { valid: true, discountAmount, finalAmount };
   }
 }
-
-

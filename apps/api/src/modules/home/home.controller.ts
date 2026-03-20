@@ -12,5 +12,3 @@ export class HomeController {
     return this.home.getHome(branchId);
   }
 }
-
-

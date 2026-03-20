@@ -10,7 +10,7 @@ export class RechargeWalletDto {
   @Type(() => Number)
   amount: number;
 
-  @ApiProperty({ 
+  @ApiProperty({
     enum: PaymentMethod,
     description: 'Payment method for recharge',
     example: PaymentMethod.CREDIT_CARD,

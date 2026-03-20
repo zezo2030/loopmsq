@@ -1,4 +1,13 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Branch } from './branch.entity';
 
 @Entity('coupons')
@@ -14,7 +23,11 @@ export class Coupon {
   @Column({ type: 'varchar', length: 50 })
   code: string;
 
-  @Column({ type: 'enum', enum: ['percentage', 'fixed'], default: 'percentage' })
+  @Column({
+    type: 'enum',
+    enum: ['percentage', 'fixed'],
+    default: 'percentage',
+  })
   discountType: 'percentage' | 'fixed';
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
@@ -40,5 +53,3 @@ export class Coupon {
   @JoinColumn({ name: 'branchId' })
   branch: Branch;
 }
-
-

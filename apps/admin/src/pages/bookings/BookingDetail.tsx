@@ -380,53 +380,13 @@ export default function BookingDetail() {
                         تفصيل التسعير:
                       </div>
                       
-                      {/* Base Price */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                        <span>السعر الأساسي:</span>
-                        <span style={{ fontWeight: '500' }}>
-                          {booking.pricing.basePrice.toLocaleString()} ر.س
-                        </span>
-                      </div>
-                      
                       {/* Hourly Price */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                        <span>السعر بالساعة ({booking.durationHours} ساعات):</span>
+                        <span>تسعير الساعات ({booking.durationHours} ساعات):</span>
                         <span style={{ fontWeight: '500' }}>
                           {booking.pricing.hourlyPrice.toLocaleString()} ر.س
                         </span>
                       </div>
-                      
-                      {/* Persons Price */}
-                      {booking.pricing.pricePerPerson > 0 && (
-                        <>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                            <span>السعر لكل شخص ({booking.persons} أشخاص):</span>
-                            <span style={{ fontWeight: '500', color: '#52c41a' }}>
-                              {booking.pricing.pricePerPerson.toLocaleString()} ر.س × {booking.persons} = {booking.pricing.personsPrice.toLocaleString()} ر.س
-                            </span>
-                          </div>
-                        </>
-                      )}
-                      
-                      {/* Decoration Price */}
-                      {booking.pricing.decorationPrice > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                          <span>سعر الديكور:</span>
-                          <span style={{ fontWeight: '500' }}>
-                            {booking.pricing.decorationPrice.toLocaleString()} ر.س
-                          </span>
-                        </div>
-                      )}
-                      
-                      {/* Multiplier */}
-                      {booking.pricing.multiplier !== 1 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                          <span>المضاعف ({booking.pricing.multiplier === 1.5 ? 'نهاية الأسبوع' : 'عطلة'}):</span>
-                          <span style={{ fontWeight: '500', color: '#fa8c16' }}>
-                            × {booking.pricing.multiplier}
-                          </span>
-                        </div>
-                      )}
                       
                       <Divider style={{ margin: '8px 0' }} />
                     </>
@@ -634,5 +594,6 @@ export default function BookingDetail() {
     </div>
   )
 }
+
 
 

@@ -1,6 +1,22 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, ParseIntPipe, Post, UseGuards, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  ParseIntPipe,
+  Post,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { EventsService } from './events.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateEventRequestDto } from './dto/create-event-request.dto';
@@ -27,7 +43,10 @@ export class EventsController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiQuery({ name: 'type', required: false, type: String })
-  @ApiResponse({ status: 200, description: 'Event requests retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Event requests retrieved successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getUserRequests(
     @CurrentUser() user: any,
@@ -36,7 +55,10 @@ export class EventsController {
     @Query('status') status?: string,
     @Query('type') type?: string,
   ) {
-    return this.eventsService.findUserRequests(user.id, page, limit, { status, type });
+    return this.eventsService.findUserRequests(user.id, page, limit, {
+      status,
+      type,
+    });
   }
 
   // Admin: list all event requests with basic stats
@@ -60,7 +82,13 @@ export class EventsController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.eventsService.findAllRequests(page, limit, { status, type, branchId, from, to });
+    return this.eventsService.findAllRequests(page, limit, {
+      status,
+      type,
+      branchId,
+      from,
+      to,
+    });
   }
 
   @Get('requests/:id')
@@ -74,7 +102,10 @@ export class EventsController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Get event request by ID (Admin only)' })
-  adminGetRequest(@CurrentUser() user: any, @Param('id', ParseUUIDPipe) id: string) {
+  adminGetRequest(
+    @CurrentUser() user: any,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.eventsService.getRequest(user, id);
   }
 
@@ -82,7 +113,10 @@ export class EventsController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Quote event request' })
-  quote(@Param('id', ParseUUIDPipe) id: string, @Body() dto: QuoteEventRequestDto) {
+  quote(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: QuoteEventRequestDto,
+  ) {
     return this.eventsService.quote(id, dto);
   }
 
@@ -99,9 +133,10 @@ export class EventsController {
   @ApiResponse({ status: 200, description: 'Tickets retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Event request not found' })
-  async getEventTickets(@CurrentUser() user: any, @Param('id', ParseUUIDPipe) id: string) {
+  async getEventTickets(
+    @CurrentUser() user: any,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.eventsService.getEventTickets(id, user);
   }
 }
-
-

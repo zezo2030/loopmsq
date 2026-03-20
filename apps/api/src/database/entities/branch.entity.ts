@@ -53,6 +53,9 @@ export class Branch {
   videoUrl: string;
 
   @Column({ type: 'text', nullable: true })
+  videoCoverUrl: string | null;
+
+  @Column({ type: 'text', nullable: true })
   coverImage: string | null;
 
   @Column({ type: 'json', nullable: true })
@@ -64,15 +67,16 @@ export class Branch {
   @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
   longitude: number | null;
 
+  @Column({ type: 'boolean', default: true })
+  hasEventBookings: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  hasSchoolTrips: boolean;
+
   // Hall-related fields (merged from Hall entity)
   @Column({ type: 'json', nullable: true })
   priceConfig: {
-    basePrice: number;
     hourlyRate: number;
-    pricePerPerson: number;
-    weekendMultiplier: number;
-    holidayMultiplier: number;
-    decorationPrice?: number;
   };
 
   @Column({ type: 'boolean', default: false })

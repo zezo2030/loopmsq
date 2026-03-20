@@ -1,7 +1,18 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
-import { PaymentMethod, PaymentStatus } from '../../../database/entities/payment.entity';
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
+import {
+  PaymentMethod,
+  PaymentStatus,
+} from '../../../database/entities/payment.entity';
 
 export class ListPaymentsDto {
   @ApiPropertyOptional({ enum: PaymentStatus })
@@ -49,5 +60,3 @@ export class ListPaymentsDto {
   @Max(100)
   pageSize?: number = 20;
 }
-
-

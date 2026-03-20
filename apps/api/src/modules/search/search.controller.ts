@@ -33,8 +33,16 @@ export class SearchController {
     @Query('limit') limit = '10',
     @Query('branchId') branchId?: string,
   ) {
-    const effectiveBranchId = user.roles?.includes(UserRole.BRANCH_MANAGER) ? (user.branchId || undefined) : branchId;
-    return this.search.searchBookings(q || '', Number(page), Number(limit), effectiveBranchId, user);
+    const effectiveBranchId = user.roles?.includes(UserRole.BRANCH_MANAGER)
+      ? user.branchId || undefined
+      : branchId;
+    return this.search.searchBookings(
+      q || '',
+      Number(page),
+      Number(limit),
+      effectiveBranchId,
+      user,
+    );
   }
 
   @Get('payments')
@@ -44,8 +52,11 @@ export class SearchController {
     @Query('page') page = '1',
     @Query('limit') limit = '10',
   ) {
-    return this.search.searchPayments(q || '', Number(page), Number(limit), user);
+    return this.search.searchPayments(
+      q || '',
+      Number(page),
+      Number(limit),
+      user,
+    );
   }
 }
-
-

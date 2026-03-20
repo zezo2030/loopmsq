@@ -1,5 +1,20 @@
-import { Body, Controller, Get, GoneException, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  GoneException,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { WalletService } from './wallet.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -23,7 +38,9 @@ export class WalletController {
     @Body() dto: RechargeWalletDto,
   ) {
     // Feature disabled: allow only converting points to wallet (loyalty redeem)
-    throw new GoneException('Wallet recharge is disabled. Use points conversion instead.');
+    throw new GoneException(
+      'Wallet recharge is disabled. Use points conversion instead.',
+    );
   }
 
   @Get('me')

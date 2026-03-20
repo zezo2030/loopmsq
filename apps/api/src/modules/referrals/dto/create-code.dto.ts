@@ -11,5 +11,3 @@ export class CreateReferralCodeDto {
   @IsBoolean()
   isActive?: boolean;
 }
-
-

@@ -43,9 +43,11 @@ async function bootstrap() {
   }
 
   // Security (allow cross-origin images for admin preview)
-  app.use(helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-  }));
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
   app.use(compression());
 
   // CORS
@@ -87,19 +89,33 @@ async function bootstrap() {
     join(__dirname, '..', 'uploads'),
   ];
   const envUploads = configService.get<string>('UPLOAD_DEST');
-  const candidates = envUploads ? [envUploads, ...defaultCandidates] : defaultCandidates;
-  const uploadsRoot = candidates.find((p) => {
-    try {
-      return fs.existsSync(p);
-    } catch {
-      return false;
-    }
-  }) || candidates[0];
-  try { fs.mkdirSync(uploadsRoot, { recursive: true }); } catch {}
-  const indexEnabled = (configService.get<string>('STATIC_INDEX') || '').toLowerCase() === 'true';
-  expressInstance.use('/uploads', (express as any).static(uploadsRoot, { index: indexEnabled, redirect: false }));
+  const candidates = envUploads
+    ? [envUploads, ...defaultCandidates]
+    : defaultCandidates;
+  const uploadsRoot =
+    candidates.find((p) => {
+      try {
+        return fs.existsSync(p);
+      } catch {
+        return false;
+      }
+    }) || candidates[0];
+  try {
+    fs.mkdirSync(uploadsRoot, { recursive: true });
+  } catch {}
+  const indexEnabled =
+    (configService.get<string>('STATIC_INDEX') || '').toLowerCase() === 'true';
+  expressInstance.use(
+    '/uploads',
+    (express as any).static(uploadsRoot, {
+      index: indexEnabled,
+      redirect: false,
+    }),
+  );
   const loggerInfo = new Logger('Static');
-  loggerInfo.log(`Serving uploads from: ${uploadsRoot} (index=${indexEnabled}) at /uploads`);
+  loggerInfo.log(
+    `Serving uploads from: ${uploadsRoot} (index=${indexEnabled}) at /uploads`,
+  );
 
   // Global throttler guard
   // Note: ThrottlerGuard will be applied via module configuration
@@ -130,7 +146,11 @@ async function bootstrap() {
     const serverAdapter = new ExpressAdapter();
     serverAdapter.setBasePath(`/${apiPrefix}/queues`);
     createBullBoard({
-      queues: [new BullAdapter(smsQueue), new BullAdapter(emailQueue), new BullAdapter(pushQueue)],
+      queues: [
+        new BullAdapter(smsQueue),
+        new BullAdapter(emailQueue),
+        new BullAdapter(pushQueue),
+      ],
       serverAdapter,
     });
     const expressInstance: any = app.getHttpAdapter().getInstance();
@@ -146,7 +166,9 @@ async function bootstrap() {
     `Application is running on: http://localhost:${port}/${apiPrefix}`,
   );
   try {
-    logger.log(`Queues dashboard: http://localhost:${port}/${apiPrefix}/queues`);
+    logger.log(
+      `Queues dashboard: http://localhost:${port}/${apiPrefix}/queues`,
+    );
   } catch {}
   if (configService.get<string>('NODE_ENV') !== 'production') {
     logger.log(
@@ -166,7 +188,9 @@ async function bootstrap() {
           logger.log(`   Project ID: ${status.projectId}`);
         }
       } else {
-        logger.warn(`⚠️  Firebase Integration Status: ${status.error ? 'FAILED' : 'NOT CONFIGURED'}`);
+        logger.warn(
+          `⚠️  Firebase Integration Status: ${status.error ? 'FAILED' : 'NOT CONFIGURED'}`,
+        );
         if (status.error) {
           logger.warn(`   Error: ${status.error}`);
         }

@@ -45,15 +45,20 @@ const defaultUploadsCandidates = [
 ];
 function resolveUploadsRootFromEnvOrDefault(config?: ConfigService): string {
   const envPath = config?.get<string>('UPLOAD_DEST');
-  const candidates = envPath ? [envPath, ...defaultUploadsCandidates] : defaultUploadsCandidates;
-  const found = candidates.find((p) => {
-    try {
-      return fs.existsSync(p);
-    } catch {
-      return false;
-    }
-  }) || candidates[0];
-  try { fs.mkdirSync(found, { recursive: true }); } catch {}
+  const candidates = envPath
+    ? [envPath, ...defaultUploadsCandidates]
+    : defaultUploadsCandidates;
+  const found =
+    candidates.find((p) => {
+      try {
+        return fs.existsSync(p);
+      } catch {
+        return false;
+      }
+    }) || candidates[0];
+  try {
+    fs.mkdirSync(found, { recursive: true });
+  } catch {}
   return found;
 }
 
@@ -65,7 +70,8 @@ function resolveUploadsRootFromEnvOrDefault(config?: ConfigService): string {
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const rootPath = resolveUploadsRootFromEnvOrDefault(config);
-        const indexEnabled = (config.get<string>('STATIC_INDEX') || '').toLowerCase() === 'true';
+        const indexEnabled =
+          (config.get<string>('STATIC_INDEX') || '').toLowerCase() === 'true';
         // ServeStaticModule in current version expects an array of options
         return [
           {

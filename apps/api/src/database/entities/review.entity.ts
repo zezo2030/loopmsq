@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+  Unique,
+} from 'typeorm';
 
 @Entity('reviews')
 @Unique('uniq_booking_review', ['bookingId'])
@@ -23,5 +30,3 @@ export class Review {
   @CreateDateColumn()
   createdAt: Date;
 }
-
-

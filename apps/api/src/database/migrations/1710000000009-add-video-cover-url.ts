@@ -17,11 +17,3 @@ export class AddVideoCoverUrl1710000000009 implements MigrationInterface {
     `);
   }
 }
-
-
-
-
-
-
-
-

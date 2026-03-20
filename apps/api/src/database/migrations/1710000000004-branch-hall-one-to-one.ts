@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class BranchHallOneToOne1710000000004 implements MigrationInterface {
-  name = 'BranchHallOneToOne1710000000004'
+  name = 'BranchHallOneToOne1710000000004';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Step 1: Check if there are any duplicate branchIds
@@ -43,4 +43,3 @@ export class BranchHallOneToOne1710000000004 implements MigrationInterface {
     `);
   }
 }
-

@@ -9,13 +9,8 @@ import { User } from '../../database/entities/user.entity';
 import { DeviceToken } from '../../database/entities/device-token.entity';
 
 @Module({
-  imports: [
-    NotificationsModule,
-    TypeOrmModule.forFeature([User, DeviceToken]),
-  ],
+  imports: [NotificationsModule, TypeOrmModule.forFeature([User, DeviceToken])],
   controllers: [AdminConfigController],
   providers: [AdminConfigService, EncryptionService, RedisService],
 })
 export class AdminConfigModule {}
-
-

@@ -1,7 +1,16 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { EventRequest, EventRequestStatus } from '../../database/entities/event-request.entity';
+import {
+  EventRequest,
+  EventRequestStatus,
+} from '../../database/entities/event-request.entity';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
@@ -26,7 +35,7 @@ export class EventsService {
     private readonly dataSource: DataSource,
     private readonly notifications: NotificationsService,
     private readonly contentService: ContentService,
-  ) { }
+  ) {}
 
   async createRequest(userId: string, dto: CreateEventRequestDto) {
     const req = this.eventRepo.create({
@@ -69,7 +78,10 @@ export class EventsService {
         const branch = await this.contentService.findBranchById(req.branchId);
         (req as any).branch = branch;
       } catch (error) {
-        this.logger.error(`Failed to load branch ${req.branchId} for event request ${req.id}`, error);
+        this.logger.error(
+          `Failed to load branch ${req.branchId} for event request ${req.id}`,
+          error,
+        );
       }
     }
 
@@ -103,10 +115,15 @@ export class EventsService {
     for (const request of requests) {
       if (request.branchId) {
         try {
-          const branch = await this.contentService.findBranchById(request.branchId);
+          const branch = await this.contentService.findBranchById(
+            request.branchId,
+          );
           (request as any).branch = branch;
         } catch (error) {
-          this.logger.error(`Failed to load branch ${request.branchId} for event request ${request.id}`, error);
+          this.logger.error(
+            `Failed to load branch ${request.branchId} for event request ${request.id}`,
+            error,
+          );
         }
       }
     }
@@ -122,11 +139,19 @@ export class EventsService {
   async quote(id: string, dto: QuoteEventRequestDto) {
     const req = await this.eventRepo.findOne({ where: { id } });
     if (!req) throw new NotFoundException('Request not found');
-    if (req.status !== EventRequestStatus.SUBMITTED && req.status !== EventRequestStatus.UNDER_REVIEW) {
-      throw new BadRequestException('Only submitted/under_review can be quoted');
+    if (
+      req.status !== EventRequestStatus.SUBMITTED &&
+      req.status !== EventRequestStatus.UNDER_REVIEW
+    ) {
+      throw new BadRequestException(
+        'Only submitted/under_review can be quoted',
+      );
     }
     const base = dto.basePrice ?? 0;
-    const addOnsTotal = (req.addOns || []).reduce((s, a) => s + a.price * a.quantity, 0);
+    const addOnsTotal = (req.addOns || []).reduce(
+      (s, a) => s + a.price * a.quantity,
+      0,
+    );
     req.quotedPrice = base + addOnsTotal;
     req.status = EventRequestStatus.QUOTED;
     await this.eventRepo.save(req);
@@ -142,7 +167,10 @@ export class EventsService {
   async confirm(id: string) {
     const req = await this.eventRepo.findOne({ where: { id } });
     if (!req) throw new NotFoundException('Request not found');
-    if (req.status !== EventRequestStatus.PAID && req.status !== EventRequestStatus.QUOTED) {
+    if (
+      req.status !== EventRequestStatus.PAID &&
+      req.status !== EventRequestStatus.QUOTED
+    ) {
       throw new BadRequestException('Only paid/quoted can be confirmed');
     }
 
@@ -166,7 +194,7 @@ export class EventsService {
         status: BookingStatus.CONFIRMED,
         addOns: req.addOns,
         specialRequests: req.notes,
-        // We could store the eventRequestId in specialRequests or metadata if needed, 
+        // We could store the eventRequestId in specialRequests or metadata if needed,
         // but for now just creating the booking ensures tickets can be linked.
       } as Partial<Booking>);
 
@@ -181,7 +209,10 @@ export class EventsService {
           status: TicketStatus.VALID,
           personCount: 1,
           validFrom: savedBooking.startTime,
-          validUntil: new Date(savedBooking.startTime.getTime() + savedBooking.durationHours * 3600 * 1000),
+          validUntil: new Date(
+            savedBooking.startTime.getTime() +
+              savedBooking.durationHours * 3600 * 1000,
+          ),
         } as Partial<Ticket>);
         tickets.push(t);
       }
@@ -217,7 +248,13 @@ export class EventsService {
   async findAllRequests(
     page: number = 1,
     limit: number = 10,
-    filters?: { status?: string; type?: string; branchId?: string; from?: string; to?: string },
+    filters?: {
+      status?: string;
+      type?: string;
+      branchId?: string;
+      from?: string;
+      to?: string;
+    },
   ): Promise<{
     requests: EventRequest[];
     total: number;
@@ -236,9 +273,9 @@ export class EventsService {
     if (filters?.type) where.type = filters.type;
     if (filters?.branchId) where.branchId = filters.branchId;
     if (filters?.from && filters?.to) {
-      where.startTime = ({} as any);
-      (where.startTime as any).$gte = new Date(filters.from) as any;
-      (where.startTime as any).$lte = new Date(filters.to) as any;
+      where.startTime = {} as any;
+      where.startTime.$gte = new Date(filters.from) as any;
+      where.startTime.$lte = new Date(filters.to) as any;
     }
 
     const [requests, total] = await this.eventRepo.findAndCount({
@@ -253,19 +290,37 @@ export class EventsService {
     for (const request of requests) {
       if (request.branchId) {
         try {
-          const branch = await this.contentService.findBranchById(request.branchId);
+          const branch = await this.contentService.findBranchById(
+            request.branchId,
+          );
           (request as any).branch = branch;
         } catch (error) {
-          this.logger.error(`Failed to load branch ${request.branchId} for event request ${request.id}`, error);
+          this.logger.error(
+            `Failed to load branch ${request.branchId} for event request ${request.id}`,
+            error,
+          );
         }
       }
     }
 
-    const pending = await this.eventRepo.count({ where: [{ ...where, status: 'submitted' as any }, { ...where, status: 'under_review' as any }] as any });
-    const quoted = await this.eventRepo.count({ where: { ...where, status: 'quoted' as any } });
-    const confirmed = await this.eventRepo.count({ where: { ...where, status: 'confirmed' as any } });
-    const paidList = await this.eventRepo.find({ where: { ...where, status: 'paid' as any } });
-    const confirmedList = await this.eventRepo.find({ where: { ...where, status: 'confirmed' as any } });
+    const pending = await this.eventRepo.count({
+      where: [
+        { ...where, status: 'submitted' as any },
+        { ...where, status: 'under_review' as any },
+      ] as any,
+    });
+    const quoted = await this.eventRepo.count({
+      where: { ...where, status: 'quoted' as any },
+    });
+    const confirmed = await this.eventRepo.count({
+      where: { ...where, status: 'confirmed' as any },
+    });
+    const paidList = await this.eventRepo.find({
+      where: { ...where, status: 'paid' as any },
+    });
+    const confirmedList = await this.eventRepo.find({
+      where: { ...where, status: 'confirmed' as any },
+    });
     const totalRevenue = [...paidList, ...confirmedList]
       .map((r) => Number(r.quotedPrice || 0))
       .reduce((a, b) => a + b, 0);
@@ -291,7 +346,7 @@ export class EventsService {
       where: { id: eventRequestId },
     });
     if (!eventRequest) throw new NotFoundException('Event request not found');
-    
+
     const isOwner = eventRequest.requesterId === user.id;
     const roles: string[] = user.roles || [];
     const isStaff = roles.includes('staff') || roles.includes('admin');

@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddHallVideoUrl1710000000003 implements MigrationInterface {
-  name = 'AddHallVideoUrl1710000000003'
+  name = 'AddHallVideoUrl1710000000003';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Add videoUrl column to halls table
@@ -13,6 +13,3 @@ export class AddHallVideoUrl1710000000003 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "halls" DROP COLUMN "videoUrl"`);
   }
 }
-
-
-

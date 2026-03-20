@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { HomeAdminService } from './home-admin.service';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
@@ -18,13 +29,17 @@ export class BannerAdminController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiBearerAuth()
-  list() { return this.svc.listBanners(); }
+  list() {
+    return this.svc.listBanners();
+  }
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  create(@Body() body: any) { return this.svc.createBanner(body); }
+  create(@Body() body: any) {
+    return this.svc.createBanner(body);
+  }
 
   @Post('upload')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -39,11 +54,18 @@ export class BannerAdminController {
             join(__dirname, '..', '..', '..', 'uploads'),
             join(__dirname, '..', 'uploads'),
           ].filter(Boolean) as string[];
-          const uploadsRoot = uploadsRootCandidates.find((p) => {
-            try { return !!p && fs.existsSync(p); } catch { return false; }
-          }) || uploadsRootCandidates[0];
+          const uploadsRoot =
+            uploadsRootCandidates.find((p) => {
+              try {
+                return !!p && fs.existsSync(p);
+              } catch {
+                return false;
+              }
+            }) || uploadsRootCandidates[0];
           const target = join(uploadsRoot, 'banners');
-          try { fs.mkdirSync(target, { recursive: true }); } catch {}
+          try {
+            fs.mkdirSync(target, { recursive: true });
+          } catch {}
           cb(null, target);
         },
         filename: (req, file, cb) => {
@@ -61,13 +83,15 @@ export class BannerAdminController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  update(@Param('id') id: string, @Body() body: any) { return this.svc.updateBanner(id, body); }
+  update(@Param('id') id: string, @Body() body: any) {
+    return this.svc.updateBanner(id, body);
+  }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  remove(@Param('id') id: string) { return this.svc.deleteBanner(id); }
+  remove(@Param('id') id: string) {
+    return this.svc.deleteBanner(id);
+  }
 }
-
-

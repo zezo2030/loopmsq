@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsUUID, IsObject, ValidateIf } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateIf,
+} from 'class-validator';
 
 export class ConfirmPaymentDto {
   @ApiPropertyOptional({ format: 'uuid' })
@@ -17,13 +24,15 @@ export class ConfirmPaymentDto {
   @IsUUID()
   tripRequestId?: string;
 
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({
+    description: 'Internal payment id or external gateway payment id',
+  })
+  @IsString()
+  @IsNotEmpty()
   paymentId: string;
 
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  @IsOptional()
   @IsObject()
   gatewayPayload?: Record<string, any>;
 }
-
-

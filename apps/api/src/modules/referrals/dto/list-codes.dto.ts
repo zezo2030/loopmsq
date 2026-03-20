@@ -28,5 +28,3 @@ export class ListCodesDto {
   @Type(() => Number)
   pageSize?: number = 20;
 }
-
-

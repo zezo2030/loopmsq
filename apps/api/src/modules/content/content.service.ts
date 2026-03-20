@@ -10,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, IsNull, Between } from 'typeorm';
 import { Branch } from '../../database/entities/branch.entity';
 import { Addon } from '../../database/entities/addon.entity';
+import { Offer } from '../../database/entities/offer.entity';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { RedisService } from '../../utils/redis.service';
@@ -27,6 +28,8 @@ export class ContentService {
     private branchRepository: Repository<Branch>,
     @InjectRepository(Addon)
     private addonRepository: Repository<Addon>,
+    @InjectRepository(Offer)
+    private offerRepository: Repository<Offer>,
     @InjectRepository(Booking)
     private bookingRepository: Repository<Booking>,
     private redisService: RedisService,
@@ -103,12 +106,7 @@ export class ContentService {
     const branch = this.branchRepository.create({
       ...branchData,
       priceConfig: hallPriceConfig || {
-        basePrice: 500,
         hourlyRate: 100,
-        pricePerPerson: 10,
-        weekendMultiplier: 1.5,
-        holidayMultiplier: 2.0,
-        decorationPrice: 200,
       },
       isDecorated: hallIsDecorated ?? false,
       hallFeatures: hallFeatures || [],
@@ -163,19 +161,23 @@ export class ContentService {
 
       return branches;
     } catch (error) {
-      this.logger.error(`Failed to fetch branches from database: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch branches from database: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
-  async findBranchById(id: string): Promise<Branch> {
+  async findBranchById(id: string): Promise<Branch & { offers?: Offer[] }> {
     const cacheKey = `branch:${id}`;
+    let branch: Branch | null = null;
 
     // Try cache first
     try {
       const cached = await this.redisService.get(cacheKey);
       if (cached) {
-        return cached;
+        branch = cached as Branch;
       }
     } catch (error) {
       this.logger.warn(`Failed to get branch from cache: ${error.message}`);
@@ -183,13 +185,41 @@ export class ContentService {
     }
 
     try {
-      const branch = await this.branchRepository.findOne({
+      branch ??= await this.branchRepository.findOne({
         where: { id },
       });
 
       if (!branch) {
         throw new NotFoundException('Branch not found');
       }
+
+      const now = new Date();
+      const offers = await this.offerRepository.find({
+        where: [
+          { branchId: id, isActive: true, startsAt: IsNull(), endsAt: IsNull() },
+          {
+            branchId: id,
+            isActive: true,
+            startsAt: IsNull(),
+            endsAt: Between(now, new Date('9999-12-31')),
+          },
+          {
+            branchId: id,
+            isActive: true,
+            startsAt: Between(new Date('1970-01-01'), now),
+            endsAt: IsNull(),
+          },
+          {
+            branchId: id,
+            isActive: true,
+            startsAt: Between(new Date('1970-01-01'), now),
+            endsAt: Between(now, new Date('9999-12-31')),
+          },
+        ],
+        order: { createdAt: 'DESC' },
+      });
+
+      const branchWithOffers = Object.assign(branch, { offers });
 
       // Try to cache the result, but don't fail if caching fails
       try {
@@ -199,12 +229,15 @@ export class ContentService {
         // Continue even if caching fails
       }
 
-      return branch;
+      return branchWithOffers;
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      this.logger.error(`Failed to fetch branch from database: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch branch from database: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -236,12 +269,7 @@ export class ContentService {
     // Update hall data if provided
     if (hallPriceConfig) {
       branch.priceConfig = {
-        basePrice: hallPriceConfig.basePrice,
         hourlyRate: hallPriceConfig.hourlyRate,
-        pricePerPerson: hallPriceConfig.pricePerPerson ?? 0,
-        weekendMultiplier: hallPriceConfig.weekendMultiplier,
-        holidayMultiplier: hallPriceConfig.holidayMultiplier,
-        decorationPrice: hallPriceConfig.decorationPrice,
       };
     }
     if (hallIsDecorated !== undefined) branch.isDecorated = hallIsDecorated;
@@ -278,7 +306,10 @@ export class ContentService {
     return updatedBranch;
   }
 
-  async uploadBranchCoverImage(branchId: string, filename: string): Promise<Branch> {
+  async uploadBranchCoverImage(
+    branchId: string,
+    filename: string,
+  ): Promise<Branch> {
     const branch = await this.findBranchById(branchId);
 
     branch.coverImage = `/uploads/branches/${filename}`;
@@ -293,12 +324,17 @@ export class ContentService {
     return updatedBranch;
   }
 
-  async uploadBranchImages(branchId: string, filenames: string[]): Promise<Branch> {
+  async uploadBranchImages(
+    branchId: string,
+    filenames: string[],
+  ): Promise<Branch> {
     const branch = await this.findBranchById(branchId);
 
-    const imageUrls = filenames.map(filename => `/uploads/branches/${filename}`);
+    const imageUrls = filenames.map(
+      (filename) => `/uploads/branches/${filename}`,
+    );
     branch.images = [...(branch.images || []), ...imageUrls];
-    
+
     const updatedBranch = await this.branchRepository.save(branch);
 
     // Clear cache
@@ -314,17 +350,17 @@ export class ContentService {
     const branch = await this.findBranchById(branchId);
 
     const imageUrl = `/uploads/branches/${filename}`;
-    
+
     // Remove from cover image if it matches
     if (branch.coverImage === imageUrl) {
       branch.coverImage = null;
     }
-    
+
     // Remove from images array
     if (branch.images) {
-      branch.images = branch.images.filter(img => img !== imageUrl);
+      branch.images = branch.images.filter((img) => img !== imageUrl);
     }
-    
+
     const updatedBranch = await this.branchRepository.save(branch);
 
     // Clear cache
@@ -337,10 +373,15 @@ export class ContentService {
   }
 
   // Branch Hall Images Management (merged into branch)
-  async uploadBranchHallImages(branchId: string, filenames: string[]): Promise<Branch> {
+  async uploadBranchHallImages(
+    branchId: string,
+    filenames: string[],
+  ): Promise<Branch> {
     const branch = await this.findBranchById(branchId);
 
-    const imageUrls = filenames.map((filename) => `/uploads/branches/halls/${filename}`);
+    const imageUrls = filenames.map(
+      (filename) => `/uploads/branches/halls/${filename}`,
+    );
     branch.hallImages = [...(branch.hallImages || []), ...imageUrls];
 
     const updatedBranch = await this.branchRepository.save(branch);
@@ -353,7 +394,6 @@ export class ContentService {
     this.logger.log(`Branch hall images updated: ${branchId}`);
     return updatedBranch;
   }
-
 
   async updateBranchHallStatus(
     id: string,
@@ -381,10 +421,14 @@ export class ContentService {
     persons?: number,
   ): Promise<boolean> {
     try {
-      this.logger.log(`Checking availability for branch: ${branchId}, startTime: ${startTime}, duration: ${durationHours} hours`);
+      this.logger.log(
+        `Checking availability for branch: ${branchId}, startTime: ${startTime}, duration: ${durationHours} hours`,
+      );
 
       if (Number.isNaN(startTime.getTime())) {
-        this.logger.warn(`Invalid start time provided for branch availability: ${startTime}`);
+        this.logger.warn(
+          `Invalid start time provided for branch availability: ${startTime}`,
+        );
         return false;
       }
 
@@ -401,16 +445,29 @@ export class ContentService {
       const day = startTime.getDay(); // 0 Sunday .. 6 Saturday
       const dayKeys = [
         String(day),
-        ['sun','mon','tue','wed','thu','fri','sat'][day],
-        ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][day],
+        ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][day],
+        [
+          'sunday',
+          'monday',
+          'tuesday',
+          'wednesday',
+          'thursday',
+          'friday',
+          'saturday',
+        ][day],
       ];
       let dayCfg: any;
       for (const k of dayKeys) {
-        if (wh && wh[k] != null) { dayCfg = wh[k]; break; }
+        if (wh && wh[k] != null) {
+          dayCfg = wh[k];
+          break;
+        }
       }
       if (!dayCfg) {
         // If no config for this day, allow by default
-        this.logger.warn(`No working hours for day ${day} on branch ${branch?.id}`);
+        this.logger.warn(
+          `No working hours for day ${day} on branch ${branch?.id}`,
+        );
       } else {
         if (dayCfg.closed === true) {
           this.logger.log(`Branch closed on day ${day}`);
@@ -419,15 +476,21 @@ export class ContentService {
         const openStr: string | undefined = dayCfg.open;
         const closeStr: string | undefined = dayCfg.close;
         if (openStr && closeStr) {
-          const [oH, oM] = openStr.split(':').map((v: string) => parseInt(v, 10));
-          const [cH, cM] = closeStr.split(':').map((v: string) => parseInt(v, 10));
+          const [oH, oM] = openStr
+            .split(':')
+            .map((v: string) => parseInt(v, 10));
+          const [cH, cM] = closeStr
+            .split(':')
+            .map((v: string) => parseInt(v, 10));
           const openAt = new Date(startTime);
           openAt.setHours(oH || 0, oM || 0, 0, 0);
           const closeAt = new Date(startTime);
           closeAt.setHours(cH || 0, cM || 0, 0, 0);
           const endTime = this.calculateBookingEnd(startTime, durationHours);
           if (startTime < openAt || endTime > closeAt) {
-            this.logger.log(`Requested time ${startTime.toISOString()} - ${endTime.toISOString()} is outside working hours ${openAt.toISOString()} - ${closeAt.toISOString()}`);
+            this.logger.log(
+              `Requested time ${startTime.toISOString()} - ${endTime.toISOString()} is outside working hours ${openAt.toISOString()} - ${closeAt.toISOString()}`,
+            );
             return false;
           }
         }
@@ -477,10 +540,15 @@ export class ContentService {
         }
       }
 
-      this.logger.log(`Branch availability check passed (within working hours) for branch: ${branchId}`);
+      this.logger.log(
+        `Branch availability check passed (within working hours) for branch: ${branchId}`,
+      );
       return true;
     } catch (error) {
-      this.logger.error(`Error checking branch availability: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error checking branch availability: ${error.message}`,
+        error.stack,
+      );
       // Return true as fallback to allow booking
       return true;
     }
@@ -515,9 +583,7 @@ export class ContentService {
           : this.slotMinutes;
       const intervalMs = slotMinutesToUse * 60 * 1000;
       const normalizedDurationHours =
-        Number.isFinite(durationHours) && durationHours > 0
-          ? durationHours
-          : 1;
+        Number.isFinite(durationHours) && durationHours > 0 ? durationHours : 1;
       const requiredSlots = Math.max(
         1,
         Math.ceil((normalizedDurationHours * 60) / slotMinutesToUse),
@@ -528,7 +594,15 @@ export class ContentService {
       const dayKeys = [
         String(day),
         ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][day],
-        ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][day],
+        [
+          'sunday',
+          'monday',
+          'tuesday',
+          'wednesday',
+          'thursday',
+          'friday',
+          'saturday',
+        ][day],
       ];
       let dayCfg: any;
       for (const key of dayKeys) {
@@ -539,18 +613,24 @@ export class ContentService {
       }
 
       if (!dayCfg) {
-        this.logger.warn(`No working hours configured for date ${targetDate.toISOString()} on branch ${branch?.id}`);
+        this.logger.warn(
+          `No working hours configured for date ${targetDate.toISOString()} on branch ${branch?.id}`,
+        );
         return [];
       }
       if (dayCfg.closed === true) {
-        this.logger.log(`Branch closed on ${targetDate.toISOString()} (day ${day})`);
+        this.logger.log(
+          `Branch closed on ${targetDate.toISOString()} (day ${day})`,
+        );
         return [];
       }
 
       const openStr: string | undefined = dayCfg.open;
       const closeStr: string | undefined = dayCfg.close;
       if (!openStr || !closeStr) {
-        this.logger.warn(`Incomplete working hours for branch ${branch?.id} on day ${day}`);
+        this.logger.warn(
+          `Incomplete working hours for branch ${branch?.id} on day ${day}`,
+        );
         return [];
       }
 
@@ -562,7 +642,9 @@ export class ContentService {
       closeAt.setHours(cH || 0, cM || 0, 0, 0);
 
       if (openAt >= closeAt) {
-        this.logger.warn(`Invalid working hours window for branch ${branch?.id} on ${targetDate.toISOString()}`);
+        this.logger.warn(
+          `Invalid working hours window for branch ${branch?.id} on ${targetDate.toISOString()}`,
+        );
         return [];
       }
 
@@ -572,7 +654,9 @@ export class ContentService {
         (alignedOpen.getHours() * 60 + alignedOpen.getMinutes()) %
         slotMinutesToUse;
       if (openRemainder !== 0) {
-        alignedOpen.setMinutes(alignedOpen.getMinutes() + (slotMinutesToUse - openRemainder));
+        alignedOpen.setMinutes(
+          alignedOpen.getMinutes() + (slotMinutesToUse - openRemainder),
+        );
       }
 
       const alignedClose = new Date(closeAt);
@@ -585,7 +669,9 @@ export class ContentService {
       }
 
       if (alignedOpen >= alignedClose) {
-        this.logger.warn(`Working hours for branch ${branch?.id} do not produce any slots after alignment`);
+        this.logger.warn(
+          `Working hours for branch ${branch?.id} do not produce any slots after alignment`,
+        );
         return [];
       }
 
@@ -657,7 +743,10 @@ export class ContentService {
 
       return slots;
     } catch (error) {
-      this.logger.error(`Error generating slots for branch ${branchId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error generating slots for branch ${branchId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -669,63 +758,43 @@ export class ContentService {
     durationHours: number,
     persons: number,
   ): Promise<{
-    basePrice: number;
+    hourlyRate: number;
     hourlyPrice: number;
-    personsPrice: number;
-    pricePerPerson: number;
-    multiplier: number;
-    decorationPrice: number;
     totalPrice: number;
   }> {
     const branch = await this.findBranchById(branchId);
     if (!branch.priceConfig) {
-      throw new BadRequestException('Branch does not have pricing configuration');
+      throw new BadRequestException(
+        'Branch does not have pricing configuration',
+      );
     }
     const { priceConfig } = branch;
 
-    // Determine multiplier based on day type
-    const dayOfWeek = startTime.getDay();
-    const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Friday, Saturday
+    // New simplified pricing model:
+    // - Pricing depends only on hourly rate and duration
+    // - Add-ons are calculated separately in the bookings service
+    // - No base price, per-person pricing, decoration fees, or multipliers
 
-    // TODO: Add holiday detection logic
-    const isHoliday = false;
-
-    let multiplier = 1;
-    if (isHoliday) {
-      multiplier = priceConfig.holidayMultiplier;
-    } else if (isWeekend) {
-      multiplier = priceConfig.weekendMultiplier;
-    }
-
-    const basePrice = priceConfig.basePrice;
-    const hourlyPrice = priceConfig.hourlyRate * durationHours;
-    const pricePerPerson = priceConfig.pricePerPerson || 0;
-    const personsPrice = pricePerPerson * persons;
-    const decorationPrice = branch.isDecorated
-      ? priceConfig.decorationPrice || 0
-      : 0;
-
-    const subtotal = basePrice + hourlyPrice + personsPrice + decorationPrice;
-    const totalPrice = subtotal * multiplier;
+    const hourlyRate = priceConfig.hourlyRate;
+    const hourlyPrice = hourlyRate * durationHours;
+    const totalPrice = hourlyPrice;
 
     return {
-      basePrice,
+      hourlyRate,
       hourlyPrice,
-      personsPrice,
-      pricePerPerson,
-      multiplier,
-      decorationPrice,
       totalPrice: Math.round(totalPrice * 100) / 100, // Round to 2 decimal places
     };
   }
 
   // Add-ons fetching
-  async getBranchAddOns(branchId: string): Promise<
+  async getBranchAddOns(
+    branchId: string,
+  ): Promise<
     { id: string; name: string; price: number; defaultQuantity: number }[]
   > {
     // Pull active add-ons for the branch
-    const branchAddons = await this.addonRepository.find({ 
-      where: { isActive: true, branchId } 
+    const branchAddons = await this.addonRepository.find({
+      where: { isActive: true, branchId },
     });
 
     return branchAddons.map((a) => ({

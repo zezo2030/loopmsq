@@ -1,4 +1,11 @@
-import { Controller, Get, Query, Res, UseGuards, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  Res,
+  UseGuards,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import type { Response } from 'express';
@@ -55,7 +62,10 @@ export class ReportsController {
     const data = await this.reports.overview({ from, to, branchId });
     const csv = this.toCSV(type || 'overview', data);
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="${type || 'overview'}.csv"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${type || 'overview'}.csv"`,
+    );
     res.send(csv);
   }
 
@@ -67,12 +77,13 @@ export class ReportsController {
         ['bookings_confirmed', data.bookings.confirmed],
         ['bookings_cancelled', data.bookings.cancelled],
         ['scans', data.scans],
-        ...Object.entries(data.revenueByMethod).map(([k, v]) => [`revenue_${k}`, v]),
+        ...Object.entries(data.revenueByMethod).map(([k, v]) => [
+          `revenue_${k}`,
+          v,
+        ]),
       ];
       return rows.map((r) => r.join(',')).join('\n');
     }
     return 'metric,value\n';
   }
 }
-
-

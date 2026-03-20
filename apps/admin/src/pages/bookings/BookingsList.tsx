@@ -550,37 +550,9 @@ export default function BookingsList() {
                           <div style={{ fontWeight: 600, marginBottom: 8, color: '#1890ff' }}>تفصيل التسعير</div>
                           <div style={{ fontSize: '12px', lineHeight: '1.6' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                              <span>السعر الأساسي:</span>
-                              <span>{record.pricing.basePrice?.toLocaleString() || 0} ر.س</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                              <span>السعر بالساعة:</span>
+                              <span>تسعير الساعات:</span>
                               <span>{record.pricing.hourlyPrice?.toLocaleString() || 0} ر.س</span>
                             </div>
-                            {record.pricing.pricePerPerson > 0 && (
-                              <>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                  <span>السعر لكل شخص:</span>
-                                  <span style={{ color: '#52c41a' }}>{record.pricing.pricePerPerson?.toLocaleString() || 0} ر.س</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                  <span>إجمالي الأشخاص:</span>
-                                  <span style={{ color: '#52c41a' }}>{record.pricing.personsPrice?.toLocaleString() || 0} ر.س</span>
-                                </div>
-                              </>
-                            )}
-                            {record.pricing.decorationPrice > 0 && (
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                <span>سعر الديكور:</span>
-                                <span>{record.pricing.decorationPrice?.toLocaleString() || 0} ر.س</span>
-                              </div>
-                            )}
-                            {record.pricing.multiplier !== 1 && (
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                <span>المضاعف:</span>
-                                <span style={{ color: '#fa8c16' }}>× {record.pricing.multiplier || 1}</span>
-                              </div>
-                            )}
                           </div>
                         </Col>
                       )}
@@ -635,5 +607,6 @@ export default function BookingsList() {
     </div>
   )
 }
+
 
 

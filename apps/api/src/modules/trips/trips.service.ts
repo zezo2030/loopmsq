@@ -1,5 +1,13 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { SchoolTripRequest, TripRequestStatus } from '../../database/entities/school-trip-request.entity';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  SchoolTripRequest,
+  TripRequestStatus,
+} from '../../database/entities/school-trip-request.entity';
 import * as XLSX from 'xlsx';
 import { InvoiceTripRequestDto } from './dto/invoice-trip-request.dto';
 import { IssueTicketsDto } from './dto/issue-tickets.dto';
@@ -30,7 +38,7 @@ export class TripsService {
     @InjectRepository(Payment)
     private readonly paymentRepo: Repository<Payment>,
     private readonly notifications: NotificationsService,
-  ) { }
+  ) {}
 
   async createRequest(userId: string, dto: CreateTripRequestDto) {
     const req = this.tripRepo.create({
@@ -68,7 +76,9 @@ export class TripsService {
   }
 
   async submitRequest(userId: string, id: string, dto: SubmitTripRequestDto) {
-    const req = await this.tripRepo.findOne({ where: { id, requesterId: userId } });
+    const req = await this.tripRepo.findOne({
+      where: { id, requesterId: userId },
+    });
     if (!req) throw new NotFoundException('Request not found');
     if (req.status !== TripRequestStatus.PENDING) {
       throw new BadRequestException('Only pending requests can be submitted');
@@ -85,20 +95,32 @@ export class TripsService {
     return { success: true };
   }
 
-  async approveRequest(approverId: string, id: string, quotedPrice?: number, adminNotes?: string) {
+  async approveRequest(
+    approverId: string,
+    id: string,
+    quotedPrice?: number,
+    adminNotes?: string,
+  ) {
     const req = await this.tripRepo.findOne({ where: { id } });
     if (!req) throw new NotFoundException('Request not found');
     if (req.status !== TripRequestStatus.UNDER_REVIEW) {
-      throw new BadRequestException('Only under_review requests can be approved');
+      throw new BadRequestException(
+        'Only under_review requests can be approved',
+      );
     }
 
     // Calculate price if not provided
     if (quotedPrice) {
       req.quotedPrice = quotedPrice;
     } else {
-      const baseCount = (req.studentsList?.length || req.studentsCount) + (req.accompanyingAdults || 0);
+      const baseCount =
+        (req.studentsList?.length || req.studentsCount) +
+        (req.accompanyingAdults || 0);
       const pricePerPerson = 50; // SAR default pricing
-      const addOnsTotal = (req.addOns || []).reduce((sum, a) => sum + (a.price * a.quantity), 0);
+      const addOnsTotal = (req.addOns || []).reduce(
+        (sum, a) => sum + a.price * a.quantity,
+        0,
+      );
       req.quotedPrice = baseCount * pricePerPerson + addOnsTotal;
     }
 
@@ -122,7 +144,12 @@ export class TripsService {
     return { success: true, quotedPrice: req.quotedPrice };
   }
 
-  async uploadParticipants(userId: string, id: string, file: Express.Multer.File, userRoles?: string[]) {
+  async uploadParticipants(
+    userId: string,
+    id: string,
+    file: Express.Multer.File,
+    userRoles?: string[],
+  ) {
     const req = await this.tripRepo.findOne({ where: { id } });
     if (!req) throw new NotFoundException('Request not found');
     const isOwner = req.requesterId === userId;
@@ -132,8 +159,13 @@ export class TripsService {
       throw new ForbiddenException('Not allowed');
     }
     // Only pending or under_review requests can have participants uploaded
-    if (req.status !== TripRequestStatus.PENDING && req.status !== TripRequestStatus.UNDER_REVIEW) {
-      throw new BadRequestException('Participants can only be uploaded for pending or under-review requests');
+    if (
+      req.status !== TripRequestStatus.PENDING &&
+      req.status !== TripRequestStatus.UNDER_REVIEW
+    ) {
+      throw new BadRequestException(
+        'Participants can only be uploaded for pending or under-review requests',
+      );
     }
     if (!file) throw new BadRequestException('File is required');
     const workbook = XLSX.readFile(file.path);
@@ -145,7 +177,9 @@ export class TripsService {
     });
     const participants = rows.map((r, idx) => {
       if (!r.name || !r.guardianPhone) {
-        throw new BadRequestException(`Invalid row ${idx + 2}: name and guardianPhone are required`);
+        throw new BadRequestException(
+          `Invalid row ${idx + 2}: name and guardianPhone are required`,
+        );
       }
       return {
         name: String(r.name).trim(),
@@ -163,8 +197,18 @@ export class TripsService {
 
   async getTemplate(): Promise<Buffer> {
     const ws = XLSX.utils.json_to_sheet([
-      { name: 'الطالب 1', age: 10, guardianName: 'ولي الأمر 1', guardianPhone: '0500000000' },
-      { name: 'الطالب 2', age: 11, guardianName: 'ولي الأمر 2', guardianPhone: '0500000001' },
+      {
+        name: 'الطالب 1',
+        age: 10,
+        guardianName: 'ولي الأمر 1',
+        guardianPhone: '0500000000',
+      },
+      {
+        name: 'الطالب 2',
+        age: 11,
+        guardianName: 'ولي الأمر 2',
+        guardianPhone: '0500000001',
+      },
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
@@ -172,16 +216,26 @@ export class TripsService {
     return buf as Buffer;
   }
 
-  async createInvoice(approverId: string, id: string, dto: InvoiceTripRequestDto) {
+  async createInvoice(
+    approverId: string,
+    id: string,
+    dto: InvoiceTripRequestDto,
+  ) {
     const req = await this.tripRepo.findOne({ where: { id } });
     if (!req) throw new NotFoundException('Request not found');
     if (req.status !== TripRequestStatus.APPROVED) {
       throw new BadRequestException('Only approved requests can be invoiced');
     }
-    const baseCount = (req.studentsList?.length || req.studentsCount) + (req.accompanyingAdults || 0);
+    const baseCount =
+      (req.studentsList?.length || req.studentsCount) +
+      (req.accompanyingAdults || 0);
     const pricePerPerson = 50; // SAR mock pricing
-    const addOnsTotal = (req.addOns || []).reduce((sum, a) => sum + (a.price * a.quantity), 0);
-    const total = dto.overrideAmount ?? baseCount * pricePerPerson + addOnsTotal;
+    const addOnsTotal = (req.addOns || []).reduce(
+      (sum, a) => sum + a.price * a.quantity,
+      0,
+    );
+    const total =
+      dto.overrideAmount ?? baseCount * pricePerPerson + addOnsTotal;
     req.quotedPrice = total;
     req.status = TripRequestStatus.INVOICED;
     req.invoiceId = `inv_${req.id}`;
@@ -192,7 +246,11 @@ export class TripsService {
       data: { status: 'INVOICED' },
       channels: ['sms', 'push'],
     });
-    return { invoiceId: req.invoiceId, amount: total, currency: dto.currency || 'SAR' };
+    return {
+      invoiceId: req.invoiceId,
+      amount: total,
+      currency: dto.currency || 'SAR',
+    };
   }
 
   async issueTickets(issuerId: string, id: string, dto: IssueTicketsDto) {
@@ -200,8 +258,13 @@ export class TripsService {
     if (!req) throw new NotFoundException('Request not found');
 
     // Allow issuing tickets after payment (PAID) or directly after approval (APPROVED)
-    if (req.status !== TripRequestStatus.PAID && req.status !== TripRequestStatus.APPROVED) {
-      throw new BadRequestException('Tickets can be issued only after payment or approval');
+    if (
+      req.status !== TripRequestStatus.PAID &&
+      req.status !== TripRequestStatus.APPROVED
+    ) {
+      throw new BadRequestException(
+        'Tickets can be issued only after payment or approval',
+      );
     }
 
     // Create a booking representing the trip
@@ -239,7 +302,8 @@ export class TripsService {
         holderPhone: student.guardianPhone,
         validFrom: savedBooking.startTime as any,
         validUntil: new Date(
-          (savedBooking.startTime as any as Date).getTime() + (savedBooking.durationHours as any as number) * 3600 * 1000,
+          (savedBooking.startTime as any as Date).getTime() +
+            (savedBooking.durationHours as any as number) * 3600 * 1000,
         ),
         metadata: {
           studentAge: student.age,
@@ -260,7 +324,8 @@ export class TripsService {
         holderName: `مرافق ${i + 1}`, // ✅ اسم عام للمرافقين
         validFrom: savedBooking.startTime as any,
         validUntil: new Date(
-          (savedBooking.startTime as any as Date).getTime() + (savedBooking.durationHours as any as number) * 3600 * 1000,
+          (savedBooking.startTime as any as Date).getTime() +
+            (savedBooking.durationHours as any as number) * 3600 * 1000,
         ),
         metadata: {
           tripType: 'school',
@@ -291,7 +356,9 @@ export class TripsService {
     const req = await this.tripRepo.findOne({ where: { id } });
     if (!req) throw new NotFoundException('Request not found');
     if (req.status !== TripRequestStatus.INVOICED) {
-      throw new BadRequestException('Only invoiced requests can be marked paid');
+      throw new BadRequestException(
+        'Only invoiced requests can be marked paid',
+      );
     }
     req.status = TripRequestStatus.PAID;
     await this.tripRepo.save(req);
@@ -305,11 +372,20 @@ export class TripsService {
   }
 
   // ──── Reject trip request (Admin/Staff) ────
-  async rejectRequest(approverId: string, id: string, dto: RejectTripRequestDto) {
+  async rejectRequest(
+    approverId: string,
+    id: string,
+    dto: RejectTripRequestDto,
+  ) {
     const req = await this.tripRepo.findOne({ where: { id } });
     if (!req) throw new NotFoundException('Request not found');
-    if (req.status !== TripRequestStatus.UNDER_REVIEW && req.status !== TripRequestStatus.PENDING) {
-      throw new BadRequestException('Only pending or under-review requests can be rejected');
+    if (
+      req.status !== TripRequestStatus.UNDER_REVIEW &&
+      req.status !== TripRequestStatus.PENDING
+    ) {
+      throw new BadRequestException(
+        'Only pending or under-review requests can be rejected',
+      );
     }
     req.status = TripRequestStatus.REJECTED;
     req.rejectionReason = dto.rejectionReason;
@@ -332,7 +408,9 @@ export class TripsService {
 
   // ──── Cancel trip request (User cancels own request) ────
   async cancelRequest(userId: string, id: string, dto: CancelTripRequestDto) {
-    const req = await this.tripRepo.findOne({ where: { id, requesterId: userId } });
+    const req = await this.tripRepo.findOne({
+      where: { id, requesterId: userId },
+    });
     if (!req) throw new NotFoundException('Request not found');
 
     // Only pending, under_review, or approved requests can be cancelled by user
@@ -356,24 +434,32 @@ export class TripsService {
 
   // ──── Update draft trip request (User updates own pending request) ────
   async updateRequest(userId: string, id: string, dto: UpdateTripRequestDto) {
-    const req = await this.tripRepo.findOne({ where: { id, requesterId: userId } });
+    const req = await this.tripRepo.findOne({
+      where: { id, requesterId: userId },
+    });
     if (!req) throw new NotFoundException('Request not found');
     if (req.status !== TripRequestStatus.PENDING) {
-      throw new BadRequestException('Only pending (draft) requests can be updated');
+      throw new BadRequestException(
+        'Only pending (draft) requests can be updated',
+      );
     }
 
     // Apply partial updates
     if (dto.branchId !== undefined) req.branchId = dto.branchId;
     if (dto.schoolName !== undefined) req.schoolName = dto.schoolName;
     if (dto.studentsCount !== undefined) req.studentsCount = dto.studentsCount;
-    if (dto.accompanyingAdults !== undefined) req.accompanyingAdults = dto.accompanyingAdults;
-    if (dto.preferredDate !== undefined) req.preferredDate = new Date(dto.preferredDate) as any;
+    if (dto.accompanyingAdults !== undefined)
+      req.accompanyingAdults = dto.accompanyingAdults;
+    if (dto.preferredDate !== undefined)
+      req.preferredDate = new Date(dto.preferredDate) as any;
     if (dto.preferredTime !== undefined) req.preferredTime = dto.preferredTime;
     if (dto.durationHours !== undefined) req.durationHours = dto.durationHours;
-    if (dto.contactPersonName !== undefined) req.contactPersonName = dto.contactPersonName;
+    if (dto.contactPersonName !== undefined)
+      req.contactPersonName = dto.contactPersonName;
     if (dto.contactPhone !== undefined) req.contactPhone = dto.contactPhone;
     if (dto.contactEmail !== undefined) req.contactEmail = dto.contactEmail;
-    if (dto.specialRequirements !== undefined) req.specialRequirements = dto.specialRequirements;
+    if (dto.specialRequirements !== undefined)
+      req.specialRequirements = dto.specialRequirements;
     if (dto.addOns !== undefined) req.addOns = dto.addOns as any;
 
     const saved = await this.tripRepo.save(req);
@@ -429,9 +515,9 @@ export class TripsService {
     const where: any = {};
     if (filters?.status) where.status = filters.status as any;
     if (filters?.from && filters?.to) {
-      where.preferredDate = ({} as any);
-      (where.preferredDate as any).$gte = new Date(filters.from) as any;
-      (where.preferredDate as any).$lte = new Date(filters.to) as any;
+      where.preferredDate = {} as any;
+      where.preferredDate.$gte = new Date(filters.from) as any;
+      where.preferredDate.$lte = new Date(filters.to) as any;
     }
 
     const [requests, total] = await this.tripRepo.findAndCount({
@@ -442,11 +528,21 @@ export class TripsService {
     } as any);
 
     // Stats (respect filters)
-    const pending = await this.tripRepo.count({ where: { ...where, status: 'pending' as any } });
-    const approved = await this.tripRepo.count({ where: { ...where, status: 'approved' as any } });
-    const completed = await this.tripRepo.count({ where: { ...where, status: 'completed' as any } });
-    const paidList = await this.tripRepo.find({ where: { ...where, status: 'paid' as any } });
-    const completedList = await this.tripRepo.find({ where: { ...where, status: 'completed' as any } });
+    const pending = await this.tripRepo.count({
+      where: { ...where, status: 'pending' as any },
+    });
+    const approved = await this.tripRepo.count({
+      where: { ...where, status: 'approved' as any },
+    });
+    const completed = await this.tripRepo.count({
+      where: { ...where, status: 'completed' as any },
+    });
+    const paidList = await this.tripRepo.find({
+      where: { ...where, status: 'paid' as any },
+    });
+    const completedList = await this.tripRepo.find({
+      where: { ...where, status: 'completed' as any },
+    });
     const totalRevenue = [...paidList, ...completedList]
       .map((r) => Number(r.quotedPrice || 0))
       .reduce((a, b) => a + b, 0);
@@ -471,8 +567,14 @@ export class TripsService {
    * This will create a payment intent  and after successful payment,
    * automatically issue tickets and mark as completed
    */
-  async payForTrip(userId: string, id: string, dto: { paymentMethod?: string }) {
-    const req = await this.tripRepo.findOne({ where: { id, requesterId: userId } });
+  async payForTrip(
+    userId: string,
+    id: string,
+    dto: { paymentMethod?: string },
+  ) {
+    const req = await this.tripRepo.findOne({
+      where: { id, requesterId: userId },
+    });
     if (!req) throw new NotFoundException('Request not found');
 
     if (req.status !== TripRequestStatus.APPROVED) {
@@ -580,5 +682,3 @@ export class TripsService {
     return [];
   }
 }
-
-

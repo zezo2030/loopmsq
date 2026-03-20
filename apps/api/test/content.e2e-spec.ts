@@ -34,4 +34,3 @@ describe('ContentController - Slots Endpoint (e2e)', () => {
       .expect(400);
   });
 });
-

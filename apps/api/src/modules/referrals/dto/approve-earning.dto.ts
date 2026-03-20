@@ -7,5 +7,3 @@ export class ApproveEarningDto {
   @IsString()
   note?: string;
 }
-
-

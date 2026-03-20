@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class UpdateSmsConfigDto {
   @ApiProperty({
@@ -38,5 +44,3 @@ export class UpdateSmsConfigDto {
   @MinLength(5)
   whatsappPhoneNumberId?: string;
 }
-
-

@@ -14,5 +14,3 @@ export class GiftTicketDto {
   @Length(5, 20)
   holderPhone?: string;
 }
-
-

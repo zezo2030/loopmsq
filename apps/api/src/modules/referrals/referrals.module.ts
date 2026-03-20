@@ -10,7 +10,11 @@ import { LoyaltyModule } from '../loyalty/loyalty.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ReferralCode, ReferralAttribution, ReferralEarning]),
+    TypeOrmModule.forFeature([
+      ReferralCode,
+      ReferralAttribution,
+      ReferralEarning,
+    ]),
     UsersModule,
     LoyaltyModule,
   ],
@@ -19,5 +23,3 @@ import { LoyaltyModule } from '../loyalty/loyalty.module';
   exports: [ReferralsService],
 })
 export class ReferralsModule {}
-
-

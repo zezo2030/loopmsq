@@ -32,6 +32,7 @@ import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import * as fs from 'fs';
 import { ContentService } from './content.service';
+import { CloudinaryService } from '../../utils/cloudinary.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -43,7 +44,10 @@ import { UpdateAddonDto } from './dto/update-addon.dto';
 @ApiTags('content')
 @Controller('content')
 export class ContentController {
-  constructor(private readonly contentService: ContentService) {}
+  constructor(
+    private readonly contentService: ContentService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   // Branch endpoints
   @Post('branches')
@@ -60,39 +64,62 @@ export class ContentController {
 
   @Get('branches')
   @ApiOperation({ summary: 'Get all branches' })
-  @ApiQuery({ name: 'includeInactive', required: false, type: String, description: 'true|false|1|0' })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    type: String,
+    description: 'true|false|1|0',
+  })
   @ApiResponse({ status: 200, description: 'Branches retrieved successfully' })
-  async findAllBranches(
-    @Query('includeInactive') includeInactive?: string,
-  ) {
-    const includeInactiveBool = includeInactive === 'true' || includeInactive === '1' || includeInactive === 'yes';
+  async findAllBranches(@Query('includeInactive') includeInactive?: string) {
+    const includeInactiveBool =
+      includeInactive === 'true' ||
+      includeInactive === '1' ||
+      includeInactive === 'yes';
     return this.contentService.findAllBranches(includeInactiveBool);
   }
 
   // Compatibility endpoint: /halls redirects to branches (halls are now merged into branches)
   @Get('halls')
-  @ApiOperation({ summary: 'Get all branches (compatibility endpoint - halls are merged into branches)' })
-  @ApiQuery({ name: 'branchId', required: false, type: String, description: 'Filter by branch ID' })
-  @ApiQuery({ name: 'includeInactive', required: false, type: String, description: 'true|false|1|0' })
+  @ApiOperation({
+    summary:
+      'Get all branches (compatibility endpoint - halls are merged into branches)',
+  })
+  @ApiQuery({
+    name: 'branchId',
+    required: false,
+    type: String,
+    description: 'Filter by branch ID',
+  })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    type: String,
+    description: 'true|false|1|0',
+  })
   @ApiResponse({ status: 200, description: 'Branches retrieved successfully' })
   async findAllHalls(
     @Query('branchId') branchId?: string,
     @Query('includeInactive') includeInactive?: string,
   ) {
-    const includeInactiveBool = includeInactive === 'true' || includeInactive === '1' || includeInactive === 'yes';
-    const branches = await this.contentService.findAllBranches(includeInactiveBool);
-    
+    const includeInactiveBool =
+      includeInactive === 'true' ||
+      includeInactive === '1' ||
+      includeInactive === 'yes';
+    const branches =
+      await this.contentService.findAllBranches(includeInactiveBool);
+
     // Compatibility Fix: ensure branchId is set to id for mobile app compatibility
-    const branchesWithFix = branches.map(b => ({
+    const branchesWithFix = branches.map((b) => ({
       ...b,
-      branchId: b.id // Add this so mobile app doesn't see null
+      branchId: b.id, // Add this so mobile app doesn't see null
     }));
 
     // Filter by branchId if provided
     if (branchId) {
       return branchesWithFix.filter((branch) => branch.id === branchId);
     }
-    
+
     return branchesWithFix;
   }
 
@@ -106,7 +133,10 @@ export class ContentController {
 
   // Compatibility endpoint: /halls/:id redirects to branches/:id
   @Get('halls/:id')
-  @ApiOperation({ summary: 'Get branch by ID (compatibility endpoint - halls are merged into branches)' })
+  @ApiOperation({
+    summary:
+      'Get branch by ID (compatibility endpoint - halls are merged into branches)',
+  })
   @ApiResponse({ status: 200, description: 'Branch retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Branch not found' })
   async findHallById(@Param('id', ParseUUIDPipe) id: string) {
@@ -155,13 +185,68 @@ export class ContentController {
     return this.contentService.updateBranchStatus(id, status);
   }
 
+  @Post('branches/upload-video')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload branch video to Cloudinary' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadBranchVideo(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Video file is required');
+    }
+    if (!file.mimetype.startsWith('video/')) {
+      throw new BadRequestException('File must be a video');
+    }
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxSize) {
+      throw new BadRequestException('Video file size must be less than 100MB');
+    }
+    const { videoUrl, coverUrl } = await this.cloudinaryService.uploadVideo(
+      file,
+      'branches/videos',
+    );
+    return { videoUrl, coverUrl };
+  }
+
+  @Post('branches/upload-video-cover')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload branch video cover image to Cloudinary' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadBranchVideoCover(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Cover image file is required');
+    }
+    if (!file.mimetype.startsWith('image/')) {
+      throw new BadRequestException('File must be an image');
+    }
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      throw new BadRequestException(
+        'Cover image file size must be less than 10MB',
+      );
+    }
+    const coverUrl = await this.cloudinaryService.uploadImage(
+      file,
+      'branches/video-covers',
+    );
+    return { coverUrl };
+  }
+
   @Post('branches/:id/upload-cover')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Upload branch cover image' })
   @ApiConsumes('multipart/form-data')
-  @ApiResponse({ status: 200, description: 'Cover image uploaded successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cover image uploaded successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Branch not found' })
@@ -175,11 +260,18 @@ export class ContentController {
             join(__dirname, '..', '..', '..', 'uploads'),
             join(__dirname, '..', 'uploads'),
           ].filter(Boolean) as string[];
-          const uploadsRoot = uploadsRootCandidates.find((p) => {
-            try { return !!p && fs.existsSync(p); } catch { return false; }
-          }) || uploadsRootCandidates[0];
+          const uploadsRoot =
+            uploadsRootCandidates.find((p) => {
+              try {
+                return !!p && fs.existsSync(p);
+              } catch {
+                return false;
+              }
+            }) || uploadsRootCandidates[0];
           const target = join(uploadsRoot, 'branches');
-          try { fs.mkdirSync(target, { recursive: true }); } catch {}
+          try {
+            fs.mkdirSync(target, { recursive: true });
+          } catch {}
           cb(null, target);
         },
         filename: (req, file, cb) => {
@@ -222,11 +314,18 @@ export class ContentController {
             join(__dirname, '..', '..', '..', 'uploads'),
             join(__dirname, '..', 'uploads'),
           ].filter(Boolean) as string[];
-          const uploadsRoot = uploadsRootCandidates.find((p) => {
-            try { return !!p && fs.existsSync(p); } catch { return false; }
-          }) || uploadsRootCandidates[0];
+          const uploadsRoot =
+            uploadsRootCandidates.find((p) => {
+              try {
+                return !!p && fs.existsSync(p);
+              } catch {
+                return false;
+              }
+            }) || uploadsRootCandidates[0];
           const target = join(uploadsRoot, 'branches');
-          try { fs.mkdirSync(target, { recursive: true }); } catch {}
+          try {
+            fs.mkdirSync(target, { recursive: true });
+          } catch {}
           cb(null, target);
         },
         filename: (req, file, cb) => {
@@ -247,10 +346,9 @@ export class ContentController {
         throw new ForbiddenException('Not allowed');
       }
     }
-    const filenames = files.map(file => file.filename);
+    const filenames = files.map((file) => file.filename);
     return this.contentService.uploadBranchImages(id, filenames);
   }
-
 
   @Delete('branches/:id/images/:filename')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -298,7 +396,11 @@ export class ContentController {
   // Utility endpoints - moved from halls to branches
   @Get('branches/:id/slots')
   @ApiOperation({ summary: 'List available booking slots for a branch' })
-  @ApiQuery({ name: 'date', type: String, description: 'ISO date string (required)' })
+  @ApiQuery({
+    name: 'date',
+    type: String,
+    description: 'ISO date string (required)',
+  })
   @ApiQuery({ name: 'durationHours', type: Number, required: false })
   @ApiQuery({ name: 'slotMinutes', type: Number, required: false })
   @ApiQuery({ name: 'persons', type: Number, required: false })
@@ -408,9 +510,7 @@ export class ContentController {
   @Get('branches/:id/addons')
   @ApiOperation({ summary: 'List available add-ons for a branch' })
   @ApiResponse({ status: 200, description: 'Add-ons retrieved successfully' })
-  async getBranchAddOns(
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  async getBranchAddOns(@Param('id', ParseUUIDPipe) id: string) {
     return this.contentService.getBranchAddOns(id);
   }
 
@@ -419,7 +519,9 @@ export class ContentController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update branch hall status (compatibility endpoint)' })
+  @ApiOperation({
+    summary: 'Update branch hall status (compatibility endpoint)',
+  })
   @ApiResponse({ status: 200, description: 'Hall status updated successfully' })
   async updateHallStatus(
     @Param('id', ParseUUIDPipe) id: string,
@@ -435,8 +537,15 @@ export class ContentController {
   }
 
   @Get('halls/:id/slots')
-  @ApiOperation({ summary: 'List available booking slots for a branch (compatibility endpoint)' })
-  @ApiQuery({ name: 'date', type: String, description: 'ISO date string (required)' })
+  @ApiOperation({
+    summary:
+      'List available booking slots for a branch (compatibility endpoint)',
+  })
+  @ApiQuery({
+    name: 'date',
+    type: String,
+    description: 'ISO date string (required)',
+  })
   @ApiQuery({ name: 'durationHours', type: Number, required: false })
   @ApiQuery({ name: 'slotMinutes', type: Number, required: false })
   @ApiQuery({ name: 'persons', type: Number, required: false })
@@ -492,7 +601,9 @@ export class ContentController {
   }
 
   @Get('halls/:id/pricing')
-  @ApiOperation({ summary: 'Calculate branch pricing (compatibility endpoint)' })
+  @ApiOperation({
+    summary: 'Calculate branch pricing (compatibility endpoint)',
+  })
   @ApiQuery({ name: 'startTime', type: String, description: 'ISO date string' })
   @ApiQuery({ name: 'durationHours', type: Number })
   @ApiQuery({ name: 'persons', type: Number })
@@ -514,7 +625,9 @@ export class ContentController {
   }
 
   @Get('halls/:id/availability')
-  @ApiOperation({ summary: 'Check branch availability (compatibility endpoint)' })
+  @ApiOperation({
+    summary: 'Check branch availability (compatibility endpoint)',
+  })
   @ApiQuery({ name: 'startTime', type: String, description: 'ISO date string' })
   @ApiQuery({ name: 'durationHours', type: Number })
   @ApiResponse({
@@ -561,7 +674,12 @@ export class ContentController {
     @Query('branchId') branchId?: string,
     @Query('isActive') isActiveParam?: string,
   ) {
-    const isActive = isActiveParam === 'true' ? true : isActiveParam === 'false' ? false : undefined;
+    const isActive =
+      isActiveParam === 'true'
+        ? true
+        : isActiveParam === 'false'
+          ? false
+          : undefined;
     return this.contentService.listAddons({ branchId, isActive });
   }
 
@@ -592,6 +710,8 @@ export class ContentController {
   @ApiResponse({ status: 200, description: 'Sample data seeded successfully' })
   async seedSampleData() {
     // This is a simple endpoint to manually trigger sample data seeding
-    return { message: 'Sample data seeding triggered. Check logs for details.' };
+    return {
+      message: 'Sample data seeding triggered. Check logs for details.',
+    };
   }
 }

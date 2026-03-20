@@ -2,8 +2,14 @@ import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 
 // #region agent log
-const DEBUG_LOG_ENDPOINT = 'http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0';
-function debugLog(location: string, message: string, data: any, hypothesisId?: string) {
+const DEBUG_LOG_ENDPOINT =
+  'http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0';
+function debugLog(
+  location: string,
+  message: string,
+  data: any,
+  hypothesisId?: string,
+) {
   fetch(DEBUG_LOG_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -24,18 +30,25 @@ export const getDatabaseConfig = (
   configService: ConfigService,
 ): TypeOrmModuleOptions => {
   const synchronize = (() => {
-    const syncEnv = (configService.get<string>('DATABASE_SYNCHRONIZE') || '').toLowerCase();
+    const syncEnv = (
+      configService.get<string>('DATABASE_SYNCHRONIZE') || ''
+    ).toLowerCase();
     if (syncEnv === 'true' || syncEnv === '1' || syncEnv === 'yes') return true;
     return configService.get<string>('NODE_ENV') === 'development';
   })();
 
   // #region agent log
-  debugLog('database.config.ts:getDatabaseConfig', 'Database config created', {
-    synchronize,
-    nodeEnv: configService.get<string>('NODE_ENV'),
-    databaseName: configService.get<string>('DATABASE_NAME'),
-    entitiesPath: __dirname + '/../**/*.entity{.ts,.js}',
-  }, 'A');
+  debugLog(
+    'database.config.ts:getDatabaseConfig',
+    'Database config created',
+    {
+      synchronize,
+      nodeEnv: configService.get<string>('NODE_ENV'),
+      databaseName: configService.get<string>('DATABASE_NAME'),
+      entitiesPath: __dirname + '/../**/*.entity{.ts,.js}',
+    },
+    'A',
+  );
   // #endregion
 
   return {
@@ -52,7 +65,9 @@ export const getDatabaseConfig = (
     logging: configService.get<string>('NODE_ENV') === 'development',
     // Make SSL optional via env flag; default to disabled
     ssl: (() => {
-      const sslEnv = (configService.get<string>('DATABASE_SSL') || '').toLowerCase();
+      const sslEnv = (
+        configService.get<string>('DATABASE_SSL') || ''
+      ).toLowerCase();
       const enabled = sslEnv === 'true' || sslEnv === '1' || sslEnv === 'yes';
       return enabled ? { rejectUnauthorized: false } : false;
     })(),

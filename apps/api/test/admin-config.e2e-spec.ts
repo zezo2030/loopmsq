@@ -23,12 +23,14 @@ describe('AdminConfig (e2e)', () => {
   // Note: endpoints require auth + admin role in production.
   // Here we only assert that unauthorized returns 401 to ensure guards are applied.
   it('GET /admin/config/otp should be unauthorized without token', async () => {
-    await request(app.getHttpServer()).get('/api/v1/admin/config/otp').expect(401);
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/config/otp')
+      .expect(401);
   });
 
   it('GET /admin/config/sms should be unauthorized without token', async () => {
-    await request(app.getHttpServer()).get('/api/v1/admin/config/sms').expect(401);
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/config/sms')
+      .expect(401);
   });
 });
-
-

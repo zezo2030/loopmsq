@@ -13,31 +13,9 @@ import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 class PriceConfigDto {
-  @ApiProperty({ description: 'Base price for the hall', example: 500 })
-  @IsNumber()
-  basePrice: number;
-
   @ApiProperty({ description: 'Hourly rate', example: 100 })
   @IsNumber()
   hourlyRate: number;
-
-  @ApiProperty({ description: 'Price per person', example: 10, required: false })
-  @IsOptional()
-  @IsNumber()
-  pricePerPerson?: number;
-
-  @ApiProperty({ description: 'Weekend multiplier', example: 1.5 })
-  @IsNumber()
-  weekendMultiplier: number;
-
-  @ApiProperty({ description: 'Holiday multiplier', example: 2.0 })
-  @IsNumber()
-  holidayMultiplier: number;
-
-  @ApiProperty({ description: 'Decoration price', example: 200, required: false })
-  @IsOptional()
-  @IsNumber()
-  decorationPrice?: number;
 }
 
 export class CreateBranchDto {
@@ -149,13 +127,21 @@ export class CreateBranchDto {
   longitude?: number;
 
   @ApiProperty({
-    description: 'YouTube video URL for the branch',
+    description: 'Video URL for the branch (YouTube or Cloudinary)',
     example: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     required: false,
   })
   @IsOptional()
   @IsString()
   videoUrl?: string;
+
+  @ApiProperty({
+    description: 'Video cover/thumbnail URL (optional)',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  videoCoverUrl?: string;
 
   // Hall fields (optional - hall will be created automatically with defaults if not provided)
   @ApiProperty({

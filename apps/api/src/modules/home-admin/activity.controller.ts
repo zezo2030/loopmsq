@@ -1,5 +1,22 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiConsumes } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiConsumes,
+} from '@nestjs/swagger';
 import { HomeAdminService } from './home-admin.service';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '@nestjs/passport';
@@ -22,13 +39,17 @@ export class ActivityAdminController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  list() { return this.svc.listActivities(); }
+  list() {
+    return this.svc.listActivities();
+  }
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  create(@Body() body: any) { return this.svc.createActivity(body); }
+  create(@Body() body: any) {
+    return this.svc.createActivity(body);
+  }
 
   @Post('upload')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -43,11 +64,18 @@ export class ActivityAdminController {
             join(__dirname, '..', '..', '..', 'uploads'),
             join(__dirname, '..', 'uploads'),
           ].filter(Boolean) as string[];
-          const uploadsRoot = uploadsRootCandidates.find((p) => {
-            try { return !!p && fs.existsSync(p); } catch { return false; }
-          }) || uploadsRootCandidates[0];
+          const uploadsRoot =
+            uploadsRootCandidates.find((p) => {
+              try {
+                return !!p && fs.existsSync(p);
+              } catch {
+                return false;
+              }
+            }) || uploadsRootCandidates[0];
           const target = join(uploadsRoot, 'activities');
-          try { fs.mkdirSync(target, { recursive: true }); } catch {}
+          try {
+            fs.mkdirSync(target, { recursive: true });
+          } catch {}
           cb(null, target);
         },
         filename: (req, file, cb) => {
@@ -72,7 +100,7 @@ export class ActivityAdminController {
     if (!file) {
       throw new BadRequestException('Video file is required');
     }
-    
+
     // Validate file type
     if (!file.mimetype.startsWith('video/')) {
       throw new BadRequestException('File must be a video');
@@ -84,7 +112,10 @@ export class ActivityAdminController {
       throw new BadRequestException('Video file size must be less than 100MB');
     }
 
-    const { videoUrl, coverUrl } = await this.cloudinaryService.uploadVideo(file, 'activities/videos');
+    const { videoUrl, coverUrl } = await this.cloudinaryService.uploadVideo(
+      file,
+      'activities/videos',
+    );
     return { videoUrl, coverUrl };
   }
 
@@ -99,7 +130,7 @@ export class ActivityAdminController {
     if (!file) {
       throw new BadRequestException('Cover image file is required');
     }
-    
+
     // Validate file type
     if (!file.mimetype.startsWith('image/')) {
       throw new BadRequestException('File must be an image');
@@ -108,10 +139,15 @@ export class ActivityAdminController {
     // Validate file size (max 10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
-      throw new BadRequestException('Cover image file size must be less than 10MB');
+      throw new BadRequestException(
+        'Cover image file size must be less than 10MB',
+      );
     }
 
-    const coverUrl = await this.cloudinaryService.uploadImage(file, 'activities/video-covers');
+    const coverUrl = await this.cloudinaryService.uploadImage(
+      file,
+      'activities/video-covers',
+    );
     return { coverUrl };
   }
 
@@ -119,32 +155,15 @@ export class ActivityAdminController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  update(@Param('id') id: string, @Body() body: any) { return this.svc.updateActivity(id, body); }
+  update(@Param('id') id: string, @Body() body: any) {
+    return this.svc.updateActivity(id, body);
+  }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  remove(@Param('id') id: string) { return this.svc.deleteActivity(id); }
+  remove(@Param('id') id: string) {
+    return this.svc.deleteActivity(id);
+  }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

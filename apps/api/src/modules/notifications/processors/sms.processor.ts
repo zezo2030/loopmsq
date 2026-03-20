@@ -12,5 +12,3 @@ export class SmsProcessor {
     await this.smsProvider.send(to, body);
   }
 }
-
-

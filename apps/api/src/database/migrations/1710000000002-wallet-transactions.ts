@@ -1,4 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, TableIndex, TableForeignKey } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableIndex,
+  TableForeignKey,
+} from 'typeorm';
 
 export class WalletTransactions1710000000002 implements MigrationInterface {
   name = 'WalletTransactions1710000000002';
@@ -185,13 +191,34 @@ export class WalletTransactions1710000000002 implements MigrationInterface {
       }
     }
 
-    await queryRunner.dropIndex('wallet_transactions', 'IDX_wallet_transactions_userId_status');
-    await queryRunner.dropIndex('wallet_transactions', 'IDX_wallet_transactions_userId_type');
-    await queryRunner.dropIndex('wallet_transactions', 'IDX_wallet_transactions_createdAt');
-    await queryRunner.dropIndex('wallet_transactions', 'IDX_wallet_transactions_status');
-    await queryRunner.dropIndex('wallet_transactions', 'IDX_wallet_transactions_type');
-    await queryRunner.dropIndex('wallet_transactions', 'IDX_wallet_transactions_userId');
-    await queryRunner.dropIndex('wallet_transactions', 'IDX_wallet_transactions_walletId');
+    await queryRunner.dropIndex(
+      'wallet_transactions',
+      'IDX_wallet_transactions_userId_status',
+    );
+    await queryRunner.dropIndex(
+      'wallet_transactions',
+      'IDX_wallet_transactions_userId_type',
+    );
+    await queryRunner.dropIndex(
+      'wallet_transactions',
+      'IDX_wallet_transactions_createdAt',
+    );
+    await queryRunner.dropIndex(
+      'wallet_transactions',
+      'IDX_wallet_transactions_status',
+    );
+    await queryRunner.dropIndex(
+      'wallet_transactions',
+      'IDX_wallet_transactions_type',
+    );
+    await queryRunner.dropIndex(
+      'wallet_transactions',
+      'IDX_wallet_transactions_userId',
+    );
+    await queryRunner.dropIndex(
+      'wallet_transactions',
+      'IDX_wallet_transactions_walletId',
+    );
 
     await queryRunner.dropTable('wallet_transactions');
   }

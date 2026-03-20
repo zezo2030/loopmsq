@@ -13,5 +13,3 @@ import { RedisService } from '../../utils/redis.service';
   providers: [TicketsService, QRCodeService, RedisService],
 })
 export class TicketsModule {}
-
-

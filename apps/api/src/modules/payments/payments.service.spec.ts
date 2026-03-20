@@ -1,57 +1,136 @@
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { PaymentsService } from './payments.service';
-import { Payment, PaymentStatus, PaymentMethod } from '../../database/entities/payment.entity';
+import { DataSource, Repository } from 'typeorm';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
-import { ConfigModule } from '@nestjs/config';
+import {
+  Payment,
+  PaymentMethod,
+  PaymentStatus,
+} from '../../database/entities/payment.entity';
+import { MoyasarService } from '../../integrations/moyasar/moyasar.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
+import { QRCodeService } from '../../utils/qr-code.service';
 import { RedisService } from '../../utils/redis.service';
+import { BookingsService } from '../bookings/bookings.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ReferralsService } from '../referrals/referrals.service';
+import { WalletService } from '../wallet/wallet.service';
+import { PaymentsService } from './payments.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
-  let paymentRepo: Repository<Payment>;
-  let bookingRepo: Repository<Booking>;
+  let paymentRepo: jest.Mocked<Repository<Payment>>;
+  let bookingRepo: jest.Mocked<Repository<Booking>>;
+  let moyasarService: { retrievePayment: jest.Mock };
+  let queryRunner: {
+    connect: jest.Mock;
+    startTransaction: jest.Mock;
+    commitTransaction: jest.Mock;
+    rollbackTransaction: jest.Mock;
+    release: jest.Mock;
+    manager: {
+      create: jest.Mock;
+      save: jest.Mock;
+    };
+  };
+
+  const paymentQueryBuilder = {
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    getOne: jest.fn(),
+  };
 
   const paymentRepoMock = {
     findOne: jest.fn(),
     save: jest.fn(),
     create: jest.fn(),
-  } as any;
+    createQueryBuilder: jest.fn(() => paymentQueryBuilder),
+  } as unknown as jest.Mocked<Repository<Payment>>;
 
   const bookingRepoMock = {
     findOne: jest.fn(),
     save: jest.fn(),
-  } as any;
+  } as unknown as jest.Mocked<Repository<Booking>>;
 
-  const dataSourceMock = {
-    createQueryRunner: () => ({
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      manager: {
-        create: (entity: any, data: any) => ({ ...data, id: 'pay_1' }),
-        save: jest.fn((e: any) => e),
-      },
+  const configServiceMock = {
+    get: jest.fn((key: string) => {
+      switch (key) {
+        case 'MOYASAR_SECRET_KEY':
+          return 'sk_test_server';
+        case 'PAYMENTS_BYPASS':
+          return 'false';
+        default:
+          return undefined;
+      }
     }),
-  } as any as DataSource;
+  };
 
   const redisMock: Partial<RedisService> = {
     get: jest.fn(async () => null),
     set: jest.fn(async () => undefined),
   };
 
+  const notificationsMock = {
+    enqueue: jest.fn(async () => undefined),
+  };
+
+  const loyaltyMock = {
+    awardPoints: jest.fn(async () => undefined),
+  };
+
+  const referralsMock = {
+    createEarningForFirstPayment: jest.fn(async () => undefined),
+  };
+
+  const bookingsMock = {
+    issueTicketsForBooking: jest.fn(async () => undefined),
+  };
+
   beforeEach(async () => {
-    jest.resetAllMocks();
+    jest.clearAllMocks();
+
+    queryRunner = {
+      connect: jest.fn(async () => undefined),
+      startTransaction: jest.fn(async () => undefined),
+      commitTransaction: jest.fn(async () => undefined),
+      rollbackTransaction: jest.fn(async () => undefined),
+      release: jest.fn(async () => undefined),
+      manager: {
+        create: jest.fn((_: unknown, data: Partial<Payment>) => ({
+          id: 'internal-payment-1',
+          ...data,
+        })),
+        save: jest.fn(async <T>(entity: T) => entity),
+      },
+    };
+
+    const dataSourceMock = {
+      createQueryRunner: jest.fn(() => queryRunner),
+      getRepository: jest.fn(),
+    } as unknown as DataSource;
+
+    moyasarService = {
+      retrievePayment: jest.fn(),
+    };
+
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: false })],
       providers: [
         PaymentsService,
         { provide: getRepositoryToken(Payment), useValue: paymentRepoMock },
         { provide: getRepositoryToken(Booking), useValue: bookingRepoMock },
         { provide: DataSource, useValue: dataSourceMock },
+        { provide: ConfigService, useValue: configServiceMock },
         { provide: RedisService, useValue: redisMock },
+        { provide: NotificationsService, useValue: notificationsMock },
+        { provide: LoyaltyService, useValue: loyaltyMock },
+        { provide: ReferralsService, useValue: referralsMock },
+        { provide: RealtimeGateway, useValue: {} },
+        { provide: BookingsService, useValue: bookingsMock },
+        { provide: MoyasarService, useValue: moyasarService },
+        { provide: WalletService, useValue: {} },
+        { provide: QRCodeService, useValue: {} },
       ],
     }).compile();
 
@@ -60,46 +139,129 @@ describe('PaymentsService', () => {
     bookingRepo = moduleRef.get(getRepositoryToken(Booking));
   });
 
-  it('creates intent and returns clientSecret', async () => {
+  it('creates intent and returns an internal processing payment for card payments', async () => {
     bookingRepo.findOne.mockResolvedValue({
-      id: 'b1',
-      userId: 'u1',
+      id: 'booking-1',
+      userId: 'user-1',
       status: BookingStatus.PENDING,
       totalPrice: 100,
       payments: [],
-    });
+      user: { id: 'user-1' },
+    } as Booking);
 
-    const res = await service.createIntent('u1', {
-      bookingId: 'b1',
+    const res = await service.createIntent('user-1', {
+      bookingId: 'booking-1',
       method: PaymentMethod.CREDIT_CARD,
     });
 
-    expect(res.paymentId).toBeDefined();
-    expect(res.clientSecret).toContain('mock_secret_');
+    expect(res.paymentId).toBe('internal-payment-1');
+    expect(res.chargeId).toBe('');
+    expect(res.status).toBe(PaymentStatus.PROCESSING);
   });
 
-  it('confirms a payment and sets booking confirmed', async () => {
+  it('confirms a booking payment after verifying the external Moyasar payment', async () => {
     bookingRepo.findOne.mockResolvedValue({
-      id: 'b1',
-      userId: 'u1',
+      id: 'booking-1',
+      userId: 'user-1',
       status: BookingStatus.PENDING,
-      payments: [
-        {
-          id: 'pay1',
-          status: PaymentStatus.PROCESSING,
-          gatewayRef: 'mock_secret_pay1',
-        },
-      ],
+      payments: [],
+    } as Booking);
+
+    paymentRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 'internal-payment-1',
+      bookingId: 'booking-1',
+      amount: 100,
+      currency: 'SAR',
+      method: PaymentMethod.CREDIT_CARD,
+      status: PaymentStatus.PROCESSING,
+    } as Payment);
+    paymentQueryBuilder.getOne.mockResolvedValue(undefined);
+
+    moyasarService.retrievePayment.mockResolvedValue({
+      id: 'mysr-payment-1',
+      status: 'paid',
+      amount: 10000,
+      currency: 'SAR',
     });
 
-    const result = await service.confirmPayment('u1', {
-      bookingId: 'b1',
-      paymentId: 'pay1',
-      gatewayPayload: { clientSecret: 'mock_secret_pay1' },
+    const result = await service.confirmPayment('user-1', {
+      bookingId: 'booking-1',
+      paymentId: 'mysr-payment-1',
     });
 
     expect(result.success).toBe(true);
+    expect(moyasarService.retrievePayment).toHaveBeenCalledWith(
+      'mysr-payment-1',
+    );
+    expect(queryRunner.manager.save).toHaveBeenCalled();
+    expect(bookingsMock.issueTicketsForBooking).toHaveBeenCalledWith(
+      'booking-1',
+    );
+  });
+
+  it('rejects Moyasar payments when the verified amount does not match', async () => {
+    bookingRepo.findOne.mockResolvedValue({
+      id: 'booking-1',
+      userId: 'user-1',
+      status: BookingStatus.PENDING,
+      payments: [],
+    } as Booking);
+
+    paymentRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 'internal-payment-1',
+      bookingId: 'booking-1',
+      amount: 100,
+      currency: 'SAR',
+      method: PaymentMethod.CREDIT_CARD,
+      status: PaymentStatus.PROCESSING,
+    } as Payment);
+    paymentQueryBuilder.getOne.mockResolvedValue(undefined);
+
+    moyasarService.retrievePayment.mockResolvedValue({
+      id: 'mysr-payment-1',
+      status: 'paid',
+      amount: 9900,
+      currency: 'SAR',
+    });
+
+    await expect(
+      service.confirmPayment('user-1', {
+        bookingId: 'booking-1',
+        paymentId: 'mysr-payment-1',
+      }),
+    ).rejects.toThrow('Payment amount mismatch');
+  });
+
+  it('rejects Moyasar payments when the verified currency does not match', async () => {
+    bookingRepo.findOne.mockResolvedValue({
+      id: 'booking-1',
+      userId: 'user-1',
+      status: BookingStatus.PENDING,
+      payments: [],
+    } as Booking);
+
+    paymentRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 'internal-payment-1',
+      bookingId: 'booking-1',
+      amount: 100,
+      currency: 'SAR',
+      method: PaymentMethod.CREDIT_CARD,
+      status: PaymentStatus.PROCESSING,
+    } as Payment);
+    paymentQueryBuilder.getOne.mockResolvedValue(undefined);
+
+    moyasarService.retrievePayment.mockResolvedValue({
+      id: 'mysr-payment-1',
+      status: 'paid',
+      amount: 10000,
+      currency: 'USD',
+    });
+
+    await expect(
+      service.confirmPayment('user-1', {
+        bookingId: 'booking-1',
+        paymentId: 'mysr-payment-1',
+      }),
+    ).rejects.toThrow('Payment currency mismatch');
   });
 });
-
-

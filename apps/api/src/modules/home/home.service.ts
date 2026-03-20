@@ -6,6 +6,7 @@ import { Offer } from '../../database/entities/offer.entity';
 import { Branch } from '../../database/entities/branch.entity';
 import { Activity } from '../../database/entities/activity.entity';
 import { OrganizingBranch } from '../../database/entities/organizing-branch.entity';
+import { IntroVideo } from '../../database/entities/intro-video.entity';
 import { RedisService } from '../../utils/redis.service';
 
 @Injectable()
@@ -14,8 +15,12 @@ export class HomeService {
     @InjectRepository(Banner) private readonly bannerRepo: Repository<Banner>,
     @InjectRepository(Offer) private readonly offerRepo: Repository<Offer>,
     @InjectRepository(Branch) private readonly branchRepo: Repository<Branch>,
-    @InjectRepository(Activity) private readonly activityRepo: Repository<Activity>,
-    @InjectRepository(OrganizingBranch) private readonly organizingBranchRepo: Repository<OrganizingBranch>,
+    @InjectRepository(Activity)
+    private readonly activityRepo: Repository<Activity>,
+    @InjectRepository(OrganizingBranch)
+    private readonly organizingBranchRepo: Repository<OrganizingBranch>,
+    @InjectRepository(IntroVideo)
+    private readonly introVideoRepo: Repository<IntroVideo>,
     private readonly redis: RedisService,
   ) {}
 
@@ -29,52 +34,73 @@ export class HomeService {
         { isActive: true, startsAt: IsNull(), endsAt: IsNull() },
         { isActive: true, startsAt: LessThanOrEqual(now), endsAt: IsNull() },
         { isActive: true, startsAt: IsNull(), endsAt: MoreThanOrEqual(now) },
-        { isActive: true, startsAt: LessThanOrEqual(now), endsAt: MoreThanOrEqual(now) },
+        {
+          isActive: true,
+          startsAt: LessThanOrEqual(now),
+          endsAt: MoreThanOrEqual(now),
+        },
       ] as any,
       order: { createdAt: 'DESC' },
     });
     // Build where conditions for offers
     const baseOfferWhere: any = { isActive: true };
-    
+
     if (branchId) {
       baseOfferWhere.branchId = branchId;
     }
     // If no branchId filter, we'll still get offers but old ones (without branchId) won't display properly
-    
+
     const timeConditions = [
       { ...baseOfferWhere, startsAt: IsNull(), endsAt: IsNull() },
       { ...baseOfferWhere, startsAt: LessThanOrEqual(now), endsAt: IsNull() },
       { ...baseOfferWhere, startsAt: IsNull(), endsAt: MoreThanOrEqual(now) },
-      { ...baseOfferWhere, startsAt: LessThanOrEqual(now), endsAt: MoreThanOrEqual(now) },
+      {
+        ...baseOfferWhere,
+        startsAt: LessThanOrEqual(now),
+        endsAt: MoreThanOrEqual(now),
+      },
     ];
-    
+
     const offers = await this.offerRepo.find({
       where: timeConditions as any,
       order: { createdAt: 'DESC' },
     });
-    
+
     // Filter out offers without branchId (old data) if no specific branch requested
-    const filteredOffers = branchId 
-      ? offers 
-      : offers.filter(o => o.branchId !== null);
-    
+    const filteredOffers = branchId
+      ? offers
+      : offers.filter((o) => o.branchId !== null);
+
     // Get active activities
     const activities = await this.activityRepo.find({
       where: { isActive: true },
       order: { createdAt: 'DESC' },
     });
-    
+
     // Get active organizing branches
     const organizingBranches = await this.organizingBranchRepo.find({
       where: { isActive: true },
       order: { createdAt: 'DESC' },
     });
-    
-    const featuredBranches = await this.branchRepo.find({ order: { createdAt: 'DESC' }, take: 10 });
-    const payload = { banners, offers: filteredOffers, featuredBranches, activities, organizingBranches };
+
+    const introVideo = await this.introVideoRepo.findOne({
+      where: { isActive: true } as any,
+      order: { createdAt: 'DESC' } as any,
+    });
+
+    const featuredBranches = await this.branchRepo.find({
+      order: { createdAt: 'DESC' },
+      take: 10,
+    });
+    const payload = {
+      banners,
+      offers: filteredOffers,
+      featuredBranches,
+      activities,
+      organizingBranches,
+      introVideo,
+    };
     await this.redis.set(cacheKey, payload, 120);
     return payload;
   }
 }
-
-

@@ -6,16 +6,21 @@ import { Banner } from '../../database/entities/banner.entity';
 import { Offer } from '../../database/entities/offer.entity';
 import { Activity } from '../../database/entities/activity.entity';
 import { OrganizingBranch } from '../../database/entities/organizing-branch.entity';
+import { IntroVideo } from '../../database/entities/intro-video.entity';
 
 @Injectable()
 export class HomeAdminService {
   constructor(
     @InjectRepository(Banner) private readonly bannerRepo: Repository<Banner>,
     @InjectRepository(Offer) private readonly offerRepo: Repository<Offer>,
-    @InjectRepository(Activity) private readonly activityRepo: Repository<Activity>,
-    @InjectRepository(OrganizingBranch) private readonly organizingBranchRepo: Repository<OrganizingBranch>,
+    @InjectRepository(Activity)
+    private readonly activityRepo: Repository<Activity>,
+    @InjectRepository(OrganizingBranch)
+    private readonly organizingBranchRepo: Repository<OrganizingBranch>,
+    @InjectRepository(IntroVideo)
+    private readonly introVideoRepo: Repository<IntroVideo>,
     private readonly redis: RedisService,
-  ) { }
+  ) {}
 
   // Banner
   listBanners() {
@@ -80,7 +85,9 @@ export class HomeAdminService {
   async createActivity(dto: Partial<Activity>) {
     // Validate: must have either imageUrl or videoUrl, but not both
     if (!dto.imageUrl && !dto.videoUrl) {
-      throw new BadRequestException('Either imageUrl or videoUrl must be provided');
+      throw new BadRequestException(
+        'Either imageUrl or videoUrl must be provided',
+      );
     }
     if (dto.imageUrl && dto.videoUrl) {
       throw new BadRequestException('Cannot have both imageUrl and videoUrl');
@@ -100,7 +107,9 @@ export class HomeAdminService {
 
     // Validate videoCoverUrl format if provided (only allowed with videoUrl)
     if (dto.videoCoverUrl && !dto.videoUrl) {
-      throw new BadRequestException('videoCoverUrl can only be set when videoUrl is provided');
+      throw new BadRequestException(
+        'videoCoverUrl can only be set when videoUrl is provided',
+      );
     }
     if (dto.videoCoverUrl) {
       try {
@@ -126,7 +135,9 @@ export class HomeAdminService {
         throw new BadRequestException('Cannot have both imageUrl and videoUrl');
       }
       if (!dto.imageUrl && !dto.videoUrl) {
-        throw new BadRequestException('Either imageUrl or videoUrl must be provided');
+        throw new BadRequestException(
+          'Either imageUrl or videoUrl must be provided',
+        );
       }
     }
 
@@ -145,11 +156,15 @@ export class HomeAdminService {
     // Validate videoCoverUrl format if provided (only allowed with videoUrl)
     if (dto.videoCoverUrl !== undefined) {
       // Check if videoUrl exists in current entity or in dto
-      const currentActivity = await this.activityRepo.findOne({ where: { id } as any });
+      const currentActivity = await this.activityRepo.findOne({
+        where: { id } as any,
+      });
       const hasVideoUrl = dto.videoUrl || currentActivity?.videoUrl;
 
       if (dto.videoCoverUrl && !hasVideoUrl) {
-        throw new BadRequestException('videoCoverUrl can only be set when videoUrl is provided');
+        throw new BadRequestException(
+          'videoCoverUrl can only be set when videoUrl is provided',
+        );
       }
 
       if (dto.videoCoverUrl) {
@@ -177,13 +192,17 @@ export class HomeAdminService {
 
   // Organizing Branch
   listOrganizingBranches() {
-    return this.organizingBranchRepo.find({ order: { createdAt: 'DESC' } as any });
+    return this.organizingBranchRepo.find({
+      order: { createdAt: 'DESC' } as any,
+    });
   }
 
   async createOrganizingBranch(dto: Partial<OrganizingBranch>) {
     // Validate: must have either imageUrl or videoUrl, but not both
     if (!dto.imageUrl && !dto.videoUrl) {
-      throw new BadRequestException('Either imageUrl or videoUrl must be provided');
+      throw new BadRequestException(
+        'Either imageUrl or videoUrl must be provided',
+      );
     }
     if (dto.imageUrl && dto.videoUrl) {
       throw new BadRequestException('Cannot have both imageUrl and videoUrl');
@@ -203,7 +222,9 @@ export class HomeAdminService {
 
     // Validate videoCoverUrl format if provided (only allowed with videoUrl)
     if (dto.videoCoverUrl && !dto.videoUrl) {
-      throw new BadRequestException('videoCoverUrl can only be set when videoUrl is provided');
+      throw new BadRequestException(
+        'videoCoverUrl can only be set when videoUrl is provided',
+      );
     }
     if (dto.videoCoverUrl) {
       try {
@@ -229,7 +250,9 @@ export class HomeAdminService {
         throw new BadRequestException('Cannot have both imageUrl and videoUrl');
       }
       if (!dto.imageUrl && !dto.videoUrl) {
-        throw new BadRequestException('Either imageUrl or videoUrl must be provided');
+        throw new BadRequestException(
+          'Either imageUrl or videoUrl must be provided',
+        );
       }
     }
 
@@ -248,11 +271,15 @@ export class HomeAdminService {
     // Validate videoCoverUrl format if provided (only allowed with videoUrl)
     if (dto.videoCoverUrl !== undefined) {
       // Check if videoUrl exists in current entity or in dto
-      const currentOrganizingBranch = await this.organizingBranchRepo.findOne({ where: { id } as any });
+      const currentOrganizingBranch = await this.organizingBranchRepo.findOne({
+        where: { id } as any,
+      });
       const hasVideoUrl = dto.videoUrl || currentOrganizingBranch?.videoUrl;
 
       if (dto.videoCoverUrl && !hasVideoUrl) {
-        throw new BadRequestException('videoCoverUrl can only be set when videoUrl is provided');
+        throw new BadRequestException(
+          'videoCoverUrl can only be set when videoUrl is provided',
+        );
       }
 
       if (dto.videoCoverUrl) {
@@ -277,6 +304,90 @@ export class HomeAdminService {
     await this.redis.del('home:v1');
     return res;
   }
+
+  // Intro Video
+  listIntroVideos() {
+    return this.introVideoRepo.find({ order: { createdAt: 'DESC' } as any });
+  }
+
+  async createIntroVideo(dto: Partial<IntroVideo>) {
+    if (!dto.videoUrl) {
+      throw new BadRequestException('videoUrl is required');
+    }
+
+    // Validate URL format
+    try {
+      const url = new URL(dto.videoUrl);
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        throw new BadRequestException('Invalid video URL format');
+      }
+    } catch {
+      throw new BadRequestException('Invalid video URL format');
+    }
+
+    if (dto.videoCoverUrl) {
+      try {
+        const url = new URL(dto.videoCoverUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new BadRequestException('Invalid video cover URL format');
+        }
+      } catch {
+        throw new BadRequestException('Invalid video cover URL format');
+      }
+    }
+
+    const entity = this.introVideoRepo.create({
+      videoUrl: dto.videoUrl,
+      videoCoverUrl: dto.videoCoverUrl ?? null,
+      isActive: dto.isActive ?? true,
+    });
+    const saved = await this.introVideoRepo.save(entity);
+    await this.redis.del('home:v1');
+    return saved;
+  }
+
+  async updateIntroVideo(id: string, dto: Partial<IntroVideo>) {
+    if (dto.videoUrl) {
+      try {
+        const url = new URL(dto.videoUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new BadRequestException('Invalid video URL format');
+        }
+      } catch {
+        throw new BadRequestException('Invalid video URL format');
+      }
+    }
+
+    if (dto.videoCoverUrl !== undefined) {
+      const current = await this.introVideoRepo.findOne({
+        where: { id } as any,
+      });
+      const hasVideo = dto.videoUrl || current?.videoUrl;
+      if (dto.videoCoverUrl && !hasVideo) {
+        throw new BadRequestException(
+          'videoCoverUrl can only be set when videoUrl is provided',
+        );
+      }
+      if (dto.videoCoverUrl) {
+        try {
+          const url = new URL(dto.videoCoverUrl);
+          if (!['http:', 'https:'].includes(url.protocol)) {
+            throw new BadRequestException('Invalid video cover URL format');
+          }
+        } catch {
+          throw new BadRequestException('Invalid video cover URL format');
+        }
+      }
+    }
+
+    const res = await this.introVideoRepo.update(id, dto);
+    await this.redis.del('home:v1');
+    return res;
+  }
+
+  async deleteIntroVideo(id: string) {
+    const res = await this.introVideoRepo.delete(id);
+    await this.redis.del('home:v1');
+    return res;
+  }
 }
-
-

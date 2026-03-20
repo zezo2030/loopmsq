@@ -13,7 +13,10 @@ export class CreatePaymentIntentDto {
   @IsUUID()
   eventRequestId?: string;
 
-  @ApiPropertyOptional({ format: 'uuid', description: 'School trip request ID for payment' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'School trip request ID for payment',
+  })
   @ValidateIf((o) => !o.bookingId && !o.eventRequestId)
   @IsUUID()
   tripRequestId?: string;
@@ -22,5 +25,3 @@ export class CreatePaymentIntentDto {
   @IsEnum(PaymentMethod)
   method: PaymentMethod;
 }
-
-

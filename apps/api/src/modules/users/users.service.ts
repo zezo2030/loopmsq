@@ -109,7 +109,9 @@ export class UsersService {
         await this.walletRepository.save(wallet);
       } catch (e: any) {
         // If wallet creation fails due to constraint, log and continue to return user
-        this.logger.error(`Wallet creation failed for user ${savedUser.id}: ${e?.message || e}`);
+        this.logger.error(
+          `Wallet creation failed for user ${savedUser.id}: ${e?.message || e}`,
+        );
       }
     }
 
@@ -147,8 +149,13 @@ export class UsersService {
       .take(limit);
 
     // Branch Manager can only see users in their branch
-    if (requester?.roles?.includes(UserRole.BRANCH_MANAGER) && requester.branchId) {
-      qb.andWhere('user.branchId = :branchId', { branchId: requester.branchId });
+    if (
+      requester?.roles?.includes(UserRole.BRANCH_MANAGER) &&
+      requester.branchId
+    ) {
+      qb.andWhere('user.branchId = :branchId', {
+        branchId: requester.branchId,
+      });
     }
 
     const [users, total] = await qb.getManyAndCount();
@@ -238,7 +245,9 @@ export class UsersService {
 
     // Check phone uniqueness if phone is being updated
     if (updateUserDto.phone) {
-      const encryptedPhone = this.encryptionService.encrypt(updateUserDto.phone);
+      const encryptedPhone = this.encryptionService.encrypt(
+        updateUserDto.phone,
+      );
       if (encryptedPhone !== user.phone) {
         const existingPhoneUser = await this.userRepository.findOne({
           where: { phone: encryptedPhone },
@@ -363,13 +372,27 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    if ((user.bookings && user.bookings.length > 0) || (user.supportTickets && user.supportTickets.length > 0)) {
-      throw new BadRequestException('User has related records; deactivate instead');
+    if (
+      (user.bookings && user.bookings.length > 0) ||
+      (user.supportTickets && user.supportTickets.length > 0)
+    ) {
+      throw new BadRequestException(
+        'User has related records; deactivate instead',
+      );
     }
 
-    const wallet = await this.walletRepository.findOne({ where: { userId: id }, relations: ['transactions'] as any });
-    if (wallet && (wallet as any).transactions && (wallet as any).transactions.length > 0) {
-      throw new BadRequestException('User wallet has transactions; deactivate instead');
+    const wallet = await this.walletRepository.findOne({
+      where: { userId: id },
+      relations: ['transactions'] as any,
+    });
+    if (
+      wallet &&
+      (wallet as any).transactions &&
+      (wallet as any).transactions.length > 0
+    ) {
+      throw new BadRequestException(
+        'User wallet has transactions; deactivate instead',
+      );
     }
 
     if (wallet) {
@@ -385,7 +408,7 @@ export class UsersService {
       where: { id },
       relations: ['bookings', 'supportTickets'],
     });
-    
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -393,22 +416,38 @@ export class UsersService {
     // Branch managers can only delete staff from their own branch
     if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
       if (!requester.branchId || user.branchId !== requester.branchId) {
-        throw new ForbiddenException('You can only delete staff from your own branch');
+        throw new ForbiddenException(
+          'You can only delete staff from your own branch',
+        );
       }
-      
+
       // Branch managers can only delete staff users, not other roles
       if (!user.roles?.includes(UserRole.STAFF)) {
         throw new ForbiddenException('You can only delete staff members');
       }
     }
 
-    if ((user.bookings && user.bookings.length > 0) || (user.supportTickets && user.supportTickets.length > 0)) {
-      throw new BadRequestException('User has related records; deactivate instead');
+    if (
+      (user.bookings && user.bookings.length > 0) ||
+      (user.supportTickets && user.supportTickets.length > 0)
+    ) {
+      throw new BadRequestException(
+        'User has related records; deactivate instead',
+      );
     }
 
-    const wallet = await this.walletRepository.findOne({ where: { userId: id }, relations: ['transactions'] as any });
-    if (wallet && (wallet as any).transactions && (wallet as any).transactions.length > 0) {
-      throw new BadRequestException('User wallet has transactions; deactivate instead');
+    const wallet = await this.walletRepository.findOne({
+      where: { userId: id },
+      relations: ['transactions'] as any,
+    });
+    if (
+      wallet &&
+      (wallet as any).transactions &&
+      (wallet as any).transactions.length > 0
+    ) {
+      throw new BadRequestException(
+        'User wallet has transactions; deactivate instead',
+      );
     }
 
     if (wallet) {
@@ -424,24 +463,35 @@ export class UsersService {
       where: { id: userId },
       relations: ['bookings', 'supportTickets'],
     });
-    
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
     // Check if user has active bookings or support tickets
-    if ((user.bookings && user.bookings.length > 0) || (user.supportTickets && user.supportTickets.length > 0)) {
-      throw new BadRequestException('Cannot delete account with active bookings or support tickets. Please cancel bookings and close tickets first.');
+    if (
+      (user.bookings && user.bookings.length > 0) ||
+      (user.supportTickets && user.supportTickets.length > 0)
+    ) {
+      throw new BadRequestException(
+        'Cannot delete account with active bookings or support tickets. Please cancel bookings and close tickets first.',
+      );
     }
 
     // Check if wallet has transactions
-    const wallet = await this.walletRepository.findOne({ 
-      where: { userId }, 
-      relations: ['transactions'] as any 
+    const wallet = await this.walletRepository.findOne({
+      where: { userId },
+      relations: ['transactions'] as any,
     });
-    
-    if (wallet && (wallet as any).transactions && (wallet as any).transactions.length > 0) {
-      throw new BadRequestException('Cannot delete account with wallet transactions. Please contact support.');
+
+    if (
+      wallet &&
+      (wallet as any).transactions &&
+      (wallet as any).transactions.length > 0
+    ) {
+      throw new BadRequestException(
+        'Cannot delete account with wallet transactions. Please contact support.',
+      );
     }
 
     // Delete wallet if exists

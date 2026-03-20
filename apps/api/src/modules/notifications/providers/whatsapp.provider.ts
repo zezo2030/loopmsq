@@ -23,22 +23,24 @@ export class WhatsAppProvider {
     phoneNumberId?: string;
   }> {
     // Primary source: environment variables
-    const envAccessToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
-    const envPhoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID');
+    const envAccessToken = this.configService.get<string>(
+      'WHATSAPP_ACCESS_TOKEN',
+    );
+    const envPhoneNumberId = this.configService.get<string>(
+      'WHATSAPP_PHONE_NUMBER_ID',
+    );
     if (envAccessToken && envPhoneNumberId) {
       return { accessToken: envAccessToken, phoneNumberId: envPhoneNumberId };
     }
 
     // Fallback: admin configuration stored in Redis
     try {
-      const cfg = (await this.redis.get('config:sms')) as
-        | {
-            enabled?: boolean;
-            provider?: string;
-            whatsappAccessToken?: string;
-            whatsappPhoneNumberId?: string;
-          }
-        | null;
+      const cfg = (await this.redis.get('config:sms')) as {
+        enabled?: boolean;
+        provider?: string;
+        whatsappAccessToken?: string;
+        whatsappPhoneNumberId?: string;
+      } | null;
       if (!cfg || cfg.enabled === false || cfg.provider !== 'whatsapp') {
         return {};
       }
@@ -57,7 +59,9 @@ export class WhatsAppProvider {
         phoneNumberId: cfg.whatsappPhoneNumberId,
       };
     } catch (e) {
-      this.logger.warn(`Failed to read WhatsApp config from Redis: ${String(e)}`);
+      this.logger.warn(
+        `Failed to read WhatsApp config from Redis: ${String(e)}`,
+      );
       return {};
     }
   }
@@ -73,7 +77,7 @@ export class WhatsAppProvider {
           this.http = axios.create({
             baseURL: `https://graph.facebook.com/v18.0/${phoneNumberId}`,
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
+              Authorization: `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
             },
             timeout: 15000,
@@ -85,7 +89,9 @@ export class WhatsAppProvider {
           this.http = null;
           this.accessToken = undefined;
           this.phoneNumberId = undefined;
-          this.logger.warn('WhatsApp not configured - missing required environment variables');
+          this.logger.warn(
+            'WhatsApp not configured - missing required environment variables',
+          );
         }
       }
     } catch (e) {
@@ -94,7 +100,10 @@ export class WhatsAppProvider {
   }
 
   private getTemplateName(): string {
-    return this.configService.get<string>('WHATSAPP_OTP_TEMPLATE_NAME') || 'ver_number';
+    return (
+      this.configService.get<string>('WHATSAPP_OTP_TEMPLATE_NAME') ||
+      'ver_number'
+    );
   }
 
   private getForcedTemplateLanguage(): string | null {
@@ -111,15 +120,21 @@ export class WhatsAppProvider {
       return [forced];
     }
 
-    const preferred = lang === 'ar' ? ['ar', 'ar_SA', 'ar_EG'] : ['en_US', 'en', 'en_GB'];
+    const preferred =
+      lang === 'ar' ? ['ar', 'ar_SA', 'ar_EG'] : ['en_US', 'en', 'en_GB'];
     // Cross-language fallback if preferred language translation is unavailable.
-    const fallback = lang === 'ar' ? ['en_US', 'en', 'en_GB'] : ['ar', 'ar_SA', 'ar_EG'];
+    const fallback =
+      lang === 'ar' ? ['en_US', 'en', 'en_GB'] : ['ar', 'ar_SA', 'ar_EG'];
     return Array.from(new Set([...preferred, ...fallback]));
   }
 
-  async sendOTP(to: string, otp: string, lang: 'ar' | 'en' = 'ar'): Promise<void> {
+  async sendOTP(
+    to: string,
+    otp: string,
+    lang: 'ar' | 'en' = 'ar',
+  ): Promise<void> {
     await this.loadConfig();
-    
+
     if (!this.http || !this.phoneNumberId) {
       this.logger.warn('WhatsApp not configured, skipping OTP send');
       return;
@@ -176,9 +191,13 @@ export class WhatsAppProvider {
         const isRetryable =
           errorCode === 132001 || // missing translation
           errorCode === 132005 || // template not found
-          errorCode === 132015;   // template paused
+          errorCode === 132015; // template paused
 
-        if (isRetryable && languageCandidates.indexOf(languageCode) < languageCandidates.length - 1) {
+        if (
+          isRetryable &&
+          languageCandidates.indexOf(languageCode) <
+            languageCandidates.length - 1
+        ) {
           this.logger.warn(
             `Template "${templateName}" is not available for language "${languageCode}". Trying fallback language...`,
           );
@@ -198,26 +217,3 @@ export class WhatsAppProvider {
     // Do not throw to avoid breaking auth flow when WhatsApp fails.
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

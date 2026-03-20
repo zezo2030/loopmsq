@@ -34,7 +34,3 @@ export class Addon {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-
-
-

@@ -84,8 +84,18 @@ export class BookingsController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiQuery({ name: 'branchId', required: false, type: String })
-  @ApiQuery({ name: 'from', required: false, type: String, description: 'ISO date - startTime from' })
-  @ApiQuery({ name: 'to', required: false, type: String, description: 'ISO date - startTime to' })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    type: String,
+    description: 'ISO date - startTime from',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    type: String,
+    description: 'ISO date - startTime to',
+  })
   async adminListAll(
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 100,
@@ -94,7 +104,12 @@ export class BookingsController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.bookingsService.findAllBookings(page, limit, { status, branchId, from, to });
+    return this.bookingsService.findAllBookings(page, limit, {
+      status,
+      branchId,
+      from,
+      to,
+    });
   }
 
   // Branch manager: list branch bookings
@@ -115,7 +130,14 @@ export class BookingsController {
     @Query('to') to?: string,
     @Query('status') status?: string,
   ) {
-    return this.bookingsService.findBranchBookings(user.branchId!, page, limit, from, to, status);
+    return this.bookingsService.findBranchBookings(
+      user.branchId!,
+      page,
+      limit,
+      from,
+      to,
+      status,
+    );
   }
 
   @Get(':id')
@@ -160,7 +182,10 @@ export class BookingsController {
 
   @Get(':id/pricing')
   @ApiOperation({ summary: 'Get detailed pricing for existing booking' })
-  @ApiResponse({ status: 200, description: 'Pricing details retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pricing details retrieved successfully',
+  })
   @ApiResponse({ status: 404, description: 'Booking not found' })
   async getBookingPricing(@Param('id', ParseUUIDPipe) id: string) {
     return this.bookingsService.getBookingPricing(id);
@@ -177,8 +202,17 @@ export class BookingsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: CancelBookingDto,
   ) {
-    const isManagerOrAdmin = user.roles?.includes(UserRole.BRANCH_MANAGER) || user.roles?.includes(UserRole.ADMIN) || false;
-    return this.bookingsService.cancelBooking(id, user.id, body.reason, user.branchId, isManagerOrAdmin);
+    const isManagerOrAdmin =
+      user.roles?.includes(UserRole.BRANCH_MANAGER) ||
+      user.roles?.includes(UserRole.ADMIN) ||
+      false;
+    return this.bookingsService.cancelBooking(
+      id,
+      user.id,
+      body.reason,
+      user.branchId,
+      isManagerOrAdmin,
+    );
   }
 
   // Staff endpoints
@@ -223,8 +257,14 @@ export class BookingsController {
   @Get('staff/scans/me/stats')
   @UseGuards(RolesGuard)
   @Roles(UserRole.STAFF)
-  @ApiOperation({ summary: 'Get scan statistics for current staff (today, week, month, total)' })
-  @ApiResponse({ status: 200, description: 'Scan statistics retrieved successfully' })
+  @ApiOperation({
+    summary:
+      'Get scan statistics for current staff (today, week, month, total)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Scan statistics retrieved successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async getMyScanStats(@CurrentUser() user: User) {
@@ -259,7 +299,9 @@ export class BookingsController {
   @Post('free-ticket')
   @UseGuards(RolesGuard)
   @Roles(UserRole.BRANCH_MANAGER)
-  @ApiOperation({ summary: 'Create free ticket for user (Branch Manager only)' })
+  @ApiOperation({
+    summary: 'Create free ticket for user (Branch Manager only)',
+  })
   @ApiResponse({ status: 201, description: 'Free ticket created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -270,7 +312,9 @@ export class BookingsController {
     @Body() dto: CreateFreeTicketDto,
   ) {
     if (!user.branchId) {
-      throw new BadRequestException('Branch manager must have a branch assigned');
+      throw new BadRequestException(
+        'Branch manager must have a branch assigned',
+      );
     }
     return this.bookingsService.createFreeTicket(user.id, user.branchId, dto);
   }
@@ -279,7 +323,10 @@ export class BookingsController {
   @Post('admin/free-ticket')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Create free ticket for user (Admin only - can create for any branch)' })
+  @ApiOperation({
+    summary:
+      'Create free ticket for user (Admin only - can create for any branch)',
+  })
   @ApiResponse({ status: 201, description: 'Free ticket created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

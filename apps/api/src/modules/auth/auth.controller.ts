@@ -23,6 +23,8 @@ import { RegisterVerifyOtpDto } from './dto/register-verify-otp.dto';
 import { UserLoginDto } from './dto/user-login.dto';
 import { CompleteRegistrationDto } from './dto/complete-registration.dto';
 import { StaffLoginDto } from './dto/staff-login.dto';
+import { ForgotPasswordSendOtpDto } from './dto/forgot-password-send-otp.dto';
+import { ForgotPasswordResetDto } from './dto/forgot-password-reset.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -70,7 +72,10 @@ export class AuthController {
   @Post('register/otp/verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify OTP for registration' })
-  @ApiResponse({ status: 200, description: 'OTP verified, requires completion' })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP verified, requires completion',
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Invalid OTP' })
   @ApiResponse({ status: 409, description: 'Phone number already registered' })
@@ -81,8 +86,14 @@ export class AuthController {
   @Post('register/complete')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Complete registration with name and password' })
-  @ApiResponse({ status: 200, description: 'Registration completed successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request or verification expired' })
+  @ApiResponse({
+    status: 200,
+    description: 'Registration completed successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request or verification expired',
+  })
   @ApiResponse({ status: 409, description: 'Phone number already registered' })
   async completeRegistration(@Body() dto: CompleteRegistrationDto) {
     return this.authService.completeRegistration(dto);
@@ -90,7 +101,9 @@ export class AuthController {
 
   @Post('staff/login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Admin/Branch Manager/Staff login with email and password' })
+  @ApiOperation({
+    summary: 'Admin/Branch Manager/Staff login with email and password',
+  })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async staffLogin(@Body() staffLoginDto: StaffLoginDto) {
@@ -126,6 +139,25 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async userLogin(@Body() dto: UserLoginDto) {
     return this.authService.userLogin(dto);
+  }
+
+  @Post('forgot-password/otp/send')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send OTP to reset password (phone must be registered)' })
+  @ApiResponse({ status: 200, description: 'OTP sent successfully' })
+  @ApiResponse({ status: 400, description: 'Phone not registered or OTP disabled' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  async forgotPasswordSendOtp(@Body() dto: ForgotPasswordSendOtpDto) {
+    return this.authService.forgotPasswordSendOtp(dto);
+  }
+
+  @Post('forgot-password/reset')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password with OTP and new password' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired OTP' })
+  async forgotPasswordReset(@Body() dto: ForgotPasswordResetDto) {
+    return this.authService.forgotPasswordReset(dto);
   }
 
   @Get('email-config')

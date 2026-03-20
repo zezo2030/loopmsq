@@ -15,8 +15,7 @@ import { WalletModule } from '../wallet/wallet.module';
 import { ReferralsModule } from '../referrals/referrals.module';
 import { RedisService } from '../../utils/redis.service';
 import { RealtimeModule } from '../../realtime/realtime.module';
-import { TapService } from '../../integrations/tap/tap.service';
-import { EncryptionService } from '../../utils/encryption.util';
+import { MoyasarService } from '../../integrations/moyasar/moyasar.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 
 @Module({
@@ -33,9 +32,7 @@ import { QRCodeService } from '../../utils/qr-code.service';
     RealtimeModule,
   ],
   controllers: [PaymentsController],
-  providers: [PaymentsService, RedisService, TapService, EncryptionService, QRCodeService],
+  providers: [PaymentsService, RedisService, MoyasarService, QRCodeService],
   exports: [PaymentsService],
 })
-export class PaymentsModule { }
-
-
+export class PaymentsModule {}

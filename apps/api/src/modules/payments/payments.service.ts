@@ -12,8 +12,14 @@ import {
   PaymentMethod,
   PaymentStatus,
 } from '../../database/entities/payment.entity';
-import { EventRequest, EventRequestStatus } from '../../database/entities/event-request.entity';
-import { SchoolTripRequest, TripRequestStatus } from '../../database/entities/school-trip-request.entity';
+import {
+  EventRequest,
+  EventRequestStatus,
+} from '../../database/entities/event-request.entity';
+import {
+  SchoolTripRequest,
+  TripRequestStatus,
+} from '../../database/entities/school-trip-request.entity';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { CreatePaymentIntentDto } from './dto/create-intent.dto';
@@ -27,9 +33,8 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { ReferralsService } from '../referrals/referrals.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { BookingsService } from '../bookings/bookings.service';
-import { TapService } from '../../integrations/tap/tap.service';
+import { MoyasarService } from '../../integrations/moyasar/moyasar.service';
 import { WalletService } from '../wallet/wallet.service';
-import { EncryptionService } from '../../utils/encryption.util';
 import { QRCodeService } from '../../utils/qr-code.service';
 
 @Injectable()
@@ -49,17 +54,15 @@ export class PaymentsService {
     private readonly referrals?: ReferralsService,
     private readonly realtime?: RealtimeGateway,
     private readonly bookings?: BookingsService,
-    private readonly tapService?: TapService,
+    private readonly moyasarService?: MoyasarService,
     private readonly walletService?: WalletService,
-    private readonly encryptionService?: EncryptionService,
     private readonly qrCodeService?: QRCodeService,
-  ) { }
+  ) {}
 
   async createIntent(userId: string, dto: CreatePaymentIntentDto) {
     let booking: Booking | null = null;
     let eventRequest: EventRequest | null = null;
     let tripRequest: SchoolTripRequest | null = null;
-    let targetEntity: any = null;
     let customerUser: any = null;
     let amountToPay: number = 0;
 
@@ -73,13 +76,12 @@ export class PaymentsService {
       if (booking.status !== BookingStatus.PENDING)
         throw new BadRequestException('Booking not payable');
 
-      targetEntity = booking;
       customerUser = booking.user;
       amountToPay = Number(booking.totalPrice);
     }
     // Check for EventRequest
     else if (dto.eventRequestId) {
-      // Must import EventRequest repository. 
+      // Must import EventRequest repository.
       // Since it wasn't injected in constructor, we can use dataSource or add it.
       // For simplicity/safetly here, assuming dynamic access or injected repo if added.
       // Let's use dataSource.getRepository(EventRequest)
@@ -93,25 +95,26 @@ export class PaymentsService {
 
       // Allow QUOTED directly. Also strict check for status.
       if (eventRequest.status !== EventRequestStatus.QUOTED) {
-        throw new BadRequestException('Event request not payable (must be QUOTED)');
+        throw new BadRequestException(
+          'Event request not payable (must be QUOTED)',
+        );
       }
       if (!eventRequest.quotedPrice) {
         throw new BadRequestException('Event request has no quoted price');
       }
 
-      targetEntity = eventRequest;
       customerUser = eventRequest.requester;
       amountToPay = Number(eventRequest.quotedPrice);
 
       // Check for existing payments for this event request
-      // We need to fetch payments linked to this eventRequestId manually 
+      // We need to fetch payments linked to this eventRequestId manually
       // because EventRequest entity might not have 'payments' relation loaded or defined inverse side properly yet.
       // Or we check Payment repository directly.
       const existingPayment = await this.paymentRepository.findOne({
         where: {
           eventRequestId: eventRequest.id,
-          status: PaymentStatus.PENDING
-        }
+          status: PaymentStatus.PENDING,
+        },
       });
 
       if (existingPayment && existingPayment.method === dto.method) {
@@ -136,13 +139,14 @@ export class PaymentsService {
 
       // Only allow payment for approved trips
       if (tripRequest.status !== TripRequestStatus.APPROVED) {
-        throw new BadRequestException('Trip request not payable (must be APPROVED)');
+        throw new BadRequestException(
+          'Trip request not payable (must be APPROVED)',
+        );
       }
       if (!tripRequest.quotedPrice) {
         throw new BadRequestException('Trip request has no quoted price');
       }
 
-      targetEntity = tripRequest;
       customerUser = tripRequest.requester;
       amountToPay = Number(tripRequest.quotedPrice);
 
@@ -153,7 +157,11 @@ export class PaymentsService {
         } as any,
       });
 
-      if (existingPayment && existingPayment.method === dto.method && existingPayment.status === PaymentStatus.PENDING) {
+      if (
+        existingPayment &&
+        existingPayment.method === dto.method &&
+        existingPayment.status === PaymentStatus.PENDING
+      ) {
         return {
           paymentId: existingPayment.id,
           clientSecret: existingPayment.gatewayRef,
@@ -163,10 +171,13 @@ export class PaymentsService {
         };
       }
     } else {
-      throw new BadRequestException('bookingId, eventRequestId, or tripRequestId is required');
+      throw new BadRequestException(
+        'bookingId, eventRequestId, or tripRequestId is required',
+      );
     }
 
-    if (!customerUser) throw new BadRequestException('User information not found');
+    if (!customerUser)
+      throw new BadRequestException('User information not found');
 
     // Idempotency: return existing pending/processing intent for same method (Booking logic)
     if (booking && booking.payments) {
@@ -199,7 +210,11 @@ export class PaymentsService {
     }
 
     // Idempotency by key
-    const uniqueId = booking ? booking.id : (eventRequest ? eventRequest.id : dto.tripRequestId);
+    const uniqueId = booking
+      ? booking.id
+      : eventRequest
+        ? eventRequest.id
+        : dto.tripRequestId;
     const idempotencyKey = `pay:intent:${uniqueId}:${dto.method}`;
     const exists = await this.redisService.get(idempotencyKey);
     if (exists) {
@@ -210,19 +225,16 @@ export class PaymentsService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    let redirectUrl: string | null = null;
-    let charge: any = null;
-
     try {
       // Prepare Payment object
       // Note: Payment entity needs 'eventRequestId' column if not present?
       // Based on typical TypeORM, we might need to be careful if column is missing.
       // Assuming Payment entity handles connection to EventRequest or we just store generic ref.
-      // Let's look at Payment entity definition? 
+      // Let's look at Payment entity definition?
       // Use 'bookingId' for booking, and 'eventRequestId' column for events if it exists.
       // If Payment entity doesn't have eventRequestId, we might need to add it or hack it.
       // Looking at typical setups, we should add eventRequestId to Payment entity or use a polymorphic approach.
-      // Assuming for this fix that we can just save it. 
+      // Assuming for this fix that we can just save it.
       // NOTE: User asked to fix backend NOW. I will assume DB column exists or I'll need to create it.
       // Let's check Payment entity... (I can't read it again mid-tool, risking it)
       // I'll assume 'eventRequestId' is added to payment entity or I should use bookingId as a hack?
@@ -255,95 +267,17 @@ export class PaymentsService {
         await queryRunner.manager.save(savedPayment);
       } else {
         // Bypass payments if keys are missing or explicitly enabled
-        const bypass = !this.configService.get<string>('TAP_SECRET_KEY') ||
-          (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() === 'true';
+        const bypass =
+          !this.configService.get<string>('MOYASAR_SECRET_KEY') ||
+          (
+            this.configService.get<string>('PAYMENTS_BYPASS') || ''
+          ).toString() === 'true';
         if (bypass) {
           savedPayment.gatewayRef = `bypass_${savedPayment.id}`;
           savedPayment.status = PaymentStatus.PROCESSING;
           await queryRunner.manager.save(savedPayment);
         } else {
-          // Create Tap charge (immediate capture, 3DS required)
-          if (!this.tapService) throw new BadRequestException('Payment gateway not configured');
-
-          // Get redirect URLs from config
-          const apiBaseUrl = this.configService.get<string>('API_BASE_URL') || 'http://localhost:3000';
-
-          // Use deep link directly as requested
-          const successUrl = `loopmsq://payment/success?paymentId=${savedPayment.id}`;
-          const webhookUrl = `${apiBaseUrl}/api/v1/payments/webhook`;
-
-          // Prepare customer information for Tap Payments
-          const user = customerUser;
-          const customerName = user?.name || 'Customer';
-          const nameParts = customerName.trim().split(/\s+/);
-          const firstName = nameParts[0] || 'Customer';
-          const lastName = nameParts.slice(1).join(' ') || 'Name';
-
-          // Parse phone number if available
-          let phoneCountryCode = '966'; // Default to Saudi Arabia
-          let phoneNumber = '';
-          if (user?.phone && this.encryptionService) {
-            // ... (phone logic same as before) ...
-            try {
-              const decryptedPhone = this.encryptionService.decrypt(user.phone);
-              if (decryptedPhone) {
-                const cleanedPhone = decryptedPhone.replace(/\D/g, '');
-                if (cleanedPhone.startsWith('966')) {
-                  phoneCountryCode = '966';
-                  phoneNumber = cleanedPhone.substring(3);
-                } else if (cleanedPhone.startsWith('0')) {
-                  phoneCountryCode = '966';
-                  phoneNumber = cleanedPhone.substring(1);
-                } else {
-                  phoneNumber = cleanedPhone;
-                }
-              }
-            } catch (e) {
-              this.logger.warn(`Failed to decrypt phone for user ${user.id}: ${e}`);
-            }
-          }
-
-          const entityId = booking ? booking.id : (eventRequest ? eventRequest.id : tripRequest!.id);
-          const entityType = booking ? 'Booking' : (eventRequest ? 'Event Request' : 'Trip Request');
-
-          charge = await this.tapService.createCharge({
-            amount: Number(amountToPay),
-            currency: 'SAR',
-            capture: true,
-            threeDS: 'required',
-            source: { id: 'src_all' },
-            customer: {
-              first_name: firstName,
-              last_name: lastName,
-              email: user?.email || undefined,
-              phone: phoneNumber ? {
-                country_code: phoneCountryCode,
-                number: phoneNumber,
-              } : undefined,
-            },
-            redirect: {
-              url: successUrl,
-              post: {
-                url: webhookUrl,
-              },
-            },
-            description: `${entityType} ${entityId}`,
-            metadata: {
-              bookingId: booking?.id,
-              eventRequestId: eventRequest?.id,
-              tripRequestId: tripRequest?.id,
-              paymentId: savedPayment.id
-            },
-          });
-
-          savedPayment.gatewayRef = charge.id;
-          if (charge.transaction?.authorization_id) {
-            savedPayment.transactionId = charge.transaction.authorization_id;
-          }
-
-          // Extract redirect URL from charge response
-          redirectUrl = charge.transaction?.url || charge.redirect?.url || null;
-
+          // With Moyasar SDK, payment is created client-side and verified on confirm.
           savedPayment.status = PaymentStatus.PROCESSING;
           await queryRunner.manager.save(savedPayment);
         }
@@ -353,8 +287,8 @@ export class PaymentsService {
 
       const response = {
         paymentId: savedPayment.id,
-        chargeId: savedPayment.gatewayRef,
-        redirectUrl: redirectUrl,
+        chargeId: savedPayment.gatewayRef || '',
+        redirectUrl: null,
         amount: savedPayment.amount,
         currency: savedPayment.currency,
         status: savedPayment.status,
@@ -391,9 +325,11 @@ export class PaymentsService {
     // The dto might have eventRequestId if we updated DTO, but confirm dto usually relies on paymentId
     // Let's modify logic to find payment first if we trust paymentId ownership check.
 
-    // However, existing logic finds booking first. 
-    // If bookingId is missing, check if eventRequestId is in DTO? 
-    // The user's ConfirmPaymentDto usually has bookingId optional. 
+    // However, existing logic finds booking first.
+    // If bookingId is missing, check if eventRequestId is in DTO?
+    // The user's ConfirmPaymentDto usually has bookingId optional.
+
+    let externalGatewayPaymentId: string | undefined;
 
     if (!payment) {
       // Try finding payment directly and verify ownership via relations
@@ -407,7 +343,8 @@ export class PaymentsService {
       // we relied on 'bookingId' or 'eventRequestId' column.
 
       // Use query builder to handle both cases if relations are set up
-      const qb = this.paymentRepository.createQueryBuilder('p')
+      const qb = this.paymentRepository
+        .createQueryBuilder('p')
         .leftJoinAndSelect('p.booking', 'b')
         .where('p.id = :paymentId', { paymentId: dto.paymentId });
 
@@ -419,27 +356,57 @@ export class PaymentsService {
 
       if (loadedPayment) {
         if (loadedPayment.bookingId) {
-          booking = await this.bookingRepository.findOne({ where: { id: loadedPayment.bookingId, userId } });
-          if (!booking) throw new NotFoundException('Booking not found or access denied');
+          booking = await this.bookingRepository.findOne({
+            where: { id: loadedPayment.bookingId, userId },
+          });
+          if (!booking)
+            throw new NotFoundException('Booking not found or access denied');
           payment = loadedPayment;
         } else if (loadedPayment.eventRequestId) {
           const eventRepo = this.dataSource.getRepository(EventRequest);
           const eventId = loadedPayment.eventRequestId;
-          eventRequest = await eventRepo.findOne({ where: { id: eventId, requesterId: userId } });
-          if (!eventRequest) throw new NotFoundException('Event request not found or access denied');
+          eventRequest = await eventRepo.findOne({
+            where: { id: eventId, requesterId: userId },
+          });
+          if (!eventRequest)
+            throw new NotFoundException(
+              'Event request not found or access denied',
+            );
           payment = loadedPayment;
         } else if (loadedPayment.tripRequestId) {
           // Handle trip request payment
-          tripRequest = await this.dataSource.getRepository(SchoolTripRequest).findOne({
-            where: { id: loadedPayment.tripRequestId, requesterId: userId }
-          });
-          if (!tripRequest) throw new NotFoundException('Trip request not found or access denied');
+          tripRequest = await this.dataSource
+            .getRepository(SchoolTripRequest)
+            .findOne({
+              where: { id: loadedPayment.tripRequestId, requesterId: userId },
+            });
+          if (!tripRequest)
+            throw new NotFoundException(
+              'Trip request not found or access denied',
+            );
           payment = loadedPayment;
         } else {
           // Orphan payment?
           throw new NotFoundException('Payment entity context lost');
         }
       }
+    }
+
+    // If client passed external gateway payment id, map it to latest pending payment by context.
+    if (
+      !payment &&
+      (dto.bookingId || dto.eventRequestId || dto.tripRequestId)
+    ) {
+      externalGatewayPaymentId = dto.paymentId;
+      payment = await this.paymentRepository.findOne({
+        where: {
+          ...(dto.bookingId ? { bookingId: dto.bookingId } : {}),
+          ...(dto.eventRequestId ? { eventRequestId: dto.eventRequestId } : {}),
+          ...(dto.tripRequestId ? { tripRequestId: dto.tripRequestId } : {}),
+          status: PaymentStatus.PROCESSING,
+        },
+        order: { createdAt: 'DESC' },
+      });
     }
 
     if (!payment) throw new NotFoundException('Payment not found');
@@ -453,19 +420,51 @@ export class PaymentsService {
       }
       // Deduct from wallet
       // Use booking.id, eventRequest.id, or tripRequest.id
-      const refId = booking ? booking.id : (eventRequest ? eventRequest.id : tripRequest!.id);
+      const refId = booking
+        ? booking.id
+        : eventRequest
+          ? eventRequest.id
+          : tripRequest!.id;
       await this.walletService.deductWallet(userId, payment.amount, refId);
     } else {
-      const bypass = !this.configService.get<string>('TAP_SECRET_KEY') ||
-        (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() === 'true';
+      const bypass =
+        !this.configService.get<string>('MOYASAR_SECRET_KEY') ||
+        (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() ===
+          'true';
       if (!bypass) {
-        // Verify with Tap by retrieving the charge status
-        if (!this.tapService) throw new BadRequestException('Payment gateway not configured');
-        const charge = await this.tapService.retrieveCharge(payment.gatewayRef);
-        const succeeded = ['CAPTURED', 'AUTHORIZED', 'SUCCEEDED'].includes((charge.status || '').toUpperCase());
+        if (!this.moyasarService)
+          throw new BadRequestException('Payment gateway not configured');
+        const gatewayPayload = dto.gatewayPayload || {};
+        const maybePayloadId = (gatewayPayload.moyasarPaymentId ||
+          gatewayPayload.paymentId) as string | undefined;
+        const moyasarPaymentId =
+          maybePayloadId || externalGatewayPaymentId || payment.gatewayRef;
+
+        if (!moyasarPaymentId) {
+          throw new BadRequestException('Missing Moyasar payment id');
+        }
+
+        const moyasarPayment =
+          await this.moyasarService.retrievePayment(moyasarPaymentId);
+        const succeeded = ['paid', 'authorized'].includes(
+          (moyasarPayment.status || '').toLowerCase(),
+        );
         if (!succeeded) {
           throw new BadRequestException('Payment not completed');
         }
+
+        const expectedAmount = Math.round(Number(payment.amount) * 100);
+        if (Number(moyasarPayment.amount) !== expectedAmount) {
+          throw new BadRequestException('Payment amount mismatch');
+        }
+        if (
+          (moyasarPayment.currency || '').toUpperCase() !==
+          (payment.currency || '').toUpperCase()
+        ) {
+          throw new BadRequestException('Payment currency mismatch');
+        }
+
+        payment.gatewayRef = moyasarPaymentId;
       }
     }
 
@@ -473,7 +472,7 @@ export class PaymentsService {
     await queryRunner.connect();
     let transactionStarted = false;
     let savedBooking: Booking | null = null;
-    
+
     try {
       await queryRunner.startTransaction();
       transactionStarted = true;
@@ -513,24 +512,33 @@ export class PaymentsService {
         for (let i = 0; i < eventRequest.persons; i++) {
           // Generate unique QR token and hash for each ticket
           const qrToken = this.qrCodeService
-            ? this.qrCodeService.generateQRToken(savedBooking.id, `${savedBooking.id}-${i}`)
+            ? this.qrCodeService.generateQRToken(
+                savedBooking.id,
+                `${savedBooking.id}-${i}`,
+              )
             : `${savedBooking.id}-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
           const qrTokenHash = this.qrCodeService
             ? this.qrCodeService.generateQRTokenHash(qrToken)
-            : require('crypto').createHash('sha256').update(qrToken).digest('hex');
+            : require('crypto')
+                .createHash('sha256')
+                .update(qrToken)
+                .digest('hex');
 
           // Ensure startTime is a Date object
-          const startTime = savedBooking.startTime instanceof Date 
-            ? savedBooking.startTime 
-            : new Date(savedBooking.startTime);
-          
+          const startTime =
+            savedBooking.startTime instanceof Date
+              ? savedBooking.startTime
+              : new Date(savedBooking.startTime);
+
           const t = queryRunner.manager.create(Ticket, {
             bookingId: savedBooking.id,
             qrTokenHash,
             status: TicketStatus.VALID,
             personCount: 1,
             validFrom: startTime,
-            validUntil: new Date(startTime.getTime() + savedBooking.durationHours * 3600 * 1000),
+            validUntil: new Date(
+              startTime.getTime() + savedBooking.durationHours * 3600 * 1000,
+            ),
           });
           tickets.push(t);
         }
@@ -556,7 +564,10 @@ export class PaymentsService {
 
         // Create Booking for the trip
         const studentsList = tripRequest.studentsList || [];
-        const studentsCount = studentsList.length > 0 ? studentsList.length : (tripRequest.studentsCount || 0);
+        const studentsCount =
+          studentsList.length > 0
+            ? studentsList.length
+            : tripRequest.studentsCount || 0;
         const adultsCount = tripRequest.accompanyingAdults || 0;
         const totalPersons = studentsCount + adultsCount;
 
@@ -573,23 +584,30 @@ export class PaymentsService {
 
         // Generate Tickets for each student with their name
         // Ensure startTime is a Date object
-        const startTime = savedBooking.startTime instanceof Date 
-          ? savedBooking.startTime 
-          : new Date(savedBooking.startTime);
-        
+        const startTime =
+          savedBooking.startTime instanceof Date
+            ? savedBooking.startTime
+            : new Date(savedBooking.startTime);
+
         const tickets: Ticket[] = [];
-        
+
         // Generate tickets for students - use studentsList if available, otherwise create generic tickets
         if (studentsList.length > 0) {
           // Create tickets with student names from the list
           for (let i = 0; i < studentsList.length; i++) {
             const student = studentsList[i];
             const qrToken = this.qrCodeService
-              ? this.qrCodeService.generateQRToken(savedBooking.id, `${savedBooking.id}-student-${i}`)
+              ? this.qrCodeService.generateQRToken(
+                  savedBooking.id,
+                  `${savedBooking.id}-student-${i}`,
+                )
               : `${savedBooking.id}-student-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
             const qrTokenHash = this.qrCodeService
               ? this.qrCodeService.generateQRTokenHash(qrToken)
-              : require('crypto').createHash('sha256').update(qrToken).digest('hex');
+              : require('crypto')
+                  .createHash('sha256')
+                  .update(qrToken)
+                  .digest('hex');
 
             const t = queryRunner.manager.create(Ticket, {
               bookingId: savedBooking.id,
@@ -598,7 +616,10 @@ export class PaymentsService {
               personCount: 1,
               holderName: student.name || `طالب ${i + 1}`,
               validFrom: startTime,
-              validUntil: new Date(startTime.getTime() + (tripRequest.durationHours || 2) * 3600 * 1000),
+              validUntil: new Date(
+                startTime.getTime() +
+                  (tripRequest.durationHours || 2) * 3600 * 1000,
+              ),
             });
             tickets.push(t);
           }
@@ -606,11 +627,17 @@ export class PaymentsService {
           // Create generic tickets if studentsList is empty but studentsCount exists
           for (let i = 0; i < studentsCount; i++) {
             const qrToken = this.qrCodeService
-              ? this.qrCodeService.generateQRToken(savedBooking.id, `${savedBooking.id}-student-${i}`)
+              ? this.qrCodeService.generateQRToken(
+                  savedBooking.id,
+                  `${savedBooking.id}-student-${i}`,
+                )
               : `${savedBooking.id}-student-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
             const qrTokenHash = this.qrCodeService
               ? this.qrCodeService.generateQRTokenHash(qrToken)
-              : require('crypto').createHash('sha256').update(qrToken).digest('hex');
+              : require('crypto')
+                  .createHash('sha256')
+                  .update(qrToken)
+                  .digest('hex');
 
             const t = queryRunner.manager.create(Ticket, {
               bookingId: savedBooking.id,
@@ -619,7 +646,10 @@ export class PaymentsService {
               personCount: 1,
               holderName: `طالب ${i + 1}`,
               validFrom: startTime,
-              validUntil: new Date(startTime.getTime() + (tripRequest.durationHours || 2) * 3600 * 1000),
+              validUntil: new Date(
+                startTime.getTime() +
+                  (tripRequest.durationHours || 2) * 3600 * 1000,
+              ),
             });
             tickets.push(t);
           }
@@ -628,11 +658,17 @@ export class PaymentsService {
         // Generate placeholder tickets for accompanying adults
         for (let i = 0; i < adultsCount; i++) {
           const qrToken = this.qrCodeService
-            ? this.qrCodeService.generateQRToken(savedBooking.id, `${savedBooking.id}-adult-${i}`)
+            ? this.qrCodeService.generateQRToken(
+                savedBooking.id,
+                `${savedBooking.id}-adult-${i}`,
+              )
             : `${savedBooking.id}-adult-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
           const qrTokenHash = this.qrCodeService
             ? this.qrCodeService.generateQRTokenHash(qrToken)
-            : require('crypto').createHash('sha256').update(qrToken).digest('hex');
+            : require('crypto')
+                .createHash('sha256')
+                .update(qrToken)
+                .digest('hex');
 
           const t = queryRunner.manager.create(Ticket, {
             bookingId: savedBooking.id,
@@ -641,7 +677,10 @@ export class PaymentsService {
             personCount: 1,
             holderName: `مرافق ${i + 1}`,
             validFrom: startTime,
-            validUntil: new Date(startTime.getTime() + (tripRequest.durationHours || 2) * 3600 * 1000),
+            validUntil: new Date(
+              startTime.getTime() +
+                (tripRequest.durationHours || 2) * 3600 * 1000,
+            ),
           });
           tickets.push(t);
         }
@@ -669,8 +708,16 @@ export class PaymentsService {
 
       // Post-confirmation actions (tickets, notifications) - outside transaction
       // Use savedBooking if it was created, otherwise use booking.id, or null if neither exists
-      const bookingIdForLoyalty = savedBooking ? savedBooking.id : (booking ? booking.id : null);
-      const targetId = booking ? booking.id : (eventRequest ? eventRequest.id : tripRequest!.id);
+      const bookingIdForLoyalty = savedBooking
+        ? savedBooking.id
+        : booking
+          ? booking.id
+          : null;
+      const targetId = booking
+        ? booking.id
+        : eventRequest
+          ? eventRequest.id
+          : tripRequest!.id;
 
       try {
         if (booking && this.bookings) {
@@ -683,7 +730,9 @@ export class PaymentsService {
           });
         }
       } catch (e) {
-        this.logger.error(`Failed to issue tickets post-payment: ${e?.message || e}`);
+        this.logger.error(
+          `Failed to issue tickets post-payment: ${e?.message || e}`,
+        );
       }
 
       // Notify payment success and booking confirmed
@@ -702,7 +751,11 @@ export class PaymentsService {
       });
 
       // Award loyalty points - use bookingId only if it exists (not eventRequest.id or tripRequest.id)
-      await this.loyalty.awardPoints(userId, Number(payment.amount), bookingIdForLoyalty || undefined);
+      await this.loyalty.awardPoints(
+        userId,
+        Number(payment.amount),
+        bookingIdForLoyalty || undefined,
+      );
 
       // Realtime updates
       // this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: booking.status });
@@ -710,7 +763,9 @@ export class PaymentsService {
 
       // Create referral earning if eligible (fire-and-forget)
       if (this.referrals) {
-        try { await this.referrals.createEarningForFirstPayment(userId, payment.id); } catch (_) { }
+        try {
+          await this.referrals.createEarningForFirstPayment(userId, payment.id);
+        } catch (_) {}
       }
       return { success: true, paymentId: payment.id };
     } catch (e) {
@@ -725,7 +780,9 @@ export class PaymentsService {
 
   async handleWebhook(dto: WebhookEventDto) {
     // Signature verification (mock but enforced via shared secret)
-    const expectedSecret = this.configService.get<string>('PAYMENT_WEBHOOK_SECRET') || 'dev-webhook-secret';
+    const expectedSecret =
+      this.configService.get<string>('PAYMENT_WEBHOOK_SECRET') ||
+      'dev-webhook-secret';
     // In real gateway, you would compute signature from raw body + header secret
     const providedSecret = (dto as any).secret || dto.data?.secret;
     if (expectedSecret && providedSecret !== expectedSecret) {
@@ -754,7 +811,10 @@ export class PaymentsService {
         payment.status = PaymentStatus.COMPLETED;
         payment.paidAt = new Date();
         await this.paymentRepository.save(payment);
-        if (payment.booking && payment.booking.status !== BookingStatus.CONFIRMED) {
+        if (
+          payment.booking &&
+          payment.booking.status !== BookingStatus.CONFIRMED
+        ) {
           payment.booking.status = BookingStatus.CONFIRMED;
           await this.bookingRepository.save(payment.booking);
         }
@@ -864,7 +924,8 @@ export class PaymentsService {
     if (method) qb.andWhere('p.method = :method', { method });
     if (bookingId) qb.andWhere('p.bookingId = :bookingId', { bookingId });
     if (userId) qb.andWhere('b.userId = :userId', { userId });
-    if (from) qb.andWhere('(p.paidAt IS NOT NULL AND p.paidAt >= :from)', { from });
+    if (from)
+      qb.andWhere('(p.paidAt IS NOT NULL AND p.paidAt >= :from)', { from });
     if (to) qb.andWhere('(p.paidAt IS NOT NULL AND p.paidAt <= :to)', { to });
 
     const [items, total] = await qb
@@ -875,5 +936,3 @@ export class PaymentsService {
     return { items, total, page, pageSize };
   }
 }
-
-

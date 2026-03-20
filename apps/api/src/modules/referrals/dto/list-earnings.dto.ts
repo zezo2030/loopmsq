@@ -24,5 +24,3 @@ export class ListEarningsDto {
   @Type(() => Number)
   pageSize?: number = 20;
 }
-
-

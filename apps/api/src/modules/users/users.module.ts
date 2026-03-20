@@ -10,11 +10,7 @@ import { AdminSeeder } from './admin.seeder';
 @Module({
   imports: [TypeOrmModule.forFeature([User, Wallet])],
   controllers: [UsersController],
-  providers: [
-    UsersService,
-    EncryptionService,
-    AdminSeeder,
-  ],
+  providers: [UsersService, EncryptionService, AdminSeeder],
   exports: [UsersService],
 })
 export class UsersModule {}

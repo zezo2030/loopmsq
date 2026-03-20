@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PackagesService } from './packages.service';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
@@ -59,9 +69,13 @@ export class PackagesController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiBearerAuth()
-  preview(@Body() body: { packageId: string; persons: number; durationHours: number }) {
-    return this.packages.preview(body.packageId, body.persons, body.durationHours);
+  preview(
+    @Body() body: { packageId: string; persons: number; durationHours: number },
+  ) {
+    return this.packages.preview(
+      body.packageId,
+      body.persons,
+      body.durationHours,
+    );
   }
 }
-
-

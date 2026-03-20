@@ -44,7 +44,10 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 409, description: 'Email or phone already exists' })
-  async createStaff(@Body() createStaffDto: CreateStaffDto, @CurrentUser() requester: User) {
+  async createStaff(
+    @Body() createStaffDto: CreateStaffDto,
+    @CurrentUser() requester: User,
+  ) {
     // Branch managers can only create staff/users in their own branch and cannot assign elevated roles
     if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
       if (!requester.branchId) {
@@ -53,7 +56,9 @@ export class UsersController {
       createStaffDto.branchId = requester.branchId as any;
       // Limit roles to staff or user only
       const allowed = new Set([UserRole.STAFF, UserRole.USER]);
-      createStaffDto.roles = (createStaffDto.roles || []).filter((r) => allowed.has(r));
+      createStaffDto.roles = (createStaffDto.roles || []).filter((r) =>
+        allowed.has(r),
+      );
       if (!createStaffDto.roles.length) {
         createStaffDto.roles = [UserRole.STAFF];
       }
@@ -65,9 +70,15 @@ export class UsersController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Create branch manager (Admin only)' })
-  @ApiResponse({ status: 201, description: 'Branch manager created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Branch manager created successfully',
+  })
   async createBranchManager(@Body() body: CreateStaffDto) {
-    return this.usersService.createStaff({ ...body, roles: [UserRole.BRANCH_MANAGER] } as any);
+    return this.usersService.createStaff({
+      ...body,
+      roles: [UserRole.BRANCH_MANAGER],
+    } as any);
   }
 
   @Get()
@@ -130,7 +141,10 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async findOne(@CurrentUser() requester: User, @Param('id', ParseUUIDPipe) id: string) {
+  async findOne(
+    @CurrentUser() requester: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.usersService.findOne(id, requester);
   }
 
@@ -150,7 +164,11 @@ export class UsersController {
   @Delete('profile')
   @ApiOperation({ summary: 'Delete current user account' })
   @ApiResponse({ status: 200, description: 'Account deleted successfully' })
-  @ApiResponse({ status: 400, description: 'Cannot delete account with active bookings, tickets, or transactions' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Cannot delete account with active bookings, tickets, or transactions',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User not found' })
   async deleteMyAccount(@CurrentUser() user: User) {
@@ -183,7 +201,10 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async deactivate(@CurrentUser() requester: User, @Param('id', ParseUUIDPipe) id: string) {
+  async deactivate(
+    @CurrentUser() requester: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     await this.usersService.deactivate(id, requester);
     return { message: 'User deactivated successfully' };
   }
@@ -196,7 +217,10 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async activate(@CurrentUser() requester: User, @Param('id', ParseUUIDPipe) id: string) {
+  async activate(
+    @CurrentUser() requester: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     await this.usersService.activate(id, requester);
     return { message: 'User activated successfully' };
   }
@@ -224,7 +248,10 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async deleteStaff(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() requester: User) {
+  async deleteStaff(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() requester: User,
+  ) {
     await this.usersService.deleteStaff(id, requester);
     return { message: 'Staff deleted successfully' };
   }

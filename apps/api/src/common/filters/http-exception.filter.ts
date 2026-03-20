@@ -19,11 +19,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
     const status = exception.getStatus();
-    const rawMessage = (exception.getResponse() as any)?.message || exception.message || null;
+    const rawMessage =
+      (exception.getResponse() as any)?.message || exception.message || null;
     let translated: string | string[] | null = rawMessage;
     if (typeof rawMessage === 'string' && rawMessage.includes('.')) {
       try {
-        translated = this.i18n ? (this.i18n.t(`common.${rawMessage}` as any) as any) : rawMessage;
+        translated = this.i18n
+          ? (this.i18n.t(`common.${rawMessage}` as any) as any)
+          : rawMessage;
       } catch {
         translated = rawMessage;
       }
@@ -44,7 +47,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
         'HttpExceptionFilter',
       );
     } else {
-      this.logger.warn(`${request.method} ${request.url} - ${status} - ${rawMessage}`, 'HttpExceptionFilter');
+      this.logger.warn(
+        `${request.method} ${request.url} - ${status} - ${rawMessage}`,
+        'HttpExceptionFilter',
+      );
     }
 
     response.status(status).json(errorResponse);

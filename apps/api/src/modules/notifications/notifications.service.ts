@@ -14,21 +14,21 @@ export type NotificationChannel = 'sms' | 'email' | 'push' | 'whatsapp';
 
 export interface EnqueueNotification {
   type:
-  | 'OTP'
-  | 'BOOKING_CONFIRMED'
-  | 'BOOKING_REMINDER'
-  | 'BOOKING_END'
-  | 'BOOKING_CANCELLED'
-  | 'PAYMENT_SUCCESS'
-  | 'TICKETS_ISSUED'
-  | 'TRIP_STATUS'
-  | 'EVENT_STATUS'
-  | 'PROMO'
-  | 'ADMIN_MESSAGE'
-  | 'LOYALTY_EARN'
-  | 'LOYALTY_REDEEM'
-  | 'RATING_REQUEST'
-  | 'WALLET_RECHARGED';
+    | 'OTP'
+    | 'BOOKING_CONFIRMED'
+    | 'BOOKING_REMINDER'
+    | 'BOOKING_END'
+    | 'BOOKING_CANCELLED'
+    | 'PAYMENT_SUCCESS'
+    | 'TICKETS_ISSUED'
+    | 'TRIP_STATUS'
+    | 'EVENT_STATUS'
+    | 'PROMO'
+    | 'ADMIN_MESSAGE'
+    | 'LOYALTY_EARN'
+    | 'LOYALTY_REDEEM'
+    | 'RATING_REQUEST'
+    | 'WALLET_RECHARGED';
   to: { phone?: string; email?: string; userId?: string };
   template?: string;
   data: Record<string, unknown>;
@@ -44,14 +44,17 @@ export class NotificationsService {
     @InjectQueue('notifications_sms') private readonly smsQueue: Queue,
     @InjectQueue('notifications_email') private readonly emailQueue: Queue,
     @InjectQueue('notifications_push') private readonly pushQueue: Queue,
-    @InjectQueue('notifications_whatsapp') private readonly whatsappQueue: Queue,
+    @InjectQueue('notifications_whatsapp')
+    private readonly whatsappQueue: Queue,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
-    @InjectRepository(DeviceToken) private readonly tokenRepo: Repository<DeviceToken>,
-    @InjectRepository(Notification) private readonly notificationRepo: Repository<Notification>,
+    @InjectRepository(DeviceToken)
+    private readonly tokenRepo: Repository<DeviceToken>,
+    @InjectRepository(Notification)
+    private readonly notificationRepo: Repository<Notification>,
     private readonly encryption: EncryptionService,
     private readonly emailProvider: EmailProvider,
     private readonly whatsappProvider: WhatsAppProvider,
-  ) { }
+  ) {}
 
   async enqueue(n: EnqueueNotification): Promise<void> {
     const resolved = await this.resolveRecipient(n.to);
@@ -78,8 +81,18 @@ export class NotificationsService {
       jobs.push(
         this.smsQueue.add(
           'send',
-          { to: n.to.phone || resolved.phone!, body, meta: { type: n.type, lang } },
-          { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, ...(n.delayMs ? { delay: n.delayMs } : {}), ...(n.jobId ? { jobId: n.jobId } : {}) },
+          {
+            to: n.to.phone || resolved.phone!,
+            body,
+            meta: { type: n.type, lang },
+          },
+          {
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 2000 },
+            removeOnComplete: true,
+            ...(n.delayMs ? { delay: n.delayMs } : {}),
+            ...(n.jobId ? { jobId: n.jobId } : {}),
+          },
         ),
       );
     }
@@ -90,8 +103,19 @@ export class NotificationsService {
       jobs.push(
         this.emailQueue.add(
           'send',
-          { to: n.to.email || resolved.email!, subject, html, meta: { type: n.type, lang } },
-          { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, ...(n.delayMs ? { delay: n.delayMs } : {}), ...(n.jobId ? { jobId: n.jobId } : {}) },
+          {
+            to: n.to.email || resolved.email!,
+            subject,
+            html,
+            meta: { type: n.type, lang },
+          },
+          {
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 2000 },
+            removeOnComplete: true,
+            ...(n.delayMs ? { delay: n.delayMs } : {}),
+            ...(n.jobId ? { jobId: n.jobId } : {}),
+          },
         ),
       );
     }
@@ -105,14 +129,14 @@ export class NotificationsService {
             {
               to: n.to.phone || resolved.phone!,
               otp: String(n.data.otp),
-              lang
+              lang,
             },
             {
               attempts: 5,
               backoff: { type: 'exponential', delay: 2000 },
               removeOnComplete: true,
               ...(n.delayMs ? { delay: n.delayMs } : {}),
-              ...(n.jobId ? { jobId: n.jobId } : {})
+              ...(n.jobId ? { jobId: n.jobId } : {}),
             },
           ),
         );
@@ -131,7 +155,13 @@ export class NotificationsService {
           this.pushQueue.add(
             'send',
             { tokens, title, body, data: this.buildPushData(n) },
-            { attempts: 5, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, ...(n.delayMs ? { delay: n.delayMs } : {}), ...(n.jobId ? { jobId: n.jobId } : {}) },
+            {
+              attempts: 5,
+              backoff: { type: 'exponential', delay: 2000 },
+              removeOnComplete: true,
+              ...(n.delayMs ? { delay: n.delayMs } : {}),
+              ...(n.jobId ? { jobId: n.jobId } : {}),
+            },
           ),
         );
       }
@@ -155,8 +185,14 @@ export class NotificationsService {
     ]);
   }
 
-  async getUserNotifications(userId: string, page = 1, limit = 20, isRead?: boolean) {
-    const query = this.notificationRepo.createQueryBuilder('notification')
+  async getUserNotifications(
+    userId: string,
+    page = 1,
+    limit = 20,
+    isRead?: boolean,
+  ) {
+    const query = this.notificationRepo
+      .createQueryBuilder('notification')
       .where('notification.userId = :userId', { userId })
       .orderBy('notification.createdAt', 'DESC')
       .skip((page - 1) * limit)
@@ -188,7 +224,10 @@ export class NotificationsService {
   }
 
   async markAllAsRead(userId: string): Promise<void> {
-    await this.notificationRepo.update({ userId, isRead: false }, { isRead: true });
+    await this.notificationRepo.update(
+      { userId, isRead: false },
+      { isRead: true },
+    );
   }
 
   async deleteNotification(id: string, userId: string): Promise<void> {
@@ -199,7 +238,11 @@ export class NotificationsService {
     await this.notificationRepo.delete({ userId });
   }
 
-  private async resolveRecipient(to: { phone?: string; email?: string; userId?: string }): Promise<{ phone?: string; email?: string; lang?: 'ar' | 'en' }> {
+  private async resolveRecipient(to: {
+    phone?: string;
+    email?: string;
+    userId?: string;
+  }): Promise<{ phone?: string; email?: string; lang?: 'ar' | 'en' }> {
     if (to.userId) {
       const user = await this.userRepo.findOne({ where: { id: to.userId } });
       if (user) {
@@ -209,13 +252,20 @@ export class NotificationsService {
         } catch {
           phone = undefined;
         }
-        return { phone, email: user.email || undefined, lang: (user.language as any) || undefined };
+        return {
+          phone,
+          email: user.email || undefined,
+          lang: (user.language as any) || undefined,
+        };
       }
     }
     return { phone: to.phone, email: to.email };
   }
 
-  private async getUserTokens(userId?: string, _phone?: string): Promise<string[]> {
+  private async getUserTokens(
+    userId?: string,
+    _phone?: string,
+  ): Promise<string[]> {
     if (!userId) return [];
     const list = await this.tokenRepo.find({ where: { userId } });
     return list.map((t) => t.token);
@@ -264,12 +314,18 @@ export class NotificationsService {
     }
   }
 
-  private renderTemplate(n: EnqueueNotification, channel: NotificationChannel | 'email', lang: 'ar' | 'en'): string {
+  private renderTemplate(
+    n: EnqueueNotification,
+    channel: NotificationChannel | 'email',
+    lang: 'ar' | 'en',
+  ): string {
     if (n.template) return n.template;
     const d = n.data as any;
     switch (n.type) {
       case 'OTP':
-        return lang === 'ar' ? `رمز التحقق الخاص بك: ${d.otp}` : `Your OTP code is: ${d.otp}`;
+        return lang === 'ar'
+          ? `رمز التحقق الخاص بك: ${d.otp}`
+          : `Your OTP code is: ${d.otp}`;
       case 'BOOKING_CONFIRMED':
         return lang === 'ar'
           ? `تم تأكيد حجزك رقم ${d.bookingId}. شكراً لاختيارك لنا.`
@@ -292,8 +348,10 @@ export class NotificationsService {
           : `We received your payment of ${d.amount} ${d.currency}.`;
       case 'TICKETS_ISSUED':
         return lang === 'ar'
-          ? (d.welcomeMessage || `تم إصدار التذاكر لحجزك ${d.bookingId}. نتمنى لك وقتاً ممتعاً!`)
-          : (d.welcomeMessage || `Tickets issued for booking ${d.bookingId}. Enjoy!`);
+          ? d.welcomeMessage ||
+              `تم إصدار التذاكر لحجزك ${d.bookingId}. نتمنى لك وقتاً ممتعاً!`
+          : d.welcomeMessage ||
+              `Tickets issued for booking ${d.bookingId}. Enjoy!`;
       case 'TRIP_STATUS':
         return lang === 'ar'
           ? `تم تحديث حالة طلب الرحلة إلى: ${d.status}`
@@ -303,9 +361,13 @@ export class NotificationsService {
           ? `تم تحديث حالة طلب المناسبة إلى: ${d.status}`
           : `Event request status updated to: ${d.status}`;
       case 'PROMO':
-        return String(d.message || (lang === 'ar' ? 'عرض ترويجي' : 'Promotion'));
+        return String(
+          d.message || (lang === 'ar' ? 'عرض ترويجي' : 'Promotion'),
+        );
       case 'ADMIN_MESSAGE':
-        return String(d.message || (lang === 'ar' ? 'رسالة من الإدارة' : 'Admin Message'));
+        return String(
+          d.message || (lang === 'ar' ? 'رسالة من الإدارة' : 'Admin Message'),
+        );
       case 'LOYALTY_EARN':
         return lang === 'ar'
           ? `تم إضافة ${d.points} نقطة إلى رصيدك. الإجمالي: ${d.totalPoints}`
@@ -334,5 +396,3 @@ export class NotificationsService {
     return this.emailProvider.getConfigStatus();
   }
 }
-
-

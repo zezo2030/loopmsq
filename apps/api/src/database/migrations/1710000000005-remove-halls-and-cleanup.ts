@@ -23,12 +23,12 @@ export class RemoveHallsAndCleanup1710000000005 implements MigrationInterface {
       ALTER TABLE "bookings" 
       DROP CONSTRAINT IF EXISTS "FK_bookings_hallId"
     `);
-    
+
     await queryRunner.query(`
       ALTER TABLE "offers" 
       DROP CONSTRAINT IF EXISTS "FK_offers_hallId"
     `);
-    
+
     await queryRunner.query(`
       ALTER TABLE "coupons" 
       DROP CONSTRAINT IF EXISTS "FK_coupons_hallId"
@@ -207,4 +207,3 @@ export class RemoveHallsAndCleanup1710000000005 implements MigrationInterface {
     `);
   }
 }
-

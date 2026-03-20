@@ -12,5 +12,3 @@ import { ContentModule } from '../content/content.module';
   exports: [FavoritesService],
 })
 export class FavoritesModule {}
-
-

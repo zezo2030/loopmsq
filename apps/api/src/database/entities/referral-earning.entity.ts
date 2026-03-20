@@ -1,4 +1,12 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { User } from './user.entity';
 
 export enum ReferralEarningStatus {
@@ -27,7 +35,11 @@ export class ReferralEarning {
   @Column({ type: 'uuid', nullable: true })
   sourcePaymentId?: string;
 
-  @Column({ type: 'enum', enum: ReferralEarningStatus, default: ReferralEarningStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: ReferralEarningStatus,
+    default: ReferralEarningStatus.PENDING,
+  })
   status: ReferralEarningStatus;
 
   @CreateDateColumn()
@@ -41,5 +53,3 @@ export class ReferralEarning {
   @JoinColumn({ name: 'refereeId' })
   referee: User;
 }
-
-

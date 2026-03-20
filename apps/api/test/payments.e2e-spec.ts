@@ -29,5 +29,3 @@ describe('Payments (e2e)', () => {
       .expect(401);
   });
 });
-
-

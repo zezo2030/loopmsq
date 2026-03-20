@@ -16,7 +16,9 @@ describe('Coupons (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
 
     repo = app.get<Repository<Coupon>>(getRepositoryToken(Coupon));
@@ -27,7 +29,12 @@ describe('Coupons (e2e)', () => {
   });
 
   it('preview returns discount for active percentage coupon', async () => {
-    const c = repo.create({ code: 'NEW10', discountType: 'percentage', discountValue: 10, isActive: true });
+    const c = repo.create({
+      code: 'NEW10',
+      discountType: 'percentage',
+      discountValue: 10,
+      isActive: true,
+    });
     await repo.save(c);
 
     const res = await request(app.getHttpServer())
@@ -38,5 +45,3 @@ describe('Coupons (e2e)', () => {
     expect(res.body.finalAmount).toBe(180);
   });
 });
-
-

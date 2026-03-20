@@ -23,5 +23,6 @@ export const getAppConfig = (configService: ConfigService): AppConfig => ({
   uploadDest: configService.get<string>('UPLOAD_DEST') || './uploads',
   throttleTtl: configService.get<number>('THROTTLE_TTL') || 60,
   throttleLimit: configService.get<number>('THROTTLE_LIMIT') || 100,
-  paymentWebhookSecret: configService.get<string>('PAYMENT_WEBHOOK_SECRET') || 'dev-webhook-secret',
+  paymentWebhookSecret:
+    configService.get<string>('PAYMENT_WEBHOOK_SECRET') || 'dev-webhook-secret',
 });

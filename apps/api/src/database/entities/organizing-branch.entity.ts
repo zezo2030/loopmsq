@@ -1,4 +1,10 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('organizing_branches')
 export class OrganizingBranch {
@@ -23,8 +29,3 @@ export class OrganizingBranch {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-
-
-
-

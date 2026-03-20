@@ -7,10 +7,10 @@ export class EmailProcessor {
   constructor(private readonly emailProvider: EmailProvider) {}
 
   @Process('send')
-  async handleSend(job: Job<{ to: string; subject: string; html: string }>): Promise<void> {
+  async handleSend(
+    job: Job<{ to: string; subject: string; html: string }>,
+  ): Promise<void> {
     const { to, subject, html } = job.data;
     await this.emailProvider.send(to, subject, html);
   }
 }
-
-

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useAdminAuth } from '../../auth'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image, Tabs, Row, Col } from 'antd'
-import { resolveFileUrl } from '../../shared/url'
-import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
-import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../api'
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image, Tabs, Row, Col, Divider, Progress } from 'antd'
+import { resolveFileUrl, resolveFileUrlWithBust } from '../../shared/url'
+import { UploadOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons'
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete, getApiBase } from '../../api'
 import { useTranslation } from 'react-i18next'
 import WorkingHoursEditor from '../../components/WorkingHoursEditor'
 import BranchOffersTab from '../../components/BranchOffersTab'
@@ -25,15 +25,11 @@ type Branch = {
   coverImage?: string | null
   images?: string[]
   videoUrl?: string | null
+  videoCoverUrl?: string | null
   latitude?: number | null
   longitude?: number | null
   priceConfig?: {
-    basePrice: number
     hourlyRate: number
-    pricePerPerson: number
-    weekendMultiplier: number
-    holidayMultiplier: number
-    decorationPrice?: number
   }
 }
 
@@ -48,6 +44,9 @@ export default function Branches() {
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null)
   const [activeTab, setActiveTab] = useState('list')
   const [form] = Form.useForm()
+  const [uploadProgress, setUploadProgress] = useState<number>(0)
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false)
+  const [videoCoverUrl, setVideoCoverUrl] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery<Branch[]>({
     queryKey: ['branches'],
@@ -153,7 +152,7 @@ export default function Branches() {
       key: 'actions',
       render: (_: any, r: Branch) => (
         <Space>
-          <Button size="small" onClick={() => { setSelectedBranch(r); setActiveTab('details'); form.setFieldsValue({
+          <Button size="small" onClick={() => { setSelectedBranch(r); setActiveTab('details'); setVideoCoverUrl(r.videoCoverUrl || null); form.setFieldsValue({
             name_ar: r.name_ar,
             name_en: r.name_en,
             location: r.location,
@@ -167,16 +166,12 @@ export default function Branches() {
             latitude: r.latitude,
             longitude: r.longitude,
             videoUrl: r.videoUrl,
-            basePrice: r.priceConfig?.basePrice,
-            hourlyRate: r.priceConfig?.hourlyRate,
-            pricePerPerson: r.priceConfig?.pricePerPerson,
-            weekendMultiplier: r.priceConfig?.weekendMultiplier,
-            holidayMultiplier: r.priceConfig?.holidayMultiplier,
-            decorationPrice: r.priceConfig?.decorationPrice
+            videoCoverUrl: r.videoCoverUrl,
+            hourlyRate: r.priceConfig?.hourlyRate
           }); setEditing(r) }}>
             {t('common.view_details') || 'View Details'}
           </Button>
-          <Button size="small" disabled={!canEdit} onClick={() => { setEditing(r); form.setFieldsValue({
+          <Button size="small" disabled={!canEdit} onClick={() => { setEditing(r); setVideoCoverUrl(r.videoCoverUrl || null); form.setFieldsValue({
             name_ar: r.name_ar,
             name_en: r.name_en,
             location: r.location,
@@ -190,12 +185,8 @@ export default function Branches() {
             latitude: r.latitude,
             longitude: r.longitude,
             videoUrl: r.videoUrl,
-            basePrice: r.priceConfig?.basePrice,
-            hourlyRate: r.priceConfig?.hourlyRate,
-            pricePerPerson: r.priceConfig?.pricePerPerson,
-            weekendMultiplier: r.priceConfig?.weekendMultiplier,
-            holidayMultiplier: r.priceConfig?.holidayMultiplier,
-            decorationPrice: r.priceConfig?.decorationPrice
+            videoCoverUrl: r.videoCoverUrl,
+            hourlyRate: r.priceConfig?.hourlyRate
           }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
           <Select
             value={r.status}
@@ -223,7 +214,7 @@ export default function Branches() {
               <Button onClick={() => { setSelectedBranch(null); setActiveTab('list'); setEditing(null) }}>
                 {t('common.back') || 'Back to List'}
               </Button>
-              <Button type="primary" disabled={!canEdit} onClick={() => { setEditing(selectedBranch); form.setFieldsValue({
+              <Button type="primary" disabled={!canEdit} onClick={() => { setEditing(selectedBranch); setVideoCoverUrl(selectedBranch.videoCoverUrl || null); form.setFieldsValue({
                 name_ar: selectedBranch.name_ar,
                 name_en: selectedBranch.name_en,
                 location: selectedBranch.location,
@@ -237,12 +228,8 @@ export default function Branches() {
                 latitude: selectedBranch.latitude,
                 longitude: selectedBranch.longitude,
                 videoUrl: selectedBranch.videoUrl,
-                basePrice: selectedBranch.priceConfig?.basePrice,
-                hourlyRate: selectedBranch.priceConfig?.hourlyRate,
-                pricePerPerson: selectedBranch.priceConfig?.pricePerPerson,
-                weekendMultiplier: selectedBranch.priceConfig?.weekendMultiplier,
-                holidayMultiplier: selectedBranch.priceConfig?.holidayMultiplier,
-                decorationPrice: selectedBranch.priceConfig?.decorationPrice
+                videoCoverUrl: selectedBranch.videoCoverUrl,
+                hourlyRate: selectedBranch.priceConfig?.hourlyRate
               }); setOpen(true) }}>
                 {t('common.edit') || 'Edit'}
               </Button>
@@ -274,16 +261,8 @@ export default function Branches() {
                     {selectedBranch.priceConfig && (
                       <div style={{ marginTop: 16, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
                         <strong style={{ display: 'block', marginBottom: 8 }}>{t('branches.pricing_config') || 'إعدادات التسعير'}:</strong>
-                        <p><strong>{t('branches.base_price') || 'السعر الأساسي'}:</strong> {selectedBranch.priceConfig.basePrice} {t('common.currency') || 'ريال'}</p>
-                        <p><strong>{t('branches.hourly_rate') || 'السعر بالساعة'}:</strong> {selectedBranch.priceConfig.hourlyRate} {t('common.currency') || 'ريال'}</p>
-                        {selectedBranch.priceConfig.pricePerPerson > 0 && (
-                          <p><strong>{t('branches.price_per_person') || 'السعر للشخص الواحد'}:</strong> {selectedBranch.priceConfig.pricePerPerson} {t('common.currency') || 'ريال'}</p>
-                        )}
-                        {selectedBranch.priceConfig.decorationPrice && (
-                          <p><strong>{t('branches.decoration_price') || 'سعر الديكور'}:</strong> {selectedBranch.priceConfig.decorationPrice} {t('common.currency') || 'ريال'}</p>
-                        )}
-                        <p><strong>{t('branches.weekend_multiplier') || 'مضاعف عطلة نهاية الأسبوع'}:</strong> {selectedBranch.priceConfig.weekendMultiplier}x</p>
-                        <p><strong>{t('branches.holiday_multiplier') || 'مضاعف العطل الرسمية'}:</strong> {selectedBranch.priceConfig.holidayMultiplier}x</p>
+                                                <p><strong>{t('branches.hourly_rate') || 'السعر بالساعة'}:</strong> {selectedBranch.priceConfig.hourlyRate} {t('common.currency') || 'ريال'}</p>
+                        <p style={{ marginBottom: 0 }}>{t('branches.addons_priced_separately') || 'Add-ons are priced separately during booking.'}</p>
                       </div>
                     )}
                   </div>
@@ -308,7 +287,7 @@ export default function Branches() {
 
   return (
     <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
-      <Card title={t('branches.title') || 'الفروع'} extra={<Button type="primary" disabled={!canEdit} onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('branches.new') || 'فرع جديد'}</Button>}>
+      <Card title={t('branches.title') || 'الفروع'} extra={<Button type="primary" disabled={!canEdit} onClick={() => { setEditing(null); setVideoCoverUrl(null); form.resetFields(); setOpen(true) }}>{t('branches.new') || 'فرع جديد'}</Button>}>
       <Table
         rowKey="id"
         loading={isLoading}
@@ -320,7 +299,7 @@ export default function Branches() {
       <Modal
         title={editing ? (t('branches.edit_title') || 'تعديل فرع') : (t('branches.create_title') || 'إنشاء فرع')}
         open={open}
-        onCancel={() => { setOpen(false); setEditing(null) }}
+        onCancel={() => { setOpen(false); setEditing(null); setVideoCoverUrl(null) }}
         onOk={() => form.submit()}
         okText={editing ? (t('common.update') || 'تحديث') : (t('common.create') || 'إنشاء')}
       >
@@ -328,6 +307,9 @@ export default function Branches() {
           form={form}
           layout="vertical"
           onFinish={(values) => {
+            const hasLinkValue = (v: unknown) =>
+              typeof v === 'string' && /maps\.app\.goo\.gl|google\.com\/maps/i.test(v)
+
             const payload: any = {
               name_ar: values.name_ar,
               name_en: values.name_en,
@@ -338,25 +320,36 @@ export default function Branches() {
               contactPhone: values.contactPhone || null,
               amenities: values.amenities?.length ? values.amenities : undefined,
               status: values.status || 'active',
-              latitude: values.latitude ? Number(values.latitude) : null,
-              longitude: values.longitude ? Number(values.longitude) : null,
+              latitude: values.latitude
+                ? hasLinkValue(values.latitude)
+                  ? null
+                  : Number(values.latitude)
+                : null,
+              longitude: values.longitude
+                ? hasLinkValue(values.longitude)
+                  ? null
+                  : Number(values.longitude)
+                : null,
               videoUrl: values.videoUrl || null,
+              videoCoverUrl: values.videoCoverUrl || null,
             }
             if (values.workingHours) {
               payload.workingHours = values.workingHours
             }
-            // Add pricing configuration
-            if (values.basePrice || values.hourlyRate || values.pricePerPerson || values.weekendMultiplier || values.holidayMultiplier) {
+            // Preserve explicit 0 values instead of falling back to legacy defaults.
+            const hasPricingConfig = [values.hourlyRate].some((value) => value !== undefined && value !== null && value !== '')
+            if (hasPricingConfig) {
               payload.hallPriceConfig = {
-                basePrice: values.basePrice ? Number(values.basePrice) : 500,
-                hourlyRate: values.hourlyRate ? Number(values.hourlyRate) : 100,
-                pricePerPerson: values.pricePerPerson ? Number(values.pricePerPerson) : 10,
-                weekendMultiplier: values.weekendMultiplier ? Number(values.weekendMultiplier) : 1.5,
-                holidayMultiplier: values.holidayMultiplier ? Number(values.holidayMultiplier) : 2.0,
-                decorationPrice: values.decorationPrice ? Number(values.decorationPrice) : undefined,
+                hourlyRate: Number(values.hourlyRate ?? 0),
               }
             }
             if (!canEdit) { message.error(t('errors.forbidden') || 'Forbidden'); return }
+
+            // If user attempted to paste a Google Maps share link inside lat/lng:
+            if (hasLinkValue(values.latitude) || hasLinkValue(values.longitude)) {
+              message.error(t('branches.map_link_not_allowed') || 'لا يمكن وضع لينك Google Maps داخل Latitude/Longitude. لازم أرقام فقط.')
+              return
+            }
             if (editing) updateBranch.mutate({ id: editing.id, body: payload })
             else createBranch.mutate(payload)
           }}
@@ -385,6 +378,9 @@ export default function Branches() {
                   style={{ width: '100%' }}
                   placeholder="24.7136"
                 />
+                <div style={{ marginTop: 6, color: '#d46b08', fontSize: 12 }}>
+                  لازم رقم فقط (بدون لينك)
+                </div>
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -399,6 +395,9 @@ export default function Branches() {
                   style={{ width: '100%' }}
                   placeholder="46.6753"
                 />
+                <div style={{ marginTop: 6, color: '#d46b08', fontSize: 12 }}>
+                  لازم رقم فقط (بدون لينك)
+                </div>
               </Form.Item>
             </Col>
           </Row>
@@ -421,80 +420,190 @@ export default function Branches() {
           <Form.Item name="description_en" label={t('branches.description_en') || 'الوصف (EN)'}>
             <Input.TextArea rows={3} />
           </Form.Item>
-          <Form.Item 
-            name="videoUrl" 
-            label={t('branches.video_url') || 'رابط فيديو YouTube'} 
-            help={t('branches.video_url_help') || 'أدخل رابط فيديو YouTube (مثال: https://www.youtube.com/watch?v=VIDEO_ID)'}
-          >
-            <Input placeholder="https://www.youtube.com/watch?v=..." />
+
+          {/* Branch Video - Upload with progress + Cover (like IntroVideo/OrganizingBranches) */}
+          <Form.Item label={t('branches.video_url') || 'فيديو الفرع'}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {form.getFieldValue('videoUrl') ? (
+                <div>
+                  {(form.getFieldValue('videoUrl') || '').includes('cloudinary.com') || (form.getFieldValue('videoUrl') || '').includes('res.cloudinary.com') ? (
+                    <video
+                      src={form.getFieldValue('videoUrl')}
+                      controls
+                      style={{ maxWidth: 300, maxHeight: 200, borderRadius: 8 }}
+                    />
+                  ) : (
+                    <div style={{ padding: 8, background: '#f5f5f5', borderRadius: 8 }}>
+                      <Space>
+                        <PlayCircleOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                        <span>{form.getFieldValue('videoUrl')}</span>
+                      </Space>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {isUploadingVideo && (
+                <div>
+                  <Progress
+                    percent={uploadProgress}
+                    status="active"
+                    format={(percent) => {
+                      const p = percent || 0
+                      if (p < 85) return t('branches.upload_progress', { percent: p })
+                      if (p < 100) return t('branches.processing')
+                      return t('branches.completed')
+                    }}
+                  />
+                </div>
+              )}
+
+              <Upload
+                accept="video/*"
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  setIsUploadingVideo(true)
+                  setUploadProgress(0)
+                  const fd = new FormData()
+                  fd.append('file', file)
+                  const xhr = new XMLHttpRequest()
+                  xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                      const percentComplete = Math.round((e.loaded / e.total) * 85)
+                      setUploadProgress(percentComplete)
+                    }
+                  })
+                  xhr.addEventListener('load', () => {
+                    if (xhr.status === 200 || xhr.status === 201) {
+                      try {
+                        const res = JSON.parse(xhr.responseText)
+                        setUploadProgress(100)
+                        const cover = res.coverUrl || null
+                        form.setFieldsValue({
+                          videoUrl: res.videoUrl,
+                          videoCoverUrl: cover,
+                        })
+                        setVideoCoverUrl(cover)
+                        setTimeout(() => {
+                          setIsUploadingVideo(false)
+                          setUploadProgress(0)
+                        }, 800)
+                        message.success(cover ? t('branches.video_uploaded_with_cover') : t('branches.video_uploaded'))
+                      } catch {
+                        setIsUploadingVideo(false)
+                        setUploadProgress(0)
+                        message.error(t('branches.video_upload_failed'))
+                      }
+                    } else {
+                      setIsUploadingVideo(false)
+                      setUploadProgress(0)
+                      try {
+                        const errorRes = JSON.parse(xhr.responseText)
+                        message.error(errorRes.message || t('branches.video_upload_failed'))
+                      } catch {
+                        message.error(t('branches.video_upload_failed'))
+                      }
+                    }
+                  })
+                  xhr.addEventListener('loadstart', () => setUploadProgress(5))
+                  xhr.addEventListener('error', () => {
+                    setIsUploadingVideo(false)
+                    setUploadProgress(0)
+                    message.error(t('branches.video_upload_failed'))
+                  })
+                  xhr.addEventListener('abort', () => {
+                    setIsUploadingVideo(false)
+                    setUploadProgress(0)
+                  })
+                  const apiBaseUrl = getApiBase()
+                  xhr.open('POST', `${apiBaseUrl}/content/branches/upload-video`)
+                  const token = localStorage.getItem('accessToken') || localStorage.getItem('admin_token') || localStorage.getItem('token')
+                  if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+                  xhr.send(fd)
+                  return false
+                }}
+              >
+                <Button icon={<UploadOutlined />} disabled={isUploadingVideo}>
+                  {isUploadingVideo ? t('branches.uploading') : t('branches.upload_video')}
+                </Button>
+              </Upload>
+
+              <Divider>{t('branches.or') || 'أو'}</Divider>
+              <Form.Item name="videoUrl" noStyle>
+                <Input placeholder={t('branches.video_url_placeholder') || 'رابط YouTube أو Cloudinary'} />
+              </Form.Item>
+
+              <Divider>{t('branches.video_cover') || 'غلاف الفيديو (اختياري)'}</Divider>
+              <Form.Item label={t('branches.video_cover') || 'غلاف الفيديو'}>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  {(videoCoverUrl || form.getFieldValue('videoCoverUrl')) ? (
+                    <div>
+                      <Image
+                        src={resolveFileUrlWithBust(videoCoverUrl || form.getFieldValue('videoCoverUrl'))}
+                        width={200}
+                        height={120}
+                        style={{ objectFit: 'cover', borderRadius: 8 }}
+                      />
+                    </div>
+                  ) : null}
+                  <Upload
+                    accept="image/*"
+                    showUploadList={false}
+                    beforeUpload={(file) => {
+                      const fd = new FormData()
+                      fd.append('file', file)
+                      apiPost<{ coverUrl: string }>('/content/branches/upload-video-cover', fd)
+                        .then((res) => {
+                          form.setFieldsValue({ videoCoverUrl: res.coverUrl })
+                          setVideoCoverUrl(res.coverUrl)
+                          message.success(t('branches.cover_uploaded') || 'تم رفع الغلاف بنجاح')
+                        })
+                        .catch((err) => {
+                          message.error(err.response?.data?.message || t('branches.video_upload_failed'))
+                        })
+                      return false
+                    }}
+                  >
+                    <Button icon={<UploadOutlined />}>{t('branches.upload_cover') || 'رفع غلاف'}</Button>
+                  </Upload>
+                  {(videoCoverUrl || form.getFieldValue('videoCoverUrl')) && (
+                    <Button
+                      size="small"
+                      danger
+                      onClick={() => {
+                        form.setFieldsValue({ videoCoverUrl: null })
+                        setVideoCoverUrl(null)
+                        message.info(t('branches.cover_removed') || 'تم إزالة الغلاف')
+                      }}
+                    >
+                      {t('branches.remove_cover') || 'إزالة الغلاف'}
+                    </Button>
+                  )}
+                  <Form.Item name="videoCoverUrl" hidden>
+                    <Input />
+                  </Form.Item>
+                </Space>
+              </Form.Item>
+            </Space>
           </Form.Item>
-          
+
           {/* Pricing Configuration */}
-          <Card title={t('branches.pricing_config') || 'إعدادات التسعير'} style={{ marginBottom: 16 }}>
+          <Card title={t('branches.pricing_config') || 'Pricing Configuration'} style={{ marginBottom: 16 }}>
             <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item 
-                  name="basePrice" 
-                  label={t('branches.base_price') || 'السعر الأساسي'} 
-                  rules={[{ required: true, message: t('branches.base_price_required') || 'السعر الأساسي مطلوب' }]}
-                  tooltip={t('branches.base_price_tooltip') || 'السعر الأساسي للفرع'}
-                >
-                  <InputNumber min={0} step={10} style={{ width: '100%' }} placeholder="500" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
+              <Col span={24}>
                 <Form.Item 
                   name="hourlyRate" 
-                  label={t('branches.hourly_rate') || 'السعر بالساعة'} 
-                  rules={[{ required: true, message: t('branches.hourly_rate_required') || 'السعر بالساعة مطلوب' }]}
-                  tooltip={t('branches.hourly_rate_tooltip') || 'السعر الإضافي لكل ساعة'}
+                  label={t('branches.hourly_rate') || 'Hourly Rate'} 
+                  rules={[{ required: true, message: t('branches.hourly_rate_required') || 'Hourly rate is required' }]} 
+                  tooltip={t('branches.hourly_rate_tooltip') || 'Price charged for each booked hour'}
                 >
                   <InputNumber min={0} step={10} style={{ width: '100%' }} placeholder="100" />
                 </Form.Item>
               </Col>
             </Row>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item 
-                  name="pricePerPerson" 
-                  label={t('branches.price_per_person') || 'السعر للشخص الواحد'} 
-                  tooltip={t('branches.price_per_person_tooltip') || 'السعر الإضافي لكل شخص'}
-                >
-                  <InputNumber min={0} step={1} style={{ width: '100%' }} placeholder="10" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item 
-                  name="decorationPrice" 
-                  label={t('branches.decoration_price') || 'سعر الديكور'} 
-                  tooltip={t('branches.decoration_price_tooltip') || 'السعر الإضافي للديكور (اختياري)'}
-                >
-                  <InputNumber min={0} step={10} style={{ width: '100%' }} placeholder="200" />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item 
-                  name="weekendMultiplier" 
-                  label={t('branches.weekend_multiplier') || 'مضاعف عطلة نهاية الأسبوع'} 
-                  rules={[{ required: true, message: t('branches.weekend_multiplier_required') || 'مضاعف عطلة نهاية الأسبوع مطلوب' }]}
-                  tooltip={t('branches.weekend_multiplier_tooltip') || 'مضاعف السعر في عطلة نهاية الأسبوع (مثال: 1.5 يعني زيادة 50%)'}
-                >
-                  <InputNumber min={1} step={0.1} precision={2} style={{ width: '100%' }} placeholder="1.5" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item 
-                  name="holidayMultiplier" 
-                  label={t('branches.holiday_multiplier') || 'مضاعف العطل الرسمية'} 
-                  rules={[{ required: true, message: t('branches.holiday_multiplier_required') || 'مضاعف العطل الرسمية مطلوب' }]}
-                  tooltip={t('branches.holiday_multiplier_tooltip') || 'مضاعف السعر في العطل الرسمية (مثال: 2.0 يعني زيادة 100%)'}
-                >
-                  <InputNumber min={1} step={0.1} precision={2} style={{ width: '100%' }} placeholder="2.0" />
-                </Form.Item>
-              </Col>
-            </Row>
+            <div style={{ color: '#6b7280', fontSize: 12 }}>
+              {t('branches.addons_priced_separately') || 'Add-ons are priced separately during booking.'}
+            </div>
           </Card>
           
           {/* Cover Image */}

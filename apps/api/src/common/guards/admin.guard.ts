@@ -9,5 +9,3 @@ export class AdminGuard implements CanActivate {
     return roles.includes(UserRole.ADMIN);
   }
 }
-
-

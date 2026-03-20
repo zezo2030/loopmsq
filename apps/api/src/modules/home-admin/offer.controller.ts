@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, UploadedFile, UseInterceptors, Query, ForbiddenException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+  UploadedFile,
+  UseInterceptors,
+  Query,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { HomeAdminService } from './home-admin.service';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
@@ -58,11 +71,18 @@ export class OfferAdminController {
             join(__dirname, '..', '..', '..', 'uploads'),
             join(__dirname, '..', 'uploads'),
           ].filter(Boolean) as string[];
-          const uploadsRoot = uploadsRootCandidates.find((p) => {
-            try { return !!p && fs.existsSync(p); } catch { return false; }
-          }) || uploadsRootCandidates[0];
+          const uploadsRoot =
+            uploadsRootCandidates.find((p) => {
+              try {
+                return !!p && fs.existsSync(p);
+              } catch {
+                return false;
+              }
+            }) || uploadsRootCandidates[0];
           const target = join(uploadsRoot, 'offers');
-          try { fs.mkdirSync(target, { recursive: true }); } catch {}
+          try {
+            fs.mkdirSync(target, { recursive: true });
+          } catch {}
           cb(null, target);
         },
         filename: (req, file, cb) => {
@@ -95,7 +115,7 @@ export class OfferAdminController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  remove(@Param('id') id: string) { return this.svc.deleteOffer(id); }
+  remove(@Param('id') id: string) {
+    return this.svc.deleteOffer(id);
+  }
 }
-
-

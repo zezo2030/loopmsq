@@ -17,7 +17,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([SchoolTripRequest, Booking, Ticket, User, Payment]),
+    TypeOrmModule.forFeature([
+      SchoolTripRequest,
+      Booking,
+      Ticket,
+      User,
+      Payment,
+    ]),
     UsersModule,
     PaymentsModule,
     BookingsModule,
@@ -26,6 +32,4 @@ import { NotificationsModule } from '../notifications/notifications.module';
   controllers: [TripsController, TripsPublicController],
   providers: [TripsService, RedisService, QRCodeService],
 })
-export class TripsModule { }
-
-
+export class TripsModule {}

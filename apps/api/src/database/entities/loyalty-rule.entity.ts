@@ -1,4 +1,10 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('loyalty_rules')
 export class LoyaltyRule {
@@ -25,5 +31,3 @@ export class LoyaltyRule {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-

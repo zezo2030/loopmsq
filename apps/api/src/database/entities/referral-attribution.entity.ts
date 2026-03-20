@@ -1,4 +1,13 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  Unique,
+} from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('referral_attributions')
@@ -28,5 +37,3 @@ export class ReferralAttribution {
   @JoinColumn({ name: 'referrerId' })
   referrer: User;
 }
-
-
