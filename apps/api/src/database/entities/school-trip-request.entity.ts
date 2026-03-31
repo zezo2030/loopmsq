@@ -48,7 +48,7 @@ export class SchoolTripRequest {
   preferredDate: Date;
 
   @Column({ type: 'time', nullable: true })
-  preferredTime: string;
+  preferredTime: string | null;
 
   @Column({ type: 'int', default: 2 })
   durationHours: number;

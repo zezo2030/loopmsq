@@ -761,7 +761,12 @@ export class BookingsService {
     const { qrToken } = scanTicketDto;
 
     // Resolve ephemeral QR token mapping from Redis if exists, else hash directly
-    const mappedHash = await this.redisService.get(`share:qr:${qrToken}`);
+    let mappedHash: string | null = null;
+    try {
+      mappedHash = await this.redisService.get(`share:qr:${qrToken}`);
+    } catch {
+      mappedHash = null;
+    }
     const qrTokenHash =
       mappedHash || this.qrCodeService.generateQRTokenHash(qrToken);
     const ticket = await this.ticketRepository.findOne({
@@ -814,24 +819,57 @@ export class BookingsService {
     // - It remains valid for booking.durationHours from that moment
     const now = new Date();
 
-    if (!ticket.validFrom || !ticket.validUntil) {
+    const isSchoolTripTicket =
+      (ticket.metadata as any)?.tripType === 'school' ||
+      ticket.qrTokenHash.startsWith('trip_');
+
+    if (isSchoolTripTicket) {
+      if (!ticket.validFrom || !ticket.validUntil) {
+        const bookingStart = new Date(ticket.booking.startTime as any);
+        const dayStart = new Date(
+          bookingStart.getFullYear(),
+          bookingStart.getMonth(),
+          bookingStart.getDate(),
+        );
+        const dayEnd = new Date(
+          bookingStart.getFullYear(),
+          bookingStart.getMonth(),
+          bookingStart.getDate(),
+          23,
+          59,
+          59,
+          999,
+        );
+
+        if (now < dayStart || now > dayEnd) {
+          return {
+            success: false,
+            ticket,
+            booking: ticket.booking,
+            message: 'Ticket is not valid for current date',
+          };
+        }
+        ticket.validFrom = now;
+        ticket.validUntil = dayEnd;
+        await this.ticketRepository.save(ticket);
+      }
+
+      if (now < ticket.validFrom || now > ticket.validUntil) {
+        return {
+          success: false,
+          ticket,
+          booking: ticket.booking,
+          message: 'Ticket is not valid for current time',
+        };
+      }
+    } else {
+      // Regular booking ticket: valid from the moment of scan
       const bookingDurationMs =
         (ticket.booking?.durationHours ?? 0) * 60 * 60 * 1000;
       const effectiveDurationMs =
         bookingDurationMs > 0 ? bookingDurationMs : 60 * 60 * 1000; // fallback 1h
-
       ticket.validFrom = now;
       ticket.validUntil = new Date(now.getTime() + effectiveDurationMs);
-      await this.ticketRepository.save(ticket);
-    }
-
-    if (now < ticket.validFrom || now > ticket.validUntil) {
-      return {
-        success: false,
-        ticket,
-        booking: ticket.booking,
-        message: 'Ticket is not valid for current time',
-      };
     }
 
     // Mark ticket as used

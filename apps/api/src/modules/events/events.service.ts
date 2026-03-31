@@ -18,6 +18,7 @@ import { CreateEventRequestDto } from './dto/create-event-request.dto';
 import { QuoteEventRequestDto } from './dto/quote-event-request.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ContentService } from '../content/content.service';
+import { resolveEventTicketWindow } from '../../utils/event-ticket-window.util';
 
 @Injectable()
 export class EventsService {
@@ -38,12 +39,16 @@ export class EventsService {
   ) {}
 
   async createRequest(userId: string, dto: CreateEventRequestDto) {
+    const { anchorStart } = resolveEventTicketWindow(
+      dto.startTime,
+      dto.durationHours,
+    );
     const req = this.eventRepo.create({
       requesterId: userId,
       type: dto.type,
       decorated: dto.decorated || false,
       branchId: dto.branchId,
-      startTime: new Date(dto.startTime),
+      startTime: anchorStart,
       durationHours: dto.durationHours,
       persons: dto.persons,
       addOns: dto.addOns,
@@ -202,17 +207,18 @@ export class EventsService {
 
       // Generate tickets
       const tickets: Ticket[] = [];
+      const { validFrom, validUntil } = resolveEventTicketWindow(
+        req.startTime,
+        req.durationHours,
+      );
       for (let i = 0; i < req.persons; i++) {
         const t = queryRunner.manager.create(Ticket, {
           bookingId: savedBooking.id,
           qrTokenHash: '', // Placeholder, should be generated if using QR service logic
           status: TicketStatus.VALID,
           personCount: 1,
-          validFrom: savedBooking.startTime,
-          validUntil: new Date(
-            savedBooking.startTime.getTime() +
-              savedBooking.durationHours * 3600 * 1000,
-          ),
+          validFrom,
+          validUntil,
         } as Partial<Ticket>);
         tickets.push(t);
       }

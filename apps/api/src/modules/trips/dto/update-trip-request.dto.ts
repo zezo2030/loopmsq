@@ -79,7 +79,7 @@ export class UpdateTripRequestDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(12)
+  @Max(24)
   durationHours?: number;
 
   @ApiPropertyOptional()

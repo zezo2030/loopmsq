@@ -36,6 +36,7 @@ import { BookingsService } from '../bookings/bookings.service';
 import { MoyasarService } from '../../integrations/moyasar/moyasar.service';
 import { WalletService } from '../wallet/wallet.service';
 import { QRCodeService } from '../../utils/qr-code.service';
+import { resolveEventTicketWindow } from '../../utils/event-ticket-window.util';
 
 @Injectable()
 export class PaymentsService {
@@ -413,6 +414,39 @@ export class PaymentsService {
     if (payment.status === PaymentStatus.COMPLETED)
       return { success: true, paymentId: payment.id };
 
+    // Ensure payment context entities are loaded before any downstream logic.
+    // This avoids null access (e.g. booking/event/trip id) for flows that
+    // resolve payment directly via eventRequestId/tripRequestId filters.
+    if (!booking && payment.bookingId) {
+      booking = await this.bookingRepository.findOne({
+        where: { id: payment.bookingId, userId },
+      });
+      if (!booking) {
+        throw new NotFoundException('Booking not found or access denied');
+      }
+    }
+
+    if (!eventRequest && payment.eventRequestId) {
+      const eventRepo = this.dataSource.getRepository(EventRequest);
+      eventRequest = await eventRepo.findOne({
+        where: { id: payment.eventRequestId, requesterId: userId },
+        relations: ['requester'],
+      });
+      if (!eventRequest) {
+        throw new NotFoundException('Event request not found or access denied');
+      }
+    }
+
+    if (!tripRequest && payment.tripRequestId) {
+      const tripRepo = this.dataSource.getRepository(SchoolTripRequest);
+      tripRequest = await tripRepo.findOne({
+        where: { id: payment.tripRequestId, requesterId: userId },
+      } as any);
+      if (!tripRequest) {
+        throw new NotFoundException('Trip request not found or access denied');
+      }
+    }
+
     // Handle wallet payments
     if (payment.method === PaymentMethod.WALLET) {
       if (!this.walletService) {
@@ -424,7 +458,12 @@ export class PaymentsService {
         ? booking.id
         : eventRequest
           ? eventRequest.id
-          : tripRequest!.id;
+          : tripRequest
+            ? tripRequest.id
+            : null;
+      if (!refId) {
+        throw new BadRequestException('Payment context id is missing');
+      }
       await this.walletService.deductWallet(userId, payment.amount, refId);
     } else {
       const bypass =
@@ -509,6 +548,10 @@ export class PaymentsService {
 
         // Generate Tickets with unique QR token hashes
         const tickets: Ticket[] = [];
+        const { validFrom, validUntil } = resolveEventTicketWindow(
+          eventRequest.startTime,
+          eventRequest.durationHours,
+        );
         for (let i = 0; i < eventRequest.persons; i++) {
           // Generate unique QR token and hash for each ticket
           const qrToken = this.qrCodeService
@@ -524,21 +567,13 @@ export class PaymentsService {
                 .update(qrToken)
                 .digest('hex');
 
-          // Ensure startTime is a Date object
-          const startTime =
-            savedBooking.startTime instanceof Date
-              ? savedBooking.startTime
-              : new Date(savedBooking.startTime);
-
           const t = queryRunner.manager.create(Ticket, {
             bookingId: savedBooking.id,
             qrTokenHash,
             status: TicketStatus.VALID,
             personCount: 1,
-            validFrom: startTime,
-            validUntil: new Date(
-              startTime.getTime() + savedBooking.durationHours * 3600 * 1000,
-            ),
+            validFrom,
+            validUntil,
           });
           tickets.push(t);
         }
@@ -575,20 +610,14 @@ export class PaymentsService {
           userId: tripRequest.requesterId,
           branchId: (tripRequest as any).branchId,
           startTime: tripRequest.preferredDate,
-          durationHours: tripRequest.durationHours || 2,
+          durationHours: tripRequest.durationHours || 24,
           persons: totalPersons,
           totalPrice: tripRequest.quotedPrice || 0,
           status: BookingStatus.CONFIRMED,
         });
         savedBooking = await queryRunner.manager.save(newBooking);
 
-        // Generate Tickets for each student with their name
-        // Ensure startTime is a Date object
-        const startTime =
-          savedBooking.startTime instanceof Date
-            ? savedBooking.startTime
-            : new Date(savedBooking.startTime);
-
+        // Generate tickets for each student/adult.
         const tickets: Ticket[] = [];
 
         // Generate tickets for students - use studentsList if available, otherwise create generic tickets
@@ -615,11 +644,12 @@ export class PaymentsService {
               status: TicketStatus.VALID,
               personCount: 1,
               holderName: student.name || `طالب ${i + 1}`,
-              validFrom: startTime,
-              validUntil: new Date(
-                startTime.getTime() +
-                  (tripRequest.durationHours || 2) * 3600 * 1000,
-              ),
+              validFrom: null,
+              validUntil: null,
+              metadata: {
+                tripType: 'school',
+                role: 'student',
+              },
             });
             tickets.push(t);
           }
@@ -645,11 +675,12 @@ export class PaymentsService {
               status: TicketStatus.VALID,
               personCount: 1,
               holderName: `طالب ${i + 1}`,
-              validFrom: startTime,
-              validUntil: new Date(
-                startTime.getTime() +
-                  (tripRequest.durationHours || 2) * 3600 * 1000,
-              ),
+              validFrom: null,
+              validUntil: null,
+              metadata: {
+                tripType: 'school',
+                role: 'student',
+              },
             });
             tickets.push(t);
           }
@@ -676,11 +707,12 @@ export class PaymentsService {
             status: TicketStatus.VALID,
             personCount: 1,
             holderName: `مرافق ${i + 1}`,
-            validFrom: startTime,
-            validUntil: new Date(
-              startTime.getTime() +
-                (tripRequest.durationHours || 2) * 3600 * 1000,
-            ),
+            validFrom: null,
+            validUntil: null,
+            metadata: {
+              tripType: 'school',
+              role: 'adult',
+            },
           });
           tickets.push(t);
         }
@@ -717,7 +749,12 @@ export class PaymentsService {
         ? booking.id
         : eventRequest
           ? eventRequest.id
-          : tripRequest!.id;
+          : tripRequest
+            ? tripRequest.id
+            : payment.bookingId || payment.eventRequestId || payment.tripRequestId;
+      if (!targetId) {
+        throw new BadRequestException('Payment target id is missing');
+      }
 
       try {
         if (booking && this.bookings) {

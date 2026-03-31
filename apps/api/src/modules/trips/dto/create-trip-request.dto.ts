@@ -76,7 +76,7 @@ export class CreateTripRequestDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(12)
+  @Max(24)
   durationHours?: number;
 
   @ApiProperty()

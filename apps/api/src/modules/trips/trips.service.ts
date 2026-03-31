@@ -40,6 +40,11 @@ export class TripsService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  private startOfDay(dateLike: Date | string): Date {
+    const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
   async createRequest(userId: string, dto: CreateTripRequestDto) {
     const req = this.tripRepo.create({
       requesterId: userId,
@@ -47,9 +52,9 @@ export class TripsService {
       schoolName: dto.schoolName,
       studentsCount: dto.studentsCount || 0, // Will be updated from Excel file
       accompanyingAdults: dto.accompanyingAdults,
-      preferredDate: new Date(dto.preferredDate as any),
-      preferredTime: dto.preferredTime,
-      durationHours: dto.durationHours ?? 2,
+      preferredDate: this.startOfDay(dto.preferredDate as any),
+      preferredTime: null,
+      durationHours: dto.durationHours ?? 24,
       contactPersonName: dto.contactPersonName,
       contactPhone: dto.contactPhone,
       contactEmail: dto.contactEmail,
@@ -278,7 +283,7 @@ export class TripsService {
     const bookingData: Partial<Booking> = {
       userId: req.requesterId,
       branchId: (req as any).branchId || issuer?.branchId,
-      startTime: new Date(dto.startTime),
+      startTime: this.startOfDay(dto.startTime),
       durationHours: dto.durationHours as any,
       persons: totalPersons as any,
       totalPrice: Number(req.quotedPrice ?? totalPersons * 50) as any,
@@ -300,11 +305,8 @@ export class TripsService {
         personCount: 1,
         holderName: student.name, // ✅ اسم الطالب
         holderPhone: student.guardianPhone,
-        validFrom: savedBooking.startTime as any,
-        validUntil: new Date(
-          (savedBooking.startTime as any as Date).getTime() +
-            (savedBooking.durationHours as any as number) * 3600 * 1000,
-        ),
+        validFrom: null,
+        validUntil: null,
         metadata: {
           studentAge: student.age,
           guardianName: student.guardianName,
@@ -322,11 +324,8 @@ export class TripsService {
         status: TicketStatus.VALID,
         personCount: 1,
         holderName: `مرافق ${i + 1}`, // ✅ اسم عام للمرافقين
-        validFrom: savedBooking.startTime as any,
-        validUntil: new Date(
-          (savedBooking.startTime as any as Date).getTime() +
-            (savedBooking.durationHours as any as number) * 3600 * 1000,
-        ),
+        validFrom: null,
+        validUntil: null,
         metadata: {
           tripType: 'school',
           role: 'adult',
@@ -451,8 +450,8 @@ export class TripsService {
     if (dto.accompanyingAdults !== undefined)
       req.accompanyingAdults = dto.accompanyingAdults;
     if (dto.preferredDate !== undefined)
-      req.preferredDate = new Date(dto.preferredDate) as any;
-    if (dto.preferredTime !== undefined) req.preferredTime = dto.preferredTime;
+      req.preferredDate = this.startOfDay(dto.preferredDate) as any;
+    if (dto.preferredTime !== undefined) req.preferredTime = null;
     if (dto.durationHours !== undefined) req.durationHours = dto.durationHours;
     if (dto.contactPersonName !== undefined)
       req.contactPersonName = dto.contactPersonName;

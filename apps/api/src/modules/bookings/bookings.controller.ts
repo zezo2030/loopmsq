@@ -215,11 +215,11 @@ export class BookingsController {
     );
   }
 
-  // Staff endpoints
+  // Staff endpoints (branch managers may use the same staff app to scan)
   @Post('staff/scan')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.STAFF)
-  @ApiOperation({ summary: 'Scan ticket QR code (Staff only)' })
+  @Roles(UserRole.STAFF, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Scan ticket QR code (Staff or Branch Manager)' })
   @ApiResponse({ status: 200, description: 'Ticket scanned successfully' })
   @ApiResponse({ status: 400, description: 'Invalid QR code' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -233,8 +233,10 @@ export class BookingsController {
 
   @Get('staff/ticket/:token')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.STAFF)
-  @ApiOperation({ summary: 'Get ticket details by QR token (Staff only)' })
+  @Roles(UserRole.STAFF, UserRole.BRANCH_MANAGER)
+  @ApiOperation({
+    summary: 'Get ticket details by QR token (Staff or Branch Manager)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Ticket details retrieved successfully',
@@ -248,18 +250,20 @@ export class BookingsController {
 
   @Get('staff/scans/me')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.STAFF)
-  @ApiOperation({ summary: 'List tickets scanned by current staff' })
+  @Roles(UserRole.STAFF, UserRole.BRANCH_MANAGER)
+  @ApiOperation({
+    summary: 'List tickets scanned by current staff or branch manager',
+  })
   async getMyScans(@CurrentUser() user: User) {
     return this.bookingsService.getStaffScans(user.id);
   }
 
   @Get('staff/scans/me/stats')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.STAFF)
+  @Roles(UserRole.STAFF, UserRole.BRANCH_MANAGER)
   @ApiOperation({
     summary:
-      'Get scan statistics for current staff (today, week, month, total)',
+      'Get scan statistics for current user (today, week, month, total)',
   })
   @ApiResponse({
     status: 200,

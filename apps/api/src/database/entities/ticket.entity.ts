@@ -49,16 +49,20 @@ export class Ticket {
   personCount: number;
 
   @Column({ type: 'timestamp', nullable: true })
-  validFrom: Date;
+  validFrom: Date | null;
 
   @Column({ type: 'timestamp', nullable: true })
-  validUntil: Date;
+  validUntil: Date | null;
 
   @Column({ type: 'json', nullable: true })
   metadata: {
     seatNumber?: string;
     specialAccess?: string[];
     notes?: string;
+    tripType?: string;
+    role?: string;
+    studentAge?: number;
+    guardianName?: string;
   };
 
   @CreateDateColumn()

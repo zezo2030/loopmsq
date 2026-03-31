@@ -48,11 +48,19 @@ export class CreateEventRequestDto {
   @IsUUID()
   branchId: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description:
+      'Event calendar date. Time part is ignored and normalized to start of the selected day.',
+    example: '2026-04-15',
+  })
   @IsDateString()
   startTime: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description:
+      'Ticket validity duration in hours starting from the beginning of the selected event day.',
+    example: 6,
+  })
   @IsInt()
   @Min(1)
   durationHours: number;
