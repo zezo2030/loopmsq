@@ -27,6 +27,7 @@ server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name kinetic-app.cloud www.kinetic-app.cloud;
+    client_max_body_size 120M;
 
     ssl_certificate /etc/letsencrypt/live/kinetic-app.cloud/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kinetic-app.cloud/privkey.pem;
@@ -63,6 +64,7 @@ server {
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
+        client_max_body_size 120M;
         proxy_read_timeout 300s;
         proxy_connect_timeout 75s;
     }

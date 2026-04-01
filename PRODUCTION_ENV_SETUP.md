@@ -55,6 +55,7 @@ docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
    ```
 
 2. انسخ الملف `docs/nginx-host.conf.example` إلى الخادم واحفظه في `/etc/nginx/sites-available/kinetic-app.conf`. ثم حدّث أسماء النطاقات إذا لزم الأمر.
+   - تأكد من وجود `client_max_body_size 120M;` داخل إعدادات الـ `server` وداخل `location /api/` لدعم رفع الفيديو.
 
 3. أنشئ مجلد التحدي لشهادة Let's Encrypt:
 

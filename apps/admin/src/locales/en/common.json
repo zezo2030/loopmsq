@@ -225,6 +225,7 @@
   "branches.map_picker_title": "Select branch location",
   "branches.map_picker_help": "Click on the map to choose coordinates",
   "branches.map_picker_use": "Use this location",
+  "branches.map_location_applied": "Coordinates filled from the map",
   "branches.map_picker_missing_key": "Google Maps API key is missing",
   "branches.map_picker_load_failed": "Failed to load Google Maps",
   "branches.details": "Details",

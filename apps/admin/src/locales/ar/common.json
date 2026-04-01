@@ -224,6 +224,7 @@
   "branches.map_picker_title": "تحديد موقع الفرع",
   "branches.map_picker_help": "اضغط على الخريطة لاختيار الإحداثيات",
   "branches.map_picker_use": "استخدام هذا الموقع",
+  "branches.map_location_applied": "تم تعبئة الإحداثيات من الخريطة",
   "branches.map_picker_missing_key": "مفتاح Google Maps غير موجود",
   "branches.map_picker_load_failed": "فشل تحميل Google Maps",
   "branches.details": "التفاصيل",

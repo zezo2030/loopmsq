@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import WorkingHoursEditor from '../../components/WorkingHoursEditor'
 import BranchOffersTab from '../../components/BranchOffersTab'
 import BranchCouponsTab from '../../components/BranchCouponsTab'
+import BranchMapPickerModal from '../../components/BranchMapPickerModal'
 
 type Branch = {
   id: string
@@ -47,6 +48,8 @@ export default function Branches() {
   const [uploadProgress, setUploadProgress] = useState<number>(0)
   const [isUploadingVideo, setIsUploadingVideo] = useState(false)
   const [videoCoverUrl, setVideoCoverUrl] = useState<string | null>(null)
+  const [mapPickerOpen, setMapPickerOpen] = useState(false)
+  const [mapPickerSeed, setMapPickerSeed] = useState<{ lat?: number | null; lng?: number | null }>({})
 
   const { data, isLoading } = useQuery<Branch[]>({
     queryKey: ['branches'],
@@ -310,6 +313,8 @@ export default function Branches() {
             const hasLinkValue = (v: unknown) =>
               typeof v === 'string' && /maps\.app\.goo\.gl|google\.com\/maps/i.test(v)
 
+            const latIn = values.latitude
+            const lngIn = values.longitude
             const payload: any = {
               name_ar: values.name_ar,
               name_en: values.name_en,
@@ -320,16 +325,18 @@ export default function Branches() {
               contactPhone: values.contactPhone || null,
               amenities: values.amenities?.length ? values.amenities : undefined,
               status: values.status || 'active',
-              latitude: values.latitude
-                ? hasLinkValue(values.latitude)
-                  ? null
-                  : Number(values.latitude)
-                : null,
-              longitude: values.longitude
-                ? hasLinkValue(values.longitude)
-                  ? null
-                  : Number(values.longitude)
-                : null,
+              latitude:
+                latIn !== undefined && latIn !== null && latIn !== ''
+                  ? hasLinkValue(latIn)
+                    ? null
+                    : Number(latIn)
+                  : null,
+              longitude:
+                lngIn !== undefined && lngIn !== null && lngIn !== ''
+                  ? hasLinkValue(lngIn)
+                    ? null
+                    : Number(lngIn)
+                  : null,
               videoUrl: values.videoUrl || null,
               videoCoverUrl: values.videoCoverUrl || null,
             }
@@ -365,6 +372,20 @@ export default function Branches() {
           </Form.Item>
           
           {/* Location Coordinates */}
+          <div style={{ marginBottom: 8 }}>
+            <Button
+              type="default"
+              onClick={() => {
+                setMapPickerSeed({
+                  lat: form.getFieldValue('latitude'),
+                  lng: form.getFieldValue('longitude'),
+                })
+                setMapPickerOpen(true)
+              }}
+            >
+              {t('branches.pick_on_map') || 'Pick from map'}
+            </Button>
+          </div>
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item 
@@ -701,6 +722,16 @@ export default function Branches() {
           </Form.Item>
         </Form>
       </Modal>
+      <BranchMapPickerModal
+        open={mapPickerOpen}
+        onClose={() => setMapPickerOpen(false)}
+        initialLat={mapPickerSeed.lat}
+        initialLng={mapPickerSeed.lng}
+        onConfirm={(lat, lng) => {
+          form.setFieldsValue({ latitude: lat, longitude: lng })
+          message.success(t('branches.map_location_applied') || 'تم تعبئة الإحداثيات')
+        }}
+      />
       </Card>
     </div>
   )
