@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAdminAuth } from '../../auth'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image, Tabs, Row, Col, Divider, Progress } from 'antd'
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image, Tabs, Row, Col, Divider, Progress, Switch } from 'antd'
 import { resolveFileUrl, resolveFileUrlWithBust } from '../../shared/url'
 import { UploadOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete, getApiBase } from '../../api'
@@ -32,6 +32,8 @@ type Branch = {
   priceConfig?: {
     hourlyRate: number
   }
+  hasEventBookings?: boolean
+  hasSchoolTrips?: boolean
 }
 
 export default function Branches() {
@@ -170,7 +172,9 @@ export default function Branches() {
             longitude: r.longitude,
             videoUrl: r.videoUrl,
             videoCoverUrl: r.videoCoverUrl,
-            hourlyRate: r.priceConfig?.hourlyRate
+            hourlyRate: r.priceConfig?.hourlyRate,
+            hasEventBookings: r.hasEventBookings !== false,
+            hasSchoolTrips: r.hasSchoolTrips !== false,
           }); setEditing(r) }}>
             {t('common.view_details') || 'View Details'}
           </Button>
@@ -189,7 +193,9 @@ export default function Branches() {
             longitude: r.longitude,
             videoUrl: r.videoUrl,
             videoCoverUrl: r.videoCoverUrl,
-            hourlyRate: r.priceConfig?.hourlyRate
+            hourlyRate: r.priceConfig?.hourlyRate,
+            hasEventBookings: r.hasEventBookings !== false,
+            hasSchoolTrips: r.hasSchoolTrips !== false,
           }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
           <Select
             value={r.status}
@@ -232,7 +238,9 @@ export default function Branches() {
                 longitude: selectedBranch.longitude,
                 videoUrl: selectedBranch.videoUrl,
                 videoCoverUrl: selectedBranch.videoCoverUrl,
-                hourlyRate: selectedBranch.priceConfig?.hourlyRate
+                hourlyRate: selectedBranch.priceConfig?.hourlyRate,
+                hasEventBookings: selectedBranch.hasEventBookings !== false,
+                hasSchoolTrips: selectedBranch.hasSchoolTrips !== false,
               }); setOpen(true) }}>
                 {t('common.edit') || 'Edit'}
               </Button>
@@ -253,6 +261,14 @@ export default function Branches() {
                     <p><strong>{t('branches.location') || 'الموقع'}:</strong> {selectedBranch.location}</p>
                     <p><strong>{t('branches.capacity') || 'السعة'}:</strong> {selectedBranch.capacity}</p>
                     <p><strong>{t('branches.status') || 'الحالة'}:</strong> {selectedBranch.status}</p>
+                    <p>
+                      <strong>{t('branches.allow_special_event_bookings') || 'Special events'}:</strong>{' '}
+                      {selectedBranch.hasEventBookings !== false ? (t('common.yes') || 'Yes') : (t('common.no') || 'No')}
+                    </p>
+                    <p>
+                      <strong>{t('branches.allow_school_trip_requests') || 'School trips'}:</strong>{' '}
+                      {selectedBranch.hasSchoolTrips !== false ? (t('common.yes') || 'Yes') : (t('common.no') || 'No')}
+                    </p>
                     {selectedBranch.description_ar && <p><strong>{t('branches.description_ar') || 'الوصف (AR)'}:</strong> {selectedBranch.description_ar}</p>}
                     {selectedBranch.description_en && <p><strong>{t('branches.description_en') || 'الوصف (EN)'}:</strong> {selectedBranch.description_en}</p>}
                     {selectedBranch.coverImage && (
@@ -339,6 +355,8 @@ export default function Branches() {
                   : null,
               videoUrl: values.videoUrl || null,
               videoCoverUrl: values.videoCoverUrl || null,
+              hasEventBookings: values.hasEventBookings !== false,
+              hasSchoolTrips: values.hasSchoolTrips !== false,
             }
             if (values.workingHours) {
               payload.workingHours = values.workingHours
@@ -431,6 +449,22 @@ export default function Branches() {
           </Form.Item>
           <Form.Item name="amenities" label={t('branches.amenities') || 'الخدمات'}>
             <Select mode="tags" placeholder={t('branches.amenities_ph') || 'أدخل الخدمات'} />
+          </Form.Item>
+          <Form.Item
+            name="hasEventBookings"
+            label={t('branches.allow_special_event_bookings') || 'قبول طلبالاتات المناسبات'}
+            valuePropName="checked"
+            initialValue={true}
+          >
+            <Switch />
+          </Form.Item>
+          <Form.Item
+            name="hasSchoolTrips"
+            label={t('branches.allow_school_trip_requests') || 'Accept school trip requests'}
+            valuePropName="checked"
+            initialValue={true}
+          >
+            <Switch />
           </Form.Item>
           <Form.Item name="workingHours" label={t('branches.working_hours') || 'أوقات العمل'}>
             <WorkingHoursEditor />

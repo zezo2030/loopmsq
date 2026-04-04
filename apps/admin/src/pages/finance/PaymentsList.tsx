@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { Card, Table, Tag, Input, Select, DatePicker, Space, Button } from 'antd'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api'
-import dayjs from 'dayjs'
+import { formatDayjsDisplayAr } from '../../utils/formatDateTimeDisplay'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -125,7 +125,7 @@ export default function PaymentsList() {
       title: t('payments.paid_at') || 'Paid At',
       dataIndex: 'paidAt',
       key: 'paidAt',
-      render: (d?: string) => (d ? dayjs(d).format('YYYY-MM-DD HH:mm') : '-'),
+      render: (d?: string) => (d ? formatDayjsDisplayAr(d) : '-'),
     },
   ]
 

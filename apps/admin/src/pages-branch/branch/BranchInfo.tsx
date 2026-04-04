@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { apiGet, apiPut } from '../../shared/api'
 import { useAuth } from '../../shared/auth'
 import WorkingHoursEditor from '../../components/WorkingHoursEditor'
+import { formatDateTimeAr } from '../../utils/formatDateTimeDisplay'
 
 const { TextArea } = Input
 const { Option } = Select
@@ -268,7 +269,7 @@ export default function BranchInfo() {
                   <div>
                     <Typography.Text strong>{t('branch.last_updated') || 'Last Updated'}:</Typography.Text>
                     <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-                      {branchData?.updatedAt ? new Date(branchData.updatedAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : 'N/A'}
+                      {branchData?.updatedAt ? formatDateTimeAr(branchData.updatedAt) : 'N/A'}
                     </div>
                   </div>
                 </Space>

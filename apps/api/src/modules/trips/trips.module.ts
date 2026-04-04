@@ -14,6 +14,7 @@ import { BookingsModule } from '../bookings/bookings.module';
 import { RedisService } from '../../utils/redis.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ContentModule } from '../content/content.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     PaymentsModule,
     BookingsModule,
     NotificationsModule,
+    ContentModule,
   ],
   controllers: [TripsController, TripsPublicController],
   providers: [TripsService, RedisService, QRCodeService],

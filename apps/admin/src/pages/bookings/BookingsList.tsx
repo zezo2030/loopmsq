@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons'
 import { apiGet } from '../../api'
 import '../../theme.css'
+import { formatTimeAr } from '../../utils/formatDateTimeDisplay'
 
 const { RangePicker } = DatePicker
 
@@ -307,10 +308,7 @@ export default function BookingsList() {
             {new Date(record.startTime).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
           </div>
           <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
-            {new Date(record.startTime).toLocaleTimeString('ar-SA', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            })}
+            {formatTimeAr(record.startTime)}
           </div>
           <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
             {record.durationHours} ساعات

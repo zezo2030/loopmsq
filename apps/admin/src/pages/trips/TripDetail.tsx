@@ -35,6 +35,7 @@ import {
 } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
 import '../../theme.css'
+import { formatDateTimeAr } from '../../utils/formatDateTimeDisplay'
 
 type TripRequest = {
   id: string
@@ -648,12 +649,12 @@ export default function TripDetail() {
                                 </div>
                                 {ticket.validFrom && (
                                   <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                                    من: {new Date(ticket.validFrom).toLocaleString('ar-SA')}
+                                    من: {formatDateTimeAr(ticket.validFrom)}
                                   </div>
                                 )}
                                 {ticket.validUntil && (
                                   <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                                    إلى: {new Date(ticket.validUntil).toLocaleString('ar-SA')}
+                                    إلى: {formatDateTimeAr(ticket.validUntil)}
                                   </div>
                                 )}
                                 {ticket.status === 'used' && ticket.scannedAt && (
@@ -670,7 +671,7 @@ export default function TripDetail() {
                                       تم المسح
                                     </div>
                                     <div style={{ fontSize: '11px' }}>
-                                      التاريخ: {new Date(ticket.scannedAt).toLocaleString('ar-SA')}
+                                      التاريخ: {formatDateTimeAr(ticket.scannedAt)}
                                     </div>
                                     {ticket.staff?.name && (
                                       <div style={{ fontSize: '11px' }}>

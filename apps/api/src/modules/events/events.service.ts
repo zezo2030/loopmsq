@@ -39,6 +39,13 @@ export class EventsService {
   ) {}
 
   async createRequest(userId: string, dto: CreateEventRequestDto) {
+    const branch = await this.contentService.findBranchById(dto.branchId);
+    if (!branch.hasEventBookings) {
+      throw new BadRequestException(
+        'This branch does not accept special event booking requests',
+      );
+    }
+
     const { anchorStart } = resolveEventTicketWindow(
       dto.startTime,
       dto.durationHours,

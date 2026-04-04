@@ -120,7 +120,7 @@ export default function Overview() {
     {
       title: t('bookings.amount') || 'Amount',
       key: 'amount',
-      render: (record: any) => `${record.amount || 0} SAR`,
+      render: (record: any) => `${record.amount || 0} ${t('common.currency')}`,
     },
     {
       title: t('bookings.status') || 'Status',
@@ -226,7 +226,7 @@ export default function Overview() {
                       title={stat.title}
                       value={stat.value}
                       prefix={stat.icon}
-                      suffix="SAR"
+                      suffix={t('common.currency')}
                       valueStyle={{ 
                         color: stat.color, 
                         fontSize: '20px', 
@@ -248,7 +248,7 @@ export default function Overview() {
                     <Statistic
                       title={t('reports.total_revenue') || 'Total Revenue'}
                       value={Object.values(overview?.revenueByMethod || {}).reduce((a: number, b: any) => a + Number(b || 0), 0)}
-                      suffix="SAR"
+                      suffix={t('common.currency')}
                       valueStyle={{ fontSize: '20px', color: '#10b981', fontWeight: 'bold' }}
                     />
                   </Col>
@@ -259,7 +259,7 @@ export default function Overview() {
                         ? Math.round(Object.values(overview?.revenueByMethod || {}).reduce((a: number, b: any) => a + Number(b || 0), 0) / overview.bookings.total)
                         : 0
                       }
-                      suffix="SAR"
+                      suffix={t('common.currency')}
                       valueStyle={{ fontSize: '20px', color: '#3b82f6', fontWeight: 'bold' }}
                     />
                   </Col>

@@ -26,13 +26,21 @@ export class Offer {
 
   @Column({
     type: 'enum',
-    enum: ['percentage', 'fixed'],
+    enum: ['percentage', 'fixed', 'bogo'],
     default: 'percentage',
   })
-  discountType: 'percentage' | 'fixed';
+  discountType: 'percentage' | 'fixed' | 'bogo';
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   discountValue: number;
+
+  /** BOGO: tickets customer must buy per group (default 1). */
+  @Column({ type: 'int', nullable: true, default: 1 })
+  buyCount: number | null;
+
+  /** BOGO: free tickets per completed buy group (default 1). */
+  @Column({ type: 'int', nullable: true, default: 1 })
+  freeCount: number | null;
 
   @Column({ type: 'timestamp', nullable: true })
   startsAt: Date | null;

@@ -37,6 +37,7 @@ import {
 } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
 import '../../theme.css'
+import { formatTimeAr } from '../../utils/formatDateTimeDisplay'
 
 type EventRequest = {
   id: string
@@ -500,10 +501,7 @@ export default function EventDetail() {
                       })}
                     </div>
                     <div style={{ fontSize: '18px', fontWeight: '600', marginTop: '4px' }}>
-                      {new Date(event.startTime).toLocaleTimeString('ar-SA', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {formatTimeAr(event.startTime)}
                     </div>
                     <div style={{ color: '#8c8c8c', marginTop: '4px' }}>
                       المدة: {event.durationHours} ساعات
@@ -515,11 +513,9 @@ export default function EventDetail() {
                   <div>
                     <div style={{ fontWeight: '600', marginBottom: '4px' }}>وقت الانتهاء المتوقع:</div>
                     <div style={{ color: '#52c41a', fontWeight: '600' }}>
-                      {new Date(new Date(event.startTime).getTime() + event.durationHours * 60 * 60 * 1000)
-                        .toLocaleTimeString('ar-SA', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                      {formatTimeAr(
+                        new Date(new Date(event.startTime).getTime() + event.durationHours * 60 * 60 * 1000)
+                      )}
                     </div>
                   </div>
                 </Space>

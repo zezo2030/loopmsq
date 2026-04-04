@@ -7,6 +7,7 @@ import { apiGet, apiPut, apiPost, apiDelete } from '../../api'
 import { useBranchAuth } from '../../auth'
 import WorkingHoursEditor from '../../components/WorkingHoursEditor'
 import BranchHallTab from '../../components/BranchHallTab'
+import { formatDateTimeAr } from '../../utils/formatDateTimeDisplay'
 
 const { TextArea } = Input
 const { Option } = Select
@@ -400,7 +401,7 @@ export default function BranchInfo() {
                   <div>
                     <Typography.Text strong>{t('branch.last_updated') || 'Last Updated'}:</Typography.Text>
                     <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-                      {branchData?.updatedAt ? new Date(branchData.updatedAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : 'N/A'}
+                      {branchData?.updatedAt ? formatDateTimeAr(branchData.updatedAt) : 'N/A'}
                     </div>
                   </div>
                 </Space>

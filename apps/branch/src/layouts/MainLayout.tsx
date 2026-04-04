@@ -52,8 +52,18 @@ export default function MainLayout() {
     return [path === '/' ? 'dashboard' : path.replace('/', '')]
   }
 
+  const pageTitleMap: Record<string, string> = {
+    '/': t('page.dashboard_overview'),
+    '/branch': t('page.branch_info'),
+    '/offers': t('page.offers_management'),
+    '/coupons': t('page.coupons_management'),
+    '/bookings': t('page.bookings_management'),
+    '/staff': t('page.staff_management'),
+    '/reports': t('page.reports_overview'),
+  }
+  const pageTitle = pageTitleMap[location.pathname] || t('page.branch_control')
+
   const handleLogout = () => {
-    localStorage.removeItem('accessToken')
     window.location.href = '/login'
   }
 
@@ -157,7 +167,7 @@ export default function MainLayout() {
         {/* Header */}
         <div className="branch-header">
           <h1 className="branch-header-title">
-            {getPageTitle(location.pathname)}
+            {pageTitle}
           </h1>
           
           <div className="branch-header-actions">
@@ -208,18 +218,4 @@ export default function MainLayout() {
       </div>
     </div>
   )
-}
-
-function getPageTitle(pathname: string): string {
-  const { t } = useTranslation()
-  
-  if (pathname === '/') return t('page.dashboard_overview')
-  if (pathname === '/branch') return t('page.branch_info')
-  if (pathname === '/offers') return t('page.offers_management')
-  if (pathname === '/coupons') return t('page.coupons_management')
-  if (pathname === '/bookings') return t('page.bookings_management')
-  if (pathname === '/staff') return t('page.staff_management')
-  if (pathname === '/reports') return t('page.reports_overview')
-  
-  return t('page.branch_control')
 }

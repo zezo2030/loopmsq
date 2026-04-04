@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons'
 import { apiGet } from '../../api'
 import '../../theme.css'
+import { formatTimeAr } from '../../utils/formatDateTimeDisplay'
 
 type TripRequest = {
   id: string
@@ -324,10 +325,7 @@ export default function TripsList() {
             {new Date(record.createdAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
           </div>
           <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
-            {new Date(record.createdAt).toLocaleTimeString('ar-SA', {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
+            {formatTimeAr(record.createdAt)}
           </div>
         </div>
       ),

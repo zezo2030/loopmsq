@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Button, Card, Form, Input, Switch, Select, Tag, message, Row, Col, Descriptions } from 'antd'
 import { UserOutlined, MailOutlined, PhoneOutlined, CalendarOutlined, BranchesOutlined, SaveOutlined } from '@ant-design/icons'
 import { apiGet, apiPut } from '../../api'
+import { formatDateTimeAr } from '../../utils/formatDateTimeDisplay'
 import { useTranslation } from 'react-i18next'
 
 type User = {
@@ -259,16 +260,16 @@ export default function UserDetail() {
                   </Descriptions.Item>
                   <Descriptions.Item label={t('users.created_at', { defaultValue: 'Created At' })}>
                     <CalendarOutlined style={{ marginRight: '8px' }} />
-                    {userData.createdAt ? new Date(userData.createdAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : '—'}
+                    {userData.createdAt ? formatDateTimeAr(userData.createdAt) : '—'}
                   </Descriptions.Item>
                   <Descriptions.Item label={t('users.last_login', { defaultValue: 'Last Login' })}>
                     {userData.lastLoginAt
-                      ? new Date(userData.lastLoginAt).toLocaleString('ar-SA', { calendar: 'gregory' })
+                      ? formatDateTimeAr(userData.lastLoginAt)
                       : t('users.never_logged_in', { defaultValue: 'Never logged in' })}
                   </Descriptions.Item>
                   <Descriptions.Item label={t('users.last_updated', { defaultValue: 'Last Updated' })}>
                     <CalendarOutlined style={{ marginRight: '8px' }} />
-                    {userData.updatedAt ? new Date(userData.updatedAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : '—'}
+                    {userData.updatedAt ? formatDateTimeAr(userData.updatedAt) : '—'}
                   </Descriptions.Item>
                 </Descriptions>
               </Card>

@@ -76,6 +76,12 @@ export class Booking {
   @Column({ type: 'text', nullable: true })
   cancellationReason: string;
 
+  @Column({ type: 'int', nullable: true })
+  bonusTickets: number | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  appliedOfferId: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

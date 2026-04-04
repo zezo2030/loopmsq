@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { apiGet, apiPost } from '../../api'
 import { useBranchAuth } from '../../auth'
 import BookingDetail from './BookingDetail'
+import { formatDateTimeAr } from '../../utils/formatDateTimeDisplay'
 
 const { RangePicker } = DatePicker
 const { Option } = Select
@@ -132,13 +133,13 @@ export default function BookingsList() {
       title: t('bookings.start_time') || 'Start Time',
       dataIndex: 'startTime',
       key: 'startTime',
-      render: (time: string) => time ? new Date(time).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-',
+      render: (time: string) => (time ? formatDateTimeAr(time) : '-'),
     },
     {
       title: t('bookings.end_time') || 'End Time',
       dataIndex: 'endTime',
       key: 'endTime',
-      render: (time: string) => time ? new Date(time).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-',
+      render: (time: string) => (time ? formatDateTimeAr(time) : '-'),
     },
     {
       title: t('bookings.status') || 'Status',
@@ -153,7 +154,7 @@ export default function BookingsList() {
     {
       title: t('bookings.amount') || 'Amount',
       key: 'amount',
-      render: (record: any) => `${record.amount || 0} SAR`,
+      render: (record: any) => `${record.amount || 0} ${t('common.currency')}`,
     },
     {
       title: t('common.actions') || 'Actions',

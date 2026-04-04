@@ -30,6 +30,7 @@ import {
 } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
 import '../../theme.css'
+import { formatDateTimeAr, formatTimeAr } from '../../utils/formatDateTimeDisplay'
 
 type Booking = {
   id: string
@@ -319,10 +320,7 @@ export default function BookingDetail() {
                           {new Date(booking.startTime).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
                         </div>
                         <div style={{ color: '#8c8c8c' }}>
-                          {new Date(booking.startTime).toLocaleTimeString('ar-SA', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          {formatTimeAr(booking.startTime)}
                         </div>
                       </Descriptions.Item>
                       <Descriptions.Item label="المدة">{booking.durationHours} ساعات</Descriptions.Item>
@@ -343,7 +341,7 @@ export default function BookingDetail() {
                       </Descriptions.Item>
                       {booking.cancelledAt && (
                         <Descriptions.Item label="تاريخ الإلغاء">
-                          {new Date(booking.cancelledAt).toLocaleString('ar-SA', { calendar: 'gregory' })}
+                          {formatDateTimeAr(booking.cancelledAt)}
                         </Descriptions.Item>
                       )}
                       {booking.cancellationReason && (
@@ -510,12 +508,12 @@ export default function BookingDetail() {
                                 </div>
                                 {ticket.validFrom && (
                                   <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                                    من: {new Date(ticket.validFrom).toLocaleString('ar-SA', { calendar: 'gregory' })}
+                                    من: {formatDateTimeAr(ticket.validFrom)}
                                   </div>
                                 )}
                                 {ticket.validUntil && (
                                   <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                                    إلى: {new Date(ticket.validUntil).toLocaleString('ar-SA', { calendar: 'gregory' })}
+                                    إلى: {formatDateTimeAr(ticket.validUntil)}
                                   </div>
                                 )}
                                 {ticket.status === 'used' && ticket.scannedAt && (
@@ -530,7 +528,7 @@ export default function BookingDetail() {
                                       border: '1px solid #91d5ff',
                                     }}
                                   >
-                                    تاريخ المسح: {new Date(ticket.scannedAt).toLocaleString('ar-SA', { calendar: 'gregory' })}
+                                    تاريخ المسح: {formatDateTimeAr(ticket.scannedAt)}
                                   </div>
                                 )}
                                 <div style={{ fontSize: '11px', color: '#bfbfbf', marginTop: '4px' }}>

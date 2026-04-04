@@ -90,9 +90,10 @@ const WorkingHoursEditor: React.FC<WorkingHoursEditorProps> = ({ value = {}, onC
                         {t('working_hours.open') || 'Open'}
                       </Text>
                       <TimePicker
+                        use12Hours
                         value={value[day.key]?.open ? dayjs(value[day.key].open, 'HH:mm') : dayjs('09:00', 'HH:mm')}
                         onChange={(time) => handleDayChange(day.key, 'open', time)}
-                        format="HH:mm"
+                        format="h:mm A"
                         style={{ width: '100%' }}
                         size="small"
                       />
@@ -102,9 +103,10 @@ const WorkingHoursEditor: React.FC<WorkingHoursEditorProps> = ({ value = {}, onC
                         {t('working_hours.close') || 'Close'}
                       </Text>
                       <TimePicker
+                        use12Hours
                         value={value[day.key]?.close ? dayjs(value[day.key].close, 'HH:mm') : dayjs('18:00', 'HH:mm')}
                         onChange={(time) => handleDayChange(day.key, 'close', time)}
-                        format="HH:mm"
+                        format="h:mm A"
                         style={{ width: '100%' }}
                         size="small"
                       />

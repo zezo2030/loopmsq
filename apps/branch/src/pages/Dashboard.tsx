@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
 import { apiGet } from '../api'
 import { useBranchAuth } from '../auth'
+import { formatDateTimeAr } from '../utils/formatDateTimeDisplay'
 
 export default function Dashboard() {
   const { t } = useTranslation()
@@ -244,7 +245,7 @@ export default function Dashboard() {
                 </div>
                 <div style={{ fontSize: 32, fontWeight: 700, color: '#1a202c', marginBottom: 4 }}>
                   {Object.values(overview?.revenueByMethod || {}).reduce((a: number, b: any) => a + Number(b || 0), 0)}
-                  <span style={{ fontSize: 16, fontWeight: 500, marginRight: 6 }}>SAR</span>
+                  <span style={{ fontSize: 16, fontWeight: 500, marginRight: 6 }}>{t('common.currency')}</span>
                 </div>
                 <div style={{ fontSize: 14, color: '#4a5568', fontWeight: 500 }}>
                   {t('dashboard.kpi_revenue') || 'الإيرادات'}
@@ -269,7 +270,7 @@ export default function Dashboard() {
                     <Statistic
                       title={<span style={{ color: '#4a5568', fontSize: 13 }}>{`${t('reports.revenue_by_method') || 'الإيرادات'}: ${k}`}</span>}
                       value={Number(v)}
-                      suffix="SAR"
+                      suffix={t('common.currency')}
                       valueStyle={{ fontSize: 24, fontWeight: 600, color: '#1a202c' }}
                     />
                   </Card>
@@ -306,7 +307,7 @@ export default function Dashboard() {
                   style={{ maxHeight: 400, overflowY: 'auto' }}
                   itemLayout="horizontal"
                   dataSource={recent}
-                  locale={{ emptyText: 'لا توجد حجوزات حديثة' }}
+                  locale={{ emptyText: t('dashboard.no_recent_bookings') || 'لا توجد حجوزات حديثة' }}
                   renderItem={(item: any) => (
                     <List.Item style={{ padding: '14px 0', borderBottom: '1px solid #edf2f7' }}>
                       <List.Item.Meta
@@ -345,11 +346,11 @@ export default function Dashboard() {
                                 } else if (hallName) {
                                   return hallName;
                                 }
-                                return 'غير محدد';
+                                return t('dashboard.unspecified') || 'غير محدد';
                               })()}
                             </div>
                             <span style={{ color: '#718096', fontSize: 12 }}>
-                              {item.startTime ? new Date(item.startTime).toLocaleString('ar-SA', { calendar: 'gregory' }) : ''}
+                              {item.startTime ? formatDateTimeAr(item.startTime) : ''}
                             </span>
                           </div>
                         }
@@ -417,7 +418,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div style={{ fontSize: 24, fontWeight: 700, color: '#1d4ed8' }}>
-                        {Object.values(overview?.revenueByMethod || {}).reduce((a: number, b: any) => a + Number(b || 0), 0)} <span style={{ fontSize: 14, fontWeight: 500 }}>SAR</span>
+                        {Object.values(overview?.revenueByMethod || {}).reduce((a: number, b: any) => a + Number(b || 0), 0)} <span style={{ fontSize: 14, fontWeight: 500 }}>{t('common.currency')}</span>
                       </div>
                     </div>
                   </div>
@@ -480,7 +481,7 @@ export default function Dashboard() {
                         alt={`Branch Image ${index + 1}`}
                         style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8 }}
                         preview={{
-                          mask: <div style={{ color: 'white' }}>معاينة</div>
+                          mask: <div style={{ color: 'white' }}>{t('branch.preview') || 'معاينة'}</div>
                         }}
                       />
                     ))}

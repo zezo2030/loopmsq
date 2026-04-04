@@ -86,6 +86,8 @@ export class BookingsService {
     discount: number;
     totalPrice: number;
     available: boolean;
+    bonusTickets: number;
+    appliedOfferId: string | null;
   }> {
     try {
       this.logger.log(`Getting quote for branch: ${quoteDto.branchId}`);
@@ -169,13 +171,18 @@ export class BookingsService {
         return total + addOnPrice * addOn.quantity;
       }, 0);
 
-      // Apply offer discount (branch scoped)
+      // Apply offer discount (branch scoped); BOGO may add bonus tickets
       const subtotalBeforeDiscounts = pricing.totalPrice + addOnsCost;
-      const offerDiscount = await this.calculateOfferDiscount(
+      const {
+        offerDiscount,
+        appliedOfferId,
+        bonusTickets,
+      } = await this.resolveBestBranchOffer(
         branchId,
-        null, // No hallId anymore
+        null,
         subtotalBeforeDiscounts,
         new Date(startTime),
+        persons,
       );
 
       // Apply coupon discount
@@ -212,6 +219,8 @@ export class BookingsService {
         }),
         discount: Math.round((offerDiscount + discount) * 100) / 100,
         totalPrice: Math.round(totalPrice * 100) / 100,
+        bonusTickets,
+        appliedOfferId,
         // في النظام الجديد لا نقيّد بتوفر يوم/وقت معيّن، لذلك نُبقي الحقل متاحاً دائماً
         available: true,
       };
@@ -287,6 +296,8 @@ export class BookingsService {
         discountAmount: quote.discount,
         specialRequests,
         contactPhone,
+        bonusTickets: quote.bonusTickets ?? null,
+        appliedOfferId: quote.appliedOfferId ?? null,
       });
 
       this.logger.log(`Booking created with branchId: ${booking.branchId}`);
@@ -1325,14 +1336,15 @@ export class BookingsService {
   private async generateTickets(
     queryRunner: any,
     booking: Booking,
-    personCount: number,
+    paidPersons: number,
+    bonusPersons: number,
   ): Promise<Ticket[]> {
     const tickets: Ticket[] = [];
 
-    for (let i = 0; i < personCount; i++) {
+    for (let i = 0; i < paidPersons; i++) {
       const qrToken = this.qrCodeService.generateQRToken(
         booking.id,
-        `${booking.id}-${i}`,
+        `${booking.id}-p-${i}`,
       );
       const qrTokenHash = this.qrCodeService.generateQRTokenHash(qrToken);
 
@@ -1351,6 +1363,29 @@ export class BookingsService {
       tickets.push(savedTicket);
     }
 
+    for (let j = 0; j < bonusPersons; j++) {
+      const qrToken = this.qrCodeService.generateQRToken(
+        booking.id,
+        `${booking.id}-b-${j}`,
+      );
+      const qrTokenHash = this.qrCodeService.generateQRTokenHash(qrToken);
+
+      const ticket = queryRunner.manager.create(Ticket, {
+        bookingId: booking.id,
+        qrTokenHash,
+        status: TicketStatus.VALID,
+        personCount: 1,
+        validFrom: booking.startTime,
+        validUntil: new Date(
+          booking.startTime.getTime() + booking.durationHours * 60 * 60 * 1000,
+        ),
+        metadata: { isBonusTicket: true },
+      });
+
+      const savedTicket = await queryRunner.manager.save(ticket);
+      tickets.push(savedTicket);
+    }
+
     return tickets;
   }
 
@@ -1363,10 +1398,12 @@ export class BookingsService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      const bonus = booking.bonusTickets ?? 0;
       const tickets = await this.generateTickets(
         queryRunner,
         booking,
         booking.persons,
+        bonus,
       );
       await queryRunner.commitTransaction();
       return tickets;
@@ -1411,14 +1448,39 @@ export class BookingsService {
     }
   }
 
-  private async calculateOfferDiscount(
+  private computeOfferDiscountAmount(
+    o: Offer,
+    amount: number,
+    persons: number,
+  ): { discount: number; bonusTickets: number } {
+    if (o.discountType === 'bogo') {
+      const buy = Math.max(1, Math.floor(Number(o.buyCount ?? 1)));
+      const free = Math.max(1, Math.floor(Number(o.freeCount ?? 1)));
+      const rawDiscount = (amount * free) / (buy + free);
+      const discount = Math.min(rawDiscount, amount);
+      const bonusTickets =
+        persons >= 1 ? Math.floor(persons / buy) * free : 0;
+      return { discount, bonusTickets };
+    }
+    const d =
+      o.discountType === 'percentage'
+        ? (amount * Number(o.discountValue)) / 100
+        : Number(o.discountValue);
+    return { discount: Math.min(d, amount), bonusTickets: 0 };
+  }
+
+  private async resolveBestBranchOffer(
     branchId: string,
     hallId: string | null,
     amount: number,
     at: Date,
-  ): Promise<number> {
+    persons: number,
+  ): Promise<{
+    offerDiscount: number;
+    appliedOfferId: string | null;
+    bonusTickets: number;
+  }> {
     try {
-      // Only look for branch-level offers (no hallId)
       const offers = await this.offerRepository.find({
         where: [
           { branchId, isActive: true, startsAt: IsNull(), endsAt: IsNull() },
@@ -1443,18 +1505,29 @@ export class BookingsService {
         ] as any,
         order: { createdAt: 'DESC' } as any,
       });
-      let best = 0;
+      let bestDiscount = 0;
+      let bestOfferId: string | null = null;
+      let bestBonus = 0;
       for (const o of offers) {
-        const d =
-          o.discountType === 'percentage'
-            ? (amount * Number(o.discountValue)) / 100
-            : Number(o.discountValue);
-        if (d > best) best = d;
+        const { discount, bonusTickets } = this.computeOfferDiscountAmount(
+          o,
+          amount,
+          persons,
+        );
+        if (discount > bestDiscount) {
+          bestDiscount = discount;
+          bestOfferId = o.id;
+          bestBonus = bonusTickets;
+        }
       }
-      return Math.min(best, amount);
+      return {
+        offerDiscount: Math.min(bestDiscount, amount),
+        appliedOfferId: bestOfferId,
+        bonusTickets: bestBonus,
+      };
     } catch (e) {
-      this.logger.error('Failed to calculate offer discount', e);
-      return 0;
+      this.logger.error('Failed to resolve branch offer', e);
+      return { offerDiscount: 0, appliedOfferId: null, bonusTickets: 0 };
     }
   }
 
@@ -1549,6 +1622,7 @@ export class BookingsService {
         queryRunner,
         savedBooking,
         dto.persons,
+        0,
       );
 
       await queryRunner.commitTransaction();
@@ -1631,6 +1705,7 @@ export class BookingsService {
         queryRunner,
         savedBooking,
         dto.persons,
+        0,
       );
 
       await queryRunner.commitTransaction();

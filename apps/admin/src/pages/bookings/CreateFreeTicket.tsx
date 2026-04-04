@@ -26,6 +26,7 @@ import { apiGet, apiPost } from '../../api'
 import { useQuery } from '@tanstack/react-query'
 import '../../theme.css'
 import dayjs from 'dayjs'
+import { formatTimeAr } from '../../utils/formatDateTimeDisplay'
 
 const { TextArea } = Input
 
@@ -335,7 +336,7 @@ export default function CreateFreeTicket() {
                               <Space>
                                 <ClockCircleOutlined />
                                 <span>
-                                  {slotStart.format('HH:mm')} - {slotEnd.format('HH:mm')}
+                                  {formatTimeAr(slotStart.toDate())} - {formatTimeAr(slotEnd.toDate())}
                                 </span>
                                 {maxHours > 0 && (
                                   <span style={{ color: '#8c8c8c', fontSize: '12px' }}>
@@ -349,8 +350,9 @@ export default function CreateFreeTicket() {
                       </Select>
                     ) : (
                       <TimePicker
+                        use12Hours
                         style={{ width: '100%' }}
-                        format="HH:mm"
+                        format="h:mm A"
                         placeholder="اختر التاريخ والفرع أولاً"
                         disabled
                       />

@@ -23,6 +23,7 @@ import { SubmitTripRequestDto } from './dto/submit-trip-request.dto';
 import { RejectTripRequestDto } from './dto/reject-trip-request.dto';
 import { CancelTripRequestDto } from './dto/cancel-trip-request.dto';
 import { UpdateTripRequestDto } from './dto/update-trip-request.dto';
+import { ContentService } from '../content/content.service';
 
 @Injectable()
 export class TripsService {
@@ -38,6 +39,7 @@ export class TripsService {
     @InjectRepository(Payment)
     private readonly paymentRepo: Repository<Payment>,
     private readonly notifications: NotificationsService,
+    private readonly contentService: ContentService,
   ) {}
 
   private startOfDay(dateLike: Date | string): Date {
@@ -46,6 +48,13 @@ export class TripsService {
   }
 
   async createRequest(userId: string, dto: CreateTripRequestDto) {
+    const branch = await this.contentService.findBranchById(dto.branchId);
+    if (!branch.hasSchoolTrips) {
+      throw new BadRequestException(
+        'This branch does not accept school trip booking requests',
+      );
+    }
+
     const req = this.tripRepo.create({
       requesterId: userId,
       branchId: dto.branchId,

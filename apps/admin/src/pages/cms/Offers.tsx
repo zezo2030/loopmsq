@@ -14,8 +14,10 @@ type Offer = {
   branchId: string
   title: string
   description?: string | null
-  discountType: 'percentage' | 'fixed'
+  discountType: 'percentage' | 'fixed' | 'bogo'
   discountValue: number
+  buyCount?: number | null
+  freeCount?: number | null
   startsAt?: string | null
   endsAt?: string | null
   isActive: boolean
@@ -41,6 +43,7 @@ export default function Offers() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Offer | null>(null)
   const [form] = Form.useForm()
+  const discountType = Form.useWatch('discountType', form)
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<Offer>) => apiPost<Offer>('/admin/offers', body),
@@ -62,18 +65,35 @@ export default function Offers() {
     }
   }, [open, editing, isBranchMode, enforcedBranchId, form])
 
+  const formatTypeLabel = (dt: string) => {
+    if (dt === 'bogo') return t('offers.bogo')
+    if (dt === 'fixed') return t('offers.fixed')
+    return t('offers.percentage')
+  }
+
+  const formatValueCell = (r: Offer) => {
+    if (r.discountType === 'bogo') {
+      const b = r.buyCount ?? 1
+      const f = r.freeCount ?? 1
+      return t('offers.bogo_summary', { buy: b, free: f })
+    }
+    return String(r.discountValue)
+  }
+
   const columns = [
     { title: t('offers.branch'), dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
     { title: t('offers.title'), dataIndex: 'title' },
     { title: t('offers.image'), dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrlWithBust(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
-    { title: t('offers.type'), dataIndex: 'discountType' },
-    { title: t('offers.value'), dataIndex: 'discountValue' },
+    { title: t('offers.type'), dataIndex: 'discountType', render: (v: string) => formatTypeLabel(v) },
+    { title: t('offers.value'), render: (_: unknown, r: Offer) => formatValueCell(r) },
     { title: t('offers.active'), dataIndex: 'isActive', render: (v: boolean) => (v ? t('offers.yes') : t('offers.no')) },
     { title: t('offers.schedule'), render: (_: any, r: Offer) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
     { title: t('offers.actions'), render: (_: any, r: Offer) => (
       <span style={{ display: 'flex', gap: 8 }}>
         <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue({
           ...r,
+          buyCount: r.buyCount ?? 1,
+          freeCount: r.freeCount ?? 1,
           range: [r.startsAt ? dayjs(r.startsAt) : null, r.endsAt ? dayjs(r.endsAt) : null]
         }); setOpen(true) }}>{t('offers.edit')}</Button>
         <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>{t('offers.delete')}</Button>
@@ -99,6 +119,7 @@ export default function Offers() {
         <Button type="primary" onClick={() => { 
           setEditing(null); 
           form.resetFields(); 
+          form.setFieldsValue({ discountType: 'percentage', isActive: true, buyCount: 1, freeCount: 1 })
           setOpen(true);
         }}>{t('offers.new_offer')}</Button>
       </div>
@@ -114,24 +135,27 @@ export default function Offers() {
         }}
         onOk={() => {
           form.validateFields().then(values => {
-            const body: any = {
+            const isBogo = values.discountType === 'bogo'
+            const body: Record<string, unknown> = {
               branchId: enforcedBranchId || values.branchId,
               title: values.title,
               description: values.description || null,
               discountType: values.discountType,
-              discountValue: Number(values.discountValue),
+              discountValue: isBogo ? 0 : Number(values.discountValue),
+              buyCount: isBogo ? Number(values.buyCount) : null,
+              freeCount: isBogo ? Number(values.freeCount) : null,
               isActive: values.isActive ?? true,
               imageUrl: values.imageUrl || null,
             }
             const [start, end] = values.range || []
             body.startsAt = start ? start.toISOString() : null
             body.endsAt = end ? end.toISOString() : null
-            if (editing) updateMutation.mutate({ id: editing.id, body })
-            else createMutation.mutate(body)
+            if (editing) updateMutation.mutate({ id: editing.id, body: body as Partial<Offer> })
+            else createMutation.mutate(body as Partial<Offer>)
           })
         }}
       >
-        <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
+        <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true, buyCount: 1, freeCount: 1 }}>
           {!isBranchMode && (
             <Form.Item name="branchId" label={t('offers.branch')} rules={[{ required: true }]}>
               <Select
@@ -180,11 +204,28 @@ export default function Offers() {
             <Input.TextArea rows={3} />
           </Form.Item>
           <Form.Item name="discountType" label={t('offers.discount_type')} rules={[{ required: true }]}>
-            <Select options={[{ value: 'percentage', label: t('offers.percentage') }, { value: 'fixed', label: t('offers.fixed') }]} />
+            <Select
+              options={[
+                { value: 'percentage', label: t('offers.percentage') },
+                { value: 'fixed', label: t('offers.fixed') },
+                { value: 'bogo', label: t('offers.bogo') },
+              ]}
+            />
           </Form.Item>
-          <Form.Item name="discountValue" label={t('offers.discount_value')} rules={[{ required: true }]}>
-            <InputNumber style={{ width: '100%' }} min={0} />
-          </Form.Item>
+          {discountType === 'bogo' ? (
+            <>
+              <Form.Item name="buyCount" label={t('offers.buy_count')} rules={[{ required: true }, { type: 'number', min: 1 }]}>
+                <InputNumber style={{ width: '100%' }} min={1} precision={0} />
+              </Form.Item>
+              <Form.Item name="freeCount" label={t('offers.free_count')} rules={[{ required: true }, { type: 'number', min: 1 }]}>
+                <InputNumber style={{ width: '100%' }} min={1} precision={0} />
+              </Form.Item>
+            </>
+          ) : (
+            <Form.Item name="discountValue" label={t('offers.discount_value')} rules={[{ required: true }]}>
+              <InputNumber style={{ width: '100%' }} min={0} />
+            </Form.Item>
+          )}
           <Form.Item name="range" label={t('offers.schedule')}>
             <DatePicker.RangePicker showTime />
           </Form.Item>
@@ -196,5 +237,4 @@ export default function Offers() {
     </div>
   )
 }
-
 

@@ -28,12 +28,12 @@ export default function Login() {
 
     const newErrors: { email?: string; password?: string } = {}
     if (!email) {
-      newErrors.email = t('login.email_required') || 'Please enter your email'
+      newErrors.email = t('login.email_required', { defaultValue: 'Please enter your email' })
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = t('login.email_valid') || 'Please enter a valid email'
+      newErrors.email = t('login.email_valid', { defaultValue: 'Please enter a valid email' })
     }
     if (!password) {
-      newErrors.password = t('login.password_required') || 'Please enter your password'
+      newErrors.password = t('login.password_required', { defaultValue: 'Please enter your password' })
     }
     setErrors(newErrors)
     if (Object.keys(newErrors).length > 0) return
@@ -45,10 +45,10 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
-      if (!resp.ok) throw new Error(t('auth.invalid') || 'Invalid credentials')
+      if (!resp.ok) throw new Error(t('auth.invalid', { defaultValue: 'Invalid credentials' }))
       const data = await resp.json()
       localStorage.setItem('accessToken', data.accessToken)
-      message.success(t('login.success') || 'Logged in successfully')
+      message.success(t('login.success', { defaultValue: 'Logged in successfully' }))
 
       const meResp = await fetch(`${getApiBase()}/auth/me`, {
         headers: { Authorization: `Bearer ${data.accessToken}` },
@@ -58,7 +58,11 @@ export default function Login() {
 
       const wanted = roleChoice === 'admin' ? 'admin' : 'branch_manager'
       if (!roles.includes(wanted)) {
-        message.error(t('auth.not_authorized') || 'Selected role is not authorized for this account')
+        message.error(
+          t('auth.not_authorized', {
+            defaultValue: 'Selected role is not authorized for this account',
+          })
+        )
         return
       }
       try {
@@ -66,7 +70,7 @@ export default function Login() {
       } catch {}
       window.location.href = roleChoice === 'admin' ? '/admin' : '/branch'
     } catch (e: unknown) {
-      message.error((e as Error)?.message || t('login.failed') || 'Login failed')
+      message.error((e as Error)?.message || t('login.failed', { defaultValue: 'Login failed' }))
     } finally {
       setLoading(false)
     }
@@ -91,7 +95,7 @@ export default function Login() {
             {t('app.title')}
           </CardTitle>
           <CardDescription className="text-base font-medium text-slate-600">
-            {t('login.subtitle') || 'Welcome back! Please sign in to continue'}
+            {t('login.subtitle', { defaultValue: 'Welcome back! Please sign in to continue' })}
           </CardDescription>
         </CardHeader>
 
@@ -99,7 +103,7 @@ export default function Login() {
           <form onSubmit={onSubmit} className="space-y-5">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-bold text-slate-800">
-                {t('login.email') || 'Email Address'}
+                {t('login.email', { defaultValue: 'Email Address' })}
               </label>
               <div className="relative group">
                 <Mail className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-primary" />
@@ -119,7 +123,7 @@ export default function Login() {
 
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-800">
-                {t('login.role') || 'Role'}
+                {t('login.role', { defaultValue: 'Role' })}
               </label>
               <div className="flex gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
                 <button
@@ -132,7 +136,7 @@ export default function Login() {
                       : 'text-slate-600 hover:bg-slate-100'
                   )}
                 >
-                  {t('roles.admin') || 'Admin'}
+                  {t('roles.admin', { defaultValue: 'Admin' })}
                 </button>
                 <button
                   type="button"
@@ -144,14 +148,14 @@ export default function Login() {
                       : 'text-slate-600 hover:bg-slate-100'
                   )}
                 >
-                  {t('roles.branch_manager') || 'Branch Manager'}
+                  {t('roles.branch_manager', { defaultValue: 'Branch Manager' })}
                 </button>
               </div>
             </div>
 
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-bold text-slate-800">
-                {t('login.password') || 'Password'}
+                {t('login.password', { defaultValue: 'Password' })}
               </label>
               <div className="relative group">
                 <Lock className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-primary" />
@@ -159,7 +163,7 @@ export default function Login() {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder={t('login.password_placeholder') || 'Enter your password'}
+                  placeholder={t('login.password_placeholder', { defaultValue: 'Enter your password' })}
                   className="h-11 border-slate-200 bg-slate-50 ps-10 pe-10 text-slate-800 placeholder:text-slate-500 focus:border-primary/20 focus:bg-white focus-visible:ring-primary"
                   disabled={loading}
                 />
@@ -189,10 +193,10 @@ export default function Login() {
               {loading ? (
                 <>
                   <Loader2 className="me-2 h-5 w-5 animate-spin" />
-                  {t('login.signing_in') || 'Signing in...'}
+                  {t('login.signing_in', { defaultValue: 'Signing in...' })}
                 </>
               ) : (
-                t('login.signin') || 'Sign In'
+                t('login.signin', { defaultValue: 'Sign In' })
               )}
             </Button>
           </form>
@@ -200,7 +204,9 @@ export default function Login() {
 
         <CardFooter className="flex justify-center rounded-b-2xl border-t border-slate-100 bg-slate-50/50 p-6">
           <p className="text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">
-            {t('login.footer') || '🔒 Secure access for Admin and Branch Manager accounts only'}
+            {t('login.footer', {
+              defaultValue: '🔒 Secure access for Admin and Branch Manager accounts only',
+            })}
           </p>
         </CardFooter>
       </Card>

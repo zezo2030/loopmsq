@@ -234,4 +234,24 @@ export class CreateBranchDto {
   @IsOptional()
   @IsString()
   hallVideoUrl?: string;
+
+  @ApiProperty({
+    description: 'Whether this branch accepts special event booking requests',
+    example: true,
+    required: false,
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  hasEventBookings?: boolean;
+
+  @ApiProperty({
+    description: 'Whether this branch accepts school trip booking requests',
+    example: true,
+    required: false,
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  hasSchoolTrips?: boolean;
 }

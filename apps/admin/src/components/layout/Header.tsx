@@ -1,5 +1,4 @@
-import { Bell, Search, User, LogOut } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Search, User, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -13,6 +12,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import i18n from '@/i18n'
 import { useTranslation } from 'react-i18next'
+import { NotificationBell } from '@/components/layout/NotificationBell'
 
 export function Header() {
   const { t } = useTranslation()
@@ -37,7 +37,7 @@ export function Header() {
         <div className="relative w-96">
           <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
           <Input
-            placeholder={t('menu.search') || 'Search...'}
+            placeholder={t('menu.search', { defaultValue: 'Search...' })}
             className="bg-slate-50/50 ps-10 h-10 rounded-xl border-slate-100 text-slate-800 transition-all placeholder:text-slate-600 focus:bg-white focus:border-primary/20"
           />
         </div>
@@ -53,17 +53,7 @@ export function Header() {
           {i18n.language === 'ar' ? 'EN' : 'AR'}
         </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          asChild
-          className="relative rounded-xl text-slate-600 transition-all hover:bg-primary/5 hover:text-primary"
-        >
-          <Link to="/api/v1/queues" target="_blank">
-            <Bell className="h-5 w-5" />
-            <span className="absolute end-2.5 top-2.5 h-2 w-2 rounded-full border-2 border-white bg-rose-500 shadow-sm" />
-          </Link>
-        </Button>
+        <NotificationBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

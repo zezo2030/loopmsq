@@ -15,6 +15,7 @@ import { apiGet } from '../shared/api'
 import { useAuth } from '../shared/auth'
 import { resolveFileUrlWithBust } from '../shared/url'
 import { cn } from '@/lib/utils'
+import { formatDateTimeAr } from '../utils/formatDateTimeDisplay'
 
 export default function Dashboard() {
   const { t } = useTranslation()
@@ -180,7 +181,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold tracking-tight text-slate-900">
-              {totalRevenue} <span className="text-base font-medium">SAR</span>
+              {totalRevenue} <span className="text-base font-medium">{t('common.currency')}</span>
             </div>
           </CardContent>
         </Card>
@@ -198,7 +199,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold tracking-tight text-slate-900">
-                  {Number(v)} SAR
+                  {Number(v)} {t('common.currency')}
                 </div>
               </CardContent>
             </Card>
@@ -227,7 +228,7 @@ export default function Dashboard() {
             <CardContent>
               <div className="space-y-0">
                 {recent.length === 0 ? (
-                  <p className="py-8 text-center text-slate-600">لا توجد حجوزات حديثة</p>
+                  <p className="py-8 text-center text-slate-600">{t('dashboard.no_recent_bookings')}</p>
                 ) : (
                   recent.map((item) => {
                     const branchName =
@@ -237,7 +238,7 @@ export default function Dashboard() {
                       item.branch?.name_en ||
                       item.branch?.nameEn ||
                       ''
-                    const locationText = branchName || 'غير محدد'
+                    const locationText = branchName || t('dashboard.unspecified')
                     return (
                       <div
                         key={item.id}
@@ -263,7 +264,7 @@ export default function Dashboard() {
                           <p className="mt-1 text-sm text-slate-600">{locationText}</p>
                           <p className="mt-0.5 text-xs text-slate-500">
                             {item.startTime
-                              ? new Date(item.startTime).toLocaleString('ar-SA', { calendar: 'gregory' })
+                              ? formatDateTimeAr(item.startTime)
                               : ''}
                           </p>
                         </div>
@@ -311,7 +312,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="text-xl font-bold text-blue-700">
-                    {totalRevenue} <span className="text-sm font-medium">SAR</span>
+                    {totalRevenue} <span className="text-sm font-medium">{t('common.currency')}</span>
                   </div>
                 </div>
               </div>

@@ -26,6 +26,7 @@ import {
 } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
 import { useBranchAuth } from '../../auth'
+import { useTranslation } from 'react-i18next'
 import '../../theme.css'
 import dayjs from 'dayjs'
 
@@ -48,6 +49,7 @@ type Hall = {
 export default function CreateFreeTicket() {
   const navigate = useNavigate()
   const { me } = useBranchAuth()
+  const { t } = useTranslation()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [users, setUsers] = useState<User[]>([])
@@ -69,7 +71,7 @@ export default function CreateFreeTicket() {
       setUsers(response.users || [])
     } catch (error: any) {
       console.error('Failed to load users:', error)
-      message.error('فشل تحميل قائمة المستخدمين')
+      message.error(t('free_ticket.load_users_failed') || 'فشل تحميل قائمة المستخدمين')
     } finally {
       setLoadingUsers(false)
     }
@@ -83,7 +85,7 @@ export default function CreateFreeTicket() {
       setHalls(response || [])
     } catch (error: any) {
       console.error('Failed to load halls:', error)
-      message.error('فشل تحميل قائمة القاعات')
+      message.error(t('free_ticket.load_halls_failed') || 'فشل تحميل قائمة القاعات')
     } finally {
       setLoadingHalls(false)
     }
@@ -102,10 +104,10 @@ export default function CreateFreeTicket() {
       }
 
       const result = await apiPost('/bookings/free-ticket', payload)
-      message.success(`تم إنشاء ${result.tickets.length} تذكرة مجانية بنجاح`)
+      message.success(`${t('free_ticket.success', { count: result.tickets.length })}`)
       navigate('/bookings')
     } catch (error: any) {
-      const errorMessage = error?.message || 'فشل إنشاء التذكرة المجانية'
+      const errorMessage = error?.message || t('free_ticket.failed') || 'فشل إنشاء التذكرة المجانية'
       message.error(errorMessage)
       console.error('Failed to create free ticket:', error)
     } finally {
@@ -126,11 +128,11 @@ export default function CreateFreeTicket() {
                 size="large"
               />
               <Title level={2} style={{ margin: 0 }}>
-                إنشاء تذكرة مجانية
+                {t('free_ticket.title') || 'إنشاء تذكرة مجانية'}
               </Title>
             </Space>
             <Text type="secondary">
-              يمكنك إنشاء تذاكر مجانية للمستخدمين في فرعك فقط
+              {t('free_ticket.subtitle') || 'يمكنك إنشاء تذاكر مجانية للمستخدمين في فرعك فقط'}
             </Text>
           </div>
         </div>
@@ -139,8 +141,8 @@ export default function CreateFreeTicket() {
       <div className="page-content">
         <div className="page-content-inner">
           <Alert
-            message="تذكرة مجانية"
-            description="سيتم إنشاء حجز مجاني (سعر 0) مع تذاكر صالحة للمستخدم المحدد. التذاكر ستكون للفرع الخاص بك فقط."
+            message={t('free_ticket.alert_title') || 'تذكرة مجانية'}
+            description={t('free_ticket.alert_desc') || 'سيتم إنشاء حجز مجاني (سعر 0) مع تذاكر صالحة للمستخدم المحدد. التذاكر ستكون للفرع الخاص بك فقط.'}
             type="info"
             showIcon
             style={{ marginBottom: '24px' }}
@@ -162,14 +164,14 @@ export default function CreateFreeTicket() {
                     label={
                       <Space>
                         <UserOutlined />
-                        <span>المستخدم</span>
+                        <span>{t('free_ticket.user') || 'المستخدم'}</span>
                       </Space>
                     }
                     name="userId"
-                    rules={[{ required: true, message: 'يرجى اختيار المستخدم' }]}
+                    rules={[{ required: true, message: t('free_ticket.user_required') || 'يرجى اختيار المستخدم' }]}
                   >
                     <Select
-                      placeholder="اختر المستخدم"
+                      placeholder={t('free_ticket.user_ph') || 'اختر المستخدم'}
                       loading={loadingUsers}
                       showSearch
                       filterOption={(input, option) =>
@@ -188,18 +190,18 @@ export default function CreateFreeTicket() {
                     label={
                       <Space>
                         <CalendarOutlined />
-                        <span>القاعة (اختياري)</span>
+                        <span>{t('free_ticket.hall') || 'القاعة (اختياري)'}</span>
                       </Space>
                     }
                     name="hallId"
                   >
                     <Select
-                      placeholder="اختر القاعة (اختياري)"
+                      placeholder={t('free_ticket.hall_ph') || 'اختر القاعة (اختياري)'}
                       loading={loadingHalls}
                       allowClear
                       options={halls.map((hall) => ({
                         value: hall.id,
-                        label: `${hall.name}${hall.capacity ? ` (سعة: ${hall.capacity})` : ''}`,
+                        label: `${hall.name}${hall.capacity ? ` (${t('halls.capacity') || 'سعة'}: ${hall.capacity})` : ''}`,
                       }))}
                     />
                   </Form.Item>
@@ -210,18 +212,18 @@ export default function CreateFreeTicket() {
                     label={
                       <Space>
                         <CalendarOutlined />
-                        <span>تاريخ ووقت البداية</span>
+                        <span>{t('free_ticket.start_time') || 'تاريخ ووقت البداية'}</span>
                       </Space>
                     }
                     name="startTime"
-                    rules={[{ required: true, message: 'يرجى اختيار تاريخ ووقت البداية' }]}
+                    rules={[{ required: true, message: t('free_ticket.start_time_required') || 'يرجى اختيار تاريخ ووقت البداية' }]}
                   >
                     <DatePicker
-                      showTime
-                      format="YYYY-MM-DD HH:mm"
+                      showTime={{ use12Hours: true }}
+                      format="YYYY-MM-DD h:mm A"
                       style={{ width: '100%' }}
                       disabledDate={(current) => current && current < dayjs().startOf('day')}
-                      placeholder="اختر التاريخ والوقت"
+                      placeholder={t('free_ticket.start_time_ph') || 'اختر التاريخ والوقت'}
                     />
                   </Form.Item>
                 </Col>
@@ -231,20 +233,20 @@ export default function CreateFreeTicket() {
                     label={
                       <Space>
                         <ClockCircleOutlined />
-                        <span>المدة (ساعات)</span>
+                        <span>{t('free_ticket.duration') || 'المدة (ساعات)'}</span>
                       </Space>
                     }
                     name="durationHours"
                     rules={[
-                      { required: true, message: 'يرجى إدخال المدة' },
-                      { type: 'number', min: 1, max: 12, message: 'المدة يجب أن تكون بين 1 و 12 ساعة' },
+                      { required: true, message: t('free_ticket.duration_required') || 'يرجى إدخال المدة' },
+                      { type: 'number', min: 1, max: 12, message: t('free_ticket.duration_range') || 'المدة يجب أن تكون بين 1 و 12 ساعة' },
                     ]}
                   >
                     <InputNumber
                       style={{ width: '100%' }}
                       min={1}
                       max={12}
-                      placeholder="عدد الساعات"
+                      placeholder={t('free_ticket.duration_ph') || 'عدد الساعات'}
                     />
                   </Form.Item>
                 </Col>
@@ -254,31 +256,31 @@ export default function CreateFreeTicket() {
                     label={
                       <Space>
                         <TeamOutlined />
-                        <span>عدد الأشخاص (عدد التذاكر)</span>
+                        <span>{t('free_ticket.persons') || 'عدد الأشخاص (عدد التذاكر)'}</span>
                       </Space>
                     }
                     name="persons"
                     rules={[
-                      { required: true, message: 'يرجى إدخال عدد الأشخاص' },
-                      { type: 'number', min: 1, message: 'يجب أن يكون العدد على الأقل 1' },
+                      { required: true, message: t('free_ticket.persons_required') || 'يرجى إدخال عدد الأشخاص' },
+                      { type: 'number', min: 1, message: t('free_ticket.persons_min') || 'يجب أن يكون العدد على الأقل 1' },
                     ]}
                   >
                     <InputNumber
                       style={{ width: '100%' }}
                       min={1}
-                      placeholder="عدد الأشخاص"
+                      placeholder={t('free_ticket.persons_ph') || 'عدد الأشخاص'}
                     />
                   </Form.Item>
                 </Col>
 
                 <Col xs={24}>
                   <Form.Item
-                    label="ملاحظات (اختياري)"
+                    label={t('free_ticket.notes') || 'ملاحظات (اختياري)'}
                     name="notes"
                   >
                     <TextArea
                       rows={4}
-                      placeholder="أضف أي ملاحظات أو طلبات خاصة..."
+                      placeholder={t('free_ticket.notes_ph') || 'أضف أي ملاحظات أو طلبات خاصة...'}
                     />
                   </Form.Item>
                 </Col>
@@ -287,7 +289,7 @@ export default function CreateFreeTicket() {
               <Form.Item style={{ marginTop: '24px', textAlign: 'left' }}>
                 <Space>
                   <Button onClick={() => navigate('/bookings')}>
-                    إلغاء
+                    {t('free_ticket.cancel') || 'إلغاء'}
                   </Button>
                   <Button
                     type="primary"
@@ -296,7 +298,7 @@ export default function CreateFreeTicket() {
                     loading={loading}
                     size="large"
                   >
-                    إنشاء تذكرة مجانية
+                    {t('free_ticket.submit') || 'إنشاء تذكرة مجانية'}
                   </Button>
                 </Space>
               </Form.Item>

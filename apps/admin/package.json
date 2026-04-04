@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "i18n:merge": "node scripts/generate-missing-locales.mjs",
+    "i18n:check": "node scripts/check-i18n-keys.mjs",
     "gen:openapi": "openapi-typescript %VITE_API_BASE%/docs-json -o src/types/api.d.ts || openapi-typescript http://localhost:3000/api/v1/docs-json -o src/types/api.d.ts"
   },
   "dependencies": {

@@ -63,6 +63,7 @@ export class Ticket {
     role?: string;
     studentAge?: number;
     guardianName?: string;
+    isBonusTicket?: boolean;
   };
 
   @CreateDateColumn()

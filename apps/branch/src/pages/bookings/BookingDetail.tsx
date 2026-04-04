@@ -4,6 +4,7 @@ import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
 import { apiGet } from '../../api'
+import { formatDateTimeAr } from '../../utils/formatDateTimeDisplay'
 
 const { Title, Text } = Typography
 
@@ -89,10 +90,10 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label={t('bookings.created_at') || 'Created At'}>
-            {booking.createdAt ? new Date(booking.createdAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-'}
+            {booking.createdAt ? formatDateTimeAr(booking.createdAt) : '-'}
           </Descriptions.Item>
           <Descriptions.Item label={t('bookings.updated_at') || 'Updated At'}>
-            {booking.updatedAt ? new Date(booking.updatedAt).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-'}
+            {booking.updatedAt ? formatDateTimeAr(booking.updatedAt) : '-'}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -151,14 +152,14 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
           <Col xs={24} sm={12}>
             <Statistic
               title={t('bookings.start_time') || 'Start Time'}
-              value={booking.startTime ? new Date(booking.startTime).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-'}
+              value={booking.startTime ? formatDateTimeAr(booking.startTime) : '-'}
               valueStyle={{ fontSize: '16px' }}
             />
           </Col>
           <Col xs={24} sm={12}>
             <Statistic
               title={t('bookings.end_time') || 'End Time'}
-              value={booking.endTime ? new Date(booking.endTime).toLocaleString('ar-SA', { calendar: 'gregory' }) : '-'}
+              value={booking.endTime ? formatDateTimeAr(booking.endTime) : '-'}
               valueStyle={{ fontSize: '16px' }}
             />
           </Col>
@@ -251,7 +252,7 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <Title level={5} style={{ marginBottom: 0 }}>
               <IdcardOutlined style={{ marginRight: '8px' }} />
-              التذاكر ({tickets.length})
+              {t('tickets.count', { count: tickets.length }) || `التذاكر (${tickets.length})`}
             </Title>
             <Button
               icon={<ReloadOutlined />}
@@ -259,16 +260,16 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
               loading={loadingTickets}
               size="small"
             >
-              تحديث
+              {t('common.refresh') || 'تحديث'}
             </Button>
           </div>
           {loadingTickets ? (
             <div style={{ textAlign: 'center', padding: '24px', color: '#8c8c8c' }}>
-              جاري تحميل التذاكر...
+              {t('tickets.loading') || 'جاري تحميل التذاكر...'}
             </div>
           ) : tickets.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '24px', color: '#8c8c8c' }}>
-              لا توجد تذاكر متاحة
+              {t('tickets.none') || 'لا توجد تذاكر متاحة'}
             </div>
           ) : (
             <Row gutter={[12, 12]}>
@@ -277,7 +278,7 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
                   <Card size="small" style={{ border: '1px solid #f0f0f0' }}>
                     <Space direction="vertical" style={{ width: '100%' }} size={4}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text strong>{ticket.holderName || `تذكرة #${ticket.id.slice(-6)}`}</Text>
+                        <Text strong>{ticket.holderName || `${t('tickets.ticket') || 'تذكرة'} #${ticket.id.slice(-6)}`}</Text>
                         <Tag
                           color={
                             ticket.status === 'valid'
@@ -290,12 +291,12 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
                           }
                         >
                           {ticket.status === 'valid'
-                            ? 'صالحة'
+                            ? (t('tickets.status_valid') || 'صالحة')
                             : ticket.status === 'used'
-                              ? 'مستخدمة'
+                              ? (t('tickets.status_used') || 'مستخدمة')
                               : ticket.status === 'expired'
-                                ? 'منتهية'
-                                : 'ملغية'}
+                                ? (t('tickets.status_expired') || 'منتهية')
+                                : (t('tickets.status_cancelled') || 'ملغية')}
                         </Tag>
                       </div>
                       <Text type="secondary" style={{ fontSize: '12px' }}>

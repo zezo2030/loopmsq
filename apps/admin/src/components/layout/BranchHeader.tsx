@@ -36,7 +36,7 @@ export function BranchHeader() {
         <div className="relative w-96">
           <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <Input
-            placeholder={t('menu.search') || 'Search...'}
+            placeholder={t('menu.search', { defaultValue: 'Search...' })}
             className="h-10 rounded-xl border-slate-100 bg-slate-50/50 ps-10 text-slate-800 transition-all placeholder:text-slate-500 focus:border-primary/20 focus:bg-white"
           />
         </div>
