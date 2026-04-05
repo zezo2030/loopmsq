@@ -1456,11 +1456,10 @@ export class BookingsService {
     if (o.discountType === 'bogo') {
       const buy = Math.max(1, Math.floor(Number(o.buyCount ?? 1)));
       const free = Math.max(1, Math.floor(Number(o.freeCount ?? 1)));
-      const rawDiscount = (amount * free) / (buy + free);
-      const discount = Math.min(rawDiscount, amount);
+      // Gift tickets only: no monetary discount; bonus tickets are issued separately.
       const bonusTickets =
         persons >= 1 ? Math.floor(persons / buy) * free : 0;
-      return { discount, bonusTickets };
+      return { discount: 0, bonusTickets };
     }
     const d =
       o.discountType === 'percentage'
@@ -1505,25 +1504,31 @@ export class BookingsService {
         ] as any,
         order: { createdAt: 'DESC' } as any,
       });
-      let bestDiscount = 0;
+      let bestDiscount = -1;
       let bestOfferId: string | null = null;
-      let bestBonus = 0;
+      let bestBonus = -1;
       for (const o of offers) {
         const { discount, bonusTickets } = this.computeOfferDiscountAmount(
           o,
           amount,
           persons,
         );
-        if (discount > bestDiscount) {
+        if (
+          discount > bestDiscount ||
+          (discount === bestDiscount && bonusTickets > bestBonus)
+        ) {
           bestDiscount = discount;
           bestOfferId = o.id;
           bestBonus = bonusTickets;
         }
       }
+      if (!bestOfferId || bestDiscount < 0) {
+        return { offerDiscount: 0, appliedOfferId: null, bonusTickets: 0 };
+      }
       return {
         offerDiscount: Math.min(bestDiscount, amount),
         appliedOfferId: bestOfferId,
-        bonusTickets: bestBonus,
+        bonusTickets: Math.max(0, bestBonus),
       };
     } catch (e) {
       this.logger.error('Failed to resolve branch offer', e);

@@ -770,19 +770,19 @@ export class ContentService {
     }
     const { priceConfig } = branch;
 
-    // New simplified pricing model:
-    // - Pricing depends only on hourly rate and duration
-    // - Add-ons are calculated separately in the bookings service
-    // - No base price, per-person pricing, decoration fees, or multipliers
+    // Per-person pricing: hourly rate × duration × number of persons (tickets).
+    // hourlyPrice = price for one person for the selected duration (before multiplying by headcount).
+    // Add-ons are calculated separately in the bookings service.
 
     const hourlyRate = priceConfig.hourlyRate;
+    const personsCount = Math.max(1, Math.floor(Number(persons)) || 1);
     const hourlyPrice = hourlyRate * durationHours;
-    const totalPrice = hourlyPrice;
+    const totalPrice = hourlyPrice * personsCount;
 
     return {
       hourlyRate,
-      hourlyPrice,
-      totalPrice: Math.round(totalPrice * 100) / 100, // Round to 2 decimal places
+      hourlyPrice: Math.round(hourlyPrice * 100) / 100,
+      totalPrice: Math.round(totalPrice * 100) / 100,
     };
   }
 
