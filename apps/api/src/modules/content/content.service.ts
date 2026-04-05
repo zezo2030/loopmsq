@@ -761,6 +761,8 @@ export class ContentService {
     hourlyRate: number;
     hourlyPrice: number;
     totalPrice: number;
+    persons: number;
+    durationPricePerPerson: number;
   }> {
     const branch = await this.findBranchById(branchId);
     if (!branch.priceConfig) {
@@ -770,19 +772,23 @@ export class ContentService {
     }
     const { priceConfig } = branch;
 
-    // Per-person pricing: hourly rate × duration × number of persons (tickets).
-    // hourlyPrice = price for one person for the selected duration (before multiplying by headcount).
-    // Add-ons are calculated separately in the bookings service.
+    // hourlyRate = price per person per hour (one ticket-hour unit)
+    // Base hall amount = hourlyRate × durationHours × persons (ticket count)
+    // Add-ons are calculated separately in the bookings service
 
-    const hourlyRate = priceConfig.hourlyRate;
     const personsCount = Math.max(1, Math.floor(Number(persons)) || 1);
-    const hourlyPrice = hourlyRate * durationHours;
-    const totalPrice = hourlyPrice * personsCount;
+    const hourlyRate = priceConfig.hourlyRate;
+    const durationPricePerPerson = hourlyRate * durationHours;
+    const hourlyPrice = durationPricePerPerson * personsCount;
+    const totalPrice = hourlyPrice;
 
+    const round2 = (n: number) => Math.round(n * 100) / 100;
     return {
       hourlyRate,
-      hourlyPrice: Math.round(hourlyPrice * 100) / 100,
-      totalPrice: Math.round(totalPrice * 100) / 100,
+      durationPricePerPerson: round2(durationPricePerPerson),
+      hourlyPrice: round2(hourlyPrice),
+      totalPrice: round2(totalPrice),
+      persons: personsCount,
     };
   }
 

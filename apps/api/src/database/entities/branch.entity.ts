@@ -76,6 +76,7 @@ export class Branch {
   // Hall-related fields (merged from Hall entity)
   @Column({ type: 'json', nullable: true })
   priceConfig: {
+    /** SAR per person per hour; base booking = hourlyRate × durationHours × persons */
     hourlyRate: number;
   };
 

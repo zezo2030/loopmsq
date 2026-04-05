@@ -130,15 +130,9 @@ export default function Branches() {
   }
 
   const columns = [
-    { title: t('branches.id') || 'ID', dataIndex: 'id', key: 'id' },
-    { title: t('branches.name_ar') || 'الاسم (AR)', dataIndex: 'name_ar', key: 'name_ar' },
-    { title: t('branches.name_en') || 'الاسم (EN)', dataIndex: 'name_en', key: 'name_en' },
-    { title: t('branches.location') || 'الموقع', dataIndex: 'location', key: 'location' },
-    { title: t('branches.capacity') || 'السعة', dataIndex: 'capacity', key: 'capacity' },
-    { title: t('branches.status') || 'الحالة', dataIndex: 'status', key: 'status' },
-    { 
-      title: t('branches.cover_image') || 'صورة الغلاف', 
-      dataIndex: 'coverImage', 
+    {
+      title: t('branches.cover_image') || 'صورة الغلاف',
+      dataIndex: 'coverImage',
       key: 'coverImage',
       render: (coverImage: string | null) => (
         coverImage ? (
@@ -150,8 +144,13 @@ export default function Branches() {
         ) : (
           <span style={{ color: '#999' }}>لا توجد صورة</span>
         )
-      )
+      ),
     },
+    { title: t('branches.name_ar') || 'الاسم (AR)', dataIndex: 'name_ar', key: 'name_ar' },
+    { title: t('branches.name_en') || 'الاسم (EN)', dataIndex: 'name_en', key: 'name_en' },
+    { title: t('branches.location') || 'الموقع', dataIndex: 'location', key: 'location' },
+    { title: t('branches.capacity') || 'السعة', dataIndex: 'capacity', key: 'capacity' },
+    { title: t('branches.status') || 'الحالة', dataIndex: 'status', key: 'status' },
     {
       title: t('common.actions') || 'إجراءات',
       key: 'actions',
@@ -281,7 +280,7 @@ export default function Branches() {
                       <div style={{ marginTop: 16, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
                         <strong style={{ display: 'block', marginBottom: 8 }}>{t('branches.pricing_config') || 'إعدادات التسعير'}:</strong>
                                                 <p><strong>{t('branches.hourly_rate') || 'السعر بالساعة'}:</strong> {selectedBranch.priceConfig.hourlyRate} {t('common.currency') || 'ريال'}</p>
-                        <p style={{ marginBottom: 0 }}>{t('branches.addons_priced_separately') || 'Add-ons are priced separately during booking.'}</p>
+                        <p style={{ marginBottom: 0 }}>{t('branches.pricing_formula_hint')}{' '}{t('branches.addons_priced_separately') || 'Add-ons are priced separately during booking.'}</p>
                       </div>
                     )}
                   </div>

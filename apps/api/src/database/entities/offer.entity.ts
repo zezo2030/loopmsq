@@ -31,10 +31,11 @@ export class Offer {
   })
   discountType: 'percentage' | 'fixed' | 'bogo';
 
+  /** For percentage/fixed only. Ignored for BOGO (BOGO does not reduce price). */
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   discountValue: number;
 
-  /** BOGO: tickets customer must buy per group (default 1). */
+  /** BOGO: paid tickets per group (default 1). */
   @Column({ type: 'int', nullable: true, default: 1 })
   buyCount: number | null;
 

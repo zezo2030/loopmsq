@@ -171,7 +171,7 @@ export class BookingsService {
         return total + addOnPrice * addOn.quantity;
       }, 0);
 
-      // Apply offer discount (branch scoped); BOGO may add bonus tickets
+      // Apply offer: percentage/fixed reduce price; BOGO adds extra tickets only (no price discount)
       const subtotalBeforeDiscounts = pricing.totalPrice + addOnsCost;
       const {
         offerDiscount,
@@ -1456,7 +1456,6 @@ export class BookingsService {
     if (o.discountType === 'bogo') {
       const buy = Math.max(1, Math.floor(Number(o.buyCount ?? 1)));
       const free = Math.max(1, Math.floor(Number(o.freeCount ?? 1)));
-      // Gift tickets only: no monetary discount; bonus tickets are issued separately.
       const bonusTickets =
         persons >= 1 ? Math.floor(persons / buy) * free : 0;
       return { discount: 0, bonusTickets };
@@ -1513,11 +1512,12 @@ export class BookingsService {
           amount,
           persons,
         );
+        const d = Math.min(discount, amount);
         if (
-          discount > bestDiscount ||
-          (discount === bestDiscount && bonusTickets > bestBonus)
+          d > bestDiscount ||
+          (d === bestDiscount && bonusTickets > bestBonus)
         ) {
-          bestDiscount = discount;
+          bestDiscount = d;
           bestOfferId = o.id;
           bestBonus = bonusTickets;
         }
@@ -1526,9 +1526,10 @@ export class BookingsService {
         return { offerDiscount: 0, appliedOfferId: null, bonusTickets: 0 };
       }
       return {
-        offerDiscount: Math.min(bestDiscount, amount),
+        offerDiscount:
+          bestOfferId == null ? 0 : Math.max(0, Math.min(bestDiscount, amount)),
         appliedOfferId: bestOfferId,
-        bonusTickets: Math.max(0, bestBonus),
+        bonusTickets: bestOfferId == null ? 0 : bestBonus,
       };
     } catch (e) {
       this.logger.error('Failed to resolve branch offer', e);
@@ -1540,6 +1541,8 @@ export class BookingsService {
     hourlyRate: number;
     hourlyPrice: number;
     totalPrice: number;
+    persons: number;
+    durationPricePerPerson: number;
   }> {
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
