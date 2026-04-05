@@ -55,15 +55,12 @@ type BookingRow = {
   couponCode?: string
   discountAmount?: number
   createdAt: string
-  // Pricing details from backend
   pricing?: {
-    basePrice: number
+    hourlyRate: number
     hourlyPrice: number
-    personsPrice: number
-    pricePerPerson: number
-    multiplier: number
-    decorationPrice: number
     totalPrice: number
+    persons?: number
+    durationPricePerPerson?: number
   }
 }
 

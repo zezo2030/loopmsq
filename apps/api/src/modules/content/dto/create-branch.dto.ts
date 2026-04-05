@@ -13,7 +13,10 @@ import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 class PriceConfigDto {
-  @ApiProperty({ description: 'Hourly rate', example: 100 })
+  @ApiProperty({
+    description: 'Price per person per hour (SAR); total base = rate × hours × persons',
+    example: 100,
+  })
   @IsNumber()
   hourlyRate: number;
 }

@@ -761,6 +761,8 @@ export class ContentService {
     hourlyRate: number;
     hourlyPrice: number;
     totalPrice: number;
+    persons: number;
+    durationPricePerPerson: number;
   }> {
     const branch = await this.findBranchById(branchId);
     if (!branch.priceConfig) {
@@ -770,19 +772,23 @@ export class ContentService {
     }
     const { priceConfig } = branch;
 
-    // New simplified pricing model:
-    // - Pricing depends only on hourly rate and duration
-    // - Add-ons are calculated separately in the bookings service
-    // - No base price, per-person pricing, decoration fees, or multipliers
+    // hourlyRate = price per person per hour (one ticket-hour unit)
+    // Base hall amount = hourlyRate × durationHours × persons (ticket count)
+    // Add-ons are calculated separately in the bookings service
 
+    const personsCount = Math.max(1, Math.floor(Number(persons)) || 1);
     const hourlyRate = priceConfig.hourlyRate;
-    const hourlyPrice = hourlyRate * durationHours;
+    const durationPricePerPerson = hourlyRate * durationHours;
+    const hourlyPrice = durationPricePerPerson * personsCount;
     const totalPrice = hourlyPrice;
 
+    const round2 = (n: number) => Math.round(n * 100) / 100;
     return {
       hourlyRate,
-      hourlyPrice,
-      totalPrice: Math.round(totalPrice * 100) / 100, // Round to 2 decimal places
+      durationPricePerPerson: round2(durationPricePerPerson),
+      hourlyPrice: round2(hourlyPrice),
+      totalPrice: round2(totalPrice),
+      persons: personsCount,
     };
   }
 

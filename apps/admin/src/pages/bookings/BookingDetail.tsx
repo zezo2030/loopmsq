@@ -75,15 +75,13 @@ type Booking = {
   cancellationReason?: string
   createdAt: string
   updatedAt: string
-  // Pricing details from backend
+  // Pricing details from backend (calculateBranchPrice)
   pricing?: {
-    basePrice: number
+    hourlyRate: number
     hourlyPrice: number
-    personsPrice: number
-    pricePerPerson: number
-    multiplier: number
-    decorationPrice: number
     totalPrice: number
+    persons?: number
+    durationPricePerPerson?: number
   }
 }
 
@@ -380,7 +378,9 @@ export default function BookingDetail() {
                       
                       {/* Hourly Price */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                        <span>تسعير الساعات ({booking.durationHours} ساعات):</span>
+                        <span>
+                          المبلغ الأساسي ({booking.durationHours} ساعة × {booking.persons} أشخاص):
+                        </span>
                         <span style={{ fontWeight: '500' }}>
                           {booking.pricing.hourlyPrice.toLocaleString()} ر.س
                         </span>

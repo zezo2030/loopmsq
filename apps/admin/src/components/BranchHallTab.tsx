@@ -145,6 +145,7 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
           </Col>
         </Row>
         <div style={{ color: '#6b7280', marginBottom: 16 }}>
+          {t('branches.pricing_formula_hint')}{' '}
           {t('branches.addons_priced_separately') || 'Add-ons are priced separately during booking.'}
         </div>
 
