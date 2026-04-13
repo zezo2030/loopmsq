@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   Search,
   Users,
-  Calendar,
   Gift,
   BookOpen,
   Bell,
@@ -19,6 +18,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Ticket,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -38,19 +38,12 @@ const navItems: Array<{
     children: [
       { key: 'users-list', href: '/admin/users', labelKey: 'users.all' },
       { key: 'clients', href: '/admin/clients', labelKey: 'users.clients.title' },
+      { key: 'create-user', href: '/admin/clients/new', labelKey: 'users.add_client' },
       { key: 'create-staff', href: '/admin/staff/new', labelKey: 'users.add_staff' },
       { key: 'create-manager', href: '/admin/branch-managers/new', labelKey: 'users.add_manager' },
     ],
   },
-  {
-    key: 'bookings',
-    labelKey: 'menu.bookings',
-    icon: Calendar,
-    children: [
-      { key: 'bookings-list', href: '/admin/bookings', labelKey: 'menu.bookings' },
-      { key: 'bookings-free-ticket', href: '/admin/bookings/free-ticket', labelKey: 'bookings.free_ticket' },
-    ],
-  },
+
   { key: 'trips', href: '/admin/trips', labelKey: 'menu.trips', icon: BookOpen },
   { key: 'events', href: '/admin/events', labelKey: 'menu.events', icon: Gift },
   { key: 'notifications', href: '/admin/notifications', labelKey: 'menu.notifications', icon: Bell },
@@ -61,6 +54,8 @@ const navItems: Array<{
     children: [
       { key: 'cms-banners', href: '/admin/cms/banners', labelKey: 'cms.banners' },
       { key: 'cms-offers', href: '/admin/cms/offers', labelKey: 'cms.offers' },
+      { key: 'cms-offer-products', href: '/admin/cms/offer-products', labelKey: 'cms.offerProducts' },
+      { key: 'cms-subscription-plans', href: '/admin/cms/subscription-plans', labelKey: 'cms.subscriptionPlans' },
       { key: 'cms-coupons', href: '/admin/cms/coupons', labelKey: 'cms.coupons' },
       { key: 'cms-activities', href: '/admin/cms/activities', labelKey: 'cms.activities' },
       { key: 'cms-organizing-branches', href: '/admin/cms/organizing-branches', labelKey: 'cms.organizingBranches' },
@@ -71,9 +66,21 @@ const navItems: Array<{
     key: 'content',
     labelKey: 'menu.content',
     icon: Folder,
+      children: [
+        { key: 'content-branches', href: '/admin/content/branches', labelKey: 'menu.content.branches' },
+        { key: 'content-addons', href: '/admin/content/addons', labelKey: 'menu.content.addons' },
+        { key: 'content-school-addons', href: '/admin/content/school-addons', labelKey: 'menu.content.schoolAddons' },
+        { key: 'content-private-event-addons', href: '/admin/content/private-event-addons', labelKey: 'menu.content.privateEventAddons' },
+      ],
+  },
+  {
+    key: 'bookings',
+    labelKey: 'menu.bookingsSection',
+    icon: Ticket,
     children: [
-      { key: 'content-branches', href: '/admin/content/branches', labelKey: 'menu.content.branches' },
-      { key: 'content-addons', href: '/admin/content/addons', labelKey: 'menu.content.addons' },
+      { key: 'bookings-free-ticket', href: '/admin/bookings/free-ticket', labelKey: 'dashboard.free_ticket' },
+      { key: 'bookings-offer-bookings', href: '/admin/finance/offer-bookings', labelKey: 'finance.offerBookings' },
+      { key: 'bookings-subscriptions', href: '/admin/finance/subscriptions', labelKey: 'finance.subscriptions' },
     ],
   },
   {

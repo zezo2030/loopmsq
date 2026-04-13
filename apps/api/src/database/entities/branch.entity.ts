@@ -73,12 +73,14 @@ export class Branch {
   @Column({ type: 'boolean', default: true })
   hasSchoolTrips: boolean;
 
-  // Hall-related fields (merged from Hall entity)
+  @Column({ type: 'int', nullable: true })
+  schoolTripMinimumStudents: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  schoolTripDepositPercentage: number | null;
+
   @Column({ type: 'json', nullable: true })
-  priceConfig: {
-    /** SAR per person per hour; base booking = hourlyRate × durationHours × persons */
-    hourlyRate: number;
-  };
+  schoolTripMonthlyPrices: Record<string, number> | null;
 
   @Column({ type: 'boolean', default: false })
   isDecorated: boolean;
@@ -105,7 +107,6 @@ export class Branch {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  // Relations
   @OneToMany(() => Booking, (booking) => booking.branch)
   bookings: Booking[];
 }

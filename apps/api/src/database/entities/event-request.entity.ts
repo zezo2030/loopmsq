@@ -17,6 +17,7 @@ export enum EventRequestStatus {
   UNDER_REVIEW = 'under_review',
   QUOTED = 'quoted',
   INVOICED = 'invoiced',
+  DEPOSIT_PAID = 'deposit_paid',
   PAID = 'paid',
   CONFIRMED = 'confirmed',
   REJECTED = 'rejected',
@@ -25,6 +26,7 @@ export enum EventRequestStatus {
 @Entity('event_requests')
 @Index(['requesterId'])
 @Index(['status'])
+@Index(['branchId', 'status', 'startTime'])
 export class EventRequest {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -41,11 +43,17 @@ export class EventRequest {
   @Column({ type: 'uuid' })
   branchId: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  bookingId: string | null;
+
   @Column({ type: 'timestamp' })
   startTime: Date;
 
   @Column({ type: 'int', default: 2 })
   durationHours: number;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  selectedTimeSlot: string | null;
 
   @Column({ type: 'int' })
   persons: number;
@@ -61,6 +69,9 @@ export class EventRequest {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
+  @Column({ type: 'boolean', default: false })
+  acceptedTerms: boolean;
+
   @Column({
     type: 'enum',
     enum: EventRequestStatus,
@@ -70,6 +81,27 @@ export class EventRequest {
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   quotedPrice: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  hallRentalPrice: number | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  addOnsSubtotal: number | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  totalAmount: number | null;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  paymentOption: string | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  depositAmount: number | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  amountPaid: number | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  remainingAmount: number | null;
 
   @Column({
     type: 'enum',

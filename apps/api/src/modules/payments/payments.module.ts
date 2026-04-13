@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { PaymentsController } from './payments.controller';
@@ -17,6 +17,9 @@ import { RedisService } from '../../utils/redis.service';
 import { RealtimeModule } from '../../realtime/realtime.module';
 import { MoyasarService } from '../../integrations/moyasar/moyasar.service';
 import { QRCodeService } from '../../utils/qr-code.service';
+import { OfferBookingsModule } from '../offer-bookings/offer-bookings.module';
+import { SubscriptionPurchasesModule } from '../subscription-purchases/subscription-purchases.module';
+import { GiftOrdersModule } from '../gift-orders/gift-orders.module';
 
 @Module({
   imports: [
@@ -30,6 +33,9 @@ import { QRCodeService } from '../../utils/qr-code.service';
     WalletModule,
     ReferralsModule,
     RealtimeModule,
+    OfferBookingsModule,
+    SubscriptionPurchasesModule,
+    forwardRef(() => GiftOrdersModule),
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, RedisService, MoyasarService, QRCodeService],

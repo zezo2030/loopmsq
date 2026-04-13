@@ -14,6 +14,7 @@ import { Booking } from './booking.entity';
 export enum TransactionType {
   EARN = 'earn',
   BURN = 'burn',
+  REDEEM_TICKET = 'redeem_ticket',
   REFUND = 'refund',
   BONUS = 'bonus',
   PENALTY = 'penalty',
@@ -47,11 +48,16 @@ export class LoyaltyTransaction {
   @Column({ type: 'uuid', nullable: true })
   relatedBookingId: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  relatedTicketId: string;
+
   @Column({ type: 'json', nullable: true })
   metadata: {
     conversionRate?: number;
     promotionId?: string;
     expiresAt?: Date;
+    ticketId?: string;
+    branchId?: string;
   };
 
   @CreateDateColumn()

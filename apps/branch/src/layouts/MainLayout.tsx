@@ -7,11 +7,12 @@ import {
   UserOutlined, 
   LogoutOutlined,
   SettingOutlined,
-  BellOutlined,
   AppstoreOutlined,
   CalendarOutlined,
   TeamOutlined,
   BarChartOutlined,
+  TagsOutlined,
+  IdcardOutlined,
 } from '@ant-design/icons'
 import '../theme.css'
 import { useTranslation } from 'react-i18next'
@@ -43,6 +44,12 @@ export default function MainLayout() {
     if (path.startsWith('/bookings')) {
       return ['bookings']
     }
+    if (path.startsWith('/offer-bookings')) {
+      return ['offer-bookings']
+    }
+    if (path.startsWith('/subscriptions')) {
+      return ['subscriptions']
+    }
     if (path.startsWith('/staff')) {
       return ['staff']
     }
@@ -58,6 +65,8 @@ export default function MainLayout() {
     '/offers': t('page.offers_management'),
     '/coupons': t('page.coupons_management'),
     '/bookings': t('page.bookings_management'),
+    '/offer-bookings': t('page.offer_bookings_management') || 'حجوزات العروض',
+    '/subscriptions': t('page.subscriptions_management') || 'الاشتراكات',
     '/staff': t('page.staff_management'),
     '/reports': t('page.reports_overview'),
   }
@@ -133,6 +142,16 @@ export default function MainLayout() {
       key: 'bookings',
       icon: <CalendarOutlined />,
       label: <Link to="/bookings">{t('menu.bookings')}</Link>,
+    },
+    {
+      key: 'offer-bookings',
+      icon: <TagsOutlined />,
+      label: <Link to="/offer-bookings">{t('menu.offerBookings') || 'حجوزات العروض'}</Link>,
+    },
+    {
+      key: 'subscriptions',
+      icon: <IdcardOutlined />,
+      label: <Link to="/subscriptions">{t('menu.subscriptions') || 'الاشتراكات'}</Link>,
     },
     {
       key: 'staff',

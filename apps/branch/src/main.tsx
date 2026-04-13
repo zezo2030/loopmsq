@@ -16,6 +16,10 @@ import StaffList from './pages/staff/StaffList'
 import ReportsOverview from './pages/reports/Overview'
 import BranchOffers from './pages/cms/BranchOffers'
 import BranchCoupons from './pages/cms/BranchCoupons'
+import OfferBookingsList from './pages/offer-bookings/OfferBookingsList'
+import OfferBookingDetail from './pages/offer-bookings/OfferBookingDetail'
+import SubscriptionsList from './pages/subscriptions/SubscriptionsList'
+import SubscriptionDetail from './pages/subscriptions/SubscriptionDetail'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -33,6 +37,10 @@ const router = createBrowserRouter([
           { path: 'offers', element: <BranchOffers /> },
           { path: 'coupons', element: <BranchCoupons /> },
           { path: 'bookings', element: <BookingsList /> },
+          { path: 'offer-bookings', element: <OfferBookingsList /> },
+          { path: 'offer-bookings/:id', element: <OfferBookingDetail /> },
+          { path: 'subscriptions', element: <SubscriptionsList /> },
+          { path: 'subscriptions/:id', element: <SubscriptionDetail /> },
           { path: 'bookings/free-ticket', element: <CreateFreeTicket /> },
           { path: 'staff', element: <StaffList /> },
           { path: 'reports', element: <ReportsOverview /> },

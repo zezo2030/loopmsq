@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Branch } from '../entities/branch.entity';
 
 @Injectable()
@@ -10,10 +11,20 @@ export class SampleDataSeeder implements OnModuleInit {
   constructor(
     @InjectRepository(Branch)
     private branchRepository: Repository<Branch>,
+    private configService: ConfigService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     try {
+      // Check if seeding is disabled via environment variable
+      const isSeedingEnabled =
+        this.configService.get<string>('SEED_DATA') !== 'false';
+
+      if (!isSeedingEnabled) {
+        this.logger.log('Sample data seeding is disabled (SEED_DATA=false)');
+        return;
+      }
+
       await this.seedSampleData();
     } catch (error) {
       this.logger.error('Failed to seed sample data:', error);
@@ -52,10 +63,6 @@ export class SampleDataSeeder implements OnModuleInit {
           saturday: { open: '08:00', close: '22:00' },
         },
         amenities: ['مواقف سيارات', 'مطعم', 'صالة انتظار', 'واي فاي مجاني'],
-        // Hall data merged into branch
-        priceConfig: {
-          hourlyRate: 200,
-        },
         isDecorated: true,
         hallFeatures: [
           'نظام صوت متطور',

@@ -12,15 +12,16 @@ import {
   WalletTransactionType,
   WalletTransactionStatus,
 } from '../../database/entities/wallet-transaction.entity';
-import {
-  LoyaltyTransaction,
-  TransactionType,
-} from '../../database/entities/loyalty-transaction.entity';
 import { RechargeWalletDto } from './dto/recharge-wallet.dto';
 import { ListTransactionsDto } from './dto/list-transactions.dto';
 import { ConfigService } from '@nestjs/config';
 import { TapService } from '../../integrations/tap/tap.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import {
+  Payment,
+  PaymentMethod,
+  PaymentStatus,
+} from '../../database/entities/payment.entity';
 
 @Injectable()
 export class WalletService {
@@ -31,8 +32,8 @@ export class WalletService {
     private readonly walletRepository: Repository<Wallet>,
     @InjectRepository(WalletTransaction)
     private readonly transactionRepository: Repository<WalletTransaction>,
-    @InjectRepository(LoyaltyTransaction)
-    private readonly loyaltyTransactionRepository: Repository<LoyaltyTransaction>,
+    @InjectRepository(Payment)
+    private readonly paymentRepository: Repository<Payment>,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
     private readonly tapService?: TapService,
@@ -71,209 +72,174 @@ export class WalletService {
       walletTxQb.andWhere('tx.status = :status', { status });
     }
 
-    const walletTxItems = await walletTxQb
+    const [items, total] = await walletTxQb
       .orderBy('tx.createdAt', 'DESC')
-      .getMany();
-
-    const includeLoyaltyAsDeposit =
-      !type || type === WalletTransactionType.DEPOSIT;
-    const includeLoyaltyAsSuccess =
-      !status || status === WalletTransactionStatus.SUCCESS;
-
-    let loyaltyAsWalletItems: Array<Partial<WalletTransaction>> = [];
-    if (includeLoyaltyAsDeposit && includeLoyaltyAsSuccess) {
-      const loyaltyItems = await this.loyaltyTransactionRepository.find({
-        where: {
-          userId,
-          walletId: wallet.id,
-          type: TransactionType.BURN,
-        },
-        order: { createdAt: 'DESC' } as any,
-      });
-
-      loyaltyAsWalletItems = loyaltyItems
-        .filter((loyaltyTx) => Number(loyaltyTx.amountChange || 0) > 0)
-        .map((loyaltyTx) => ({
-          id: `loyalty-${loyaltyTx.id}`,
-          walletId: loyaltyTx.walletId,
-          userId: loyaltyTx.userId,
-          type: WalletTransactionType.DEPOSIT,
-          amount: Number(loyaltyTx.amountChange),
-          method: 'loyalty_points',
-          status: WalletTransactionStatus.SUCCESS,
-          reference: `loyalty_redeem_${loyaltyTx.id}`,
-          relatedBookingId: loyaltyTx.relatedBookingId || undefined,
-          failureReason: null,
-          createdAt: loyaltyTx.createdAt,
-        }));
-    }
-
-    const items = [...walletTxItems, ...loyaltyAsWalletItems].sort(
-      (a: any, b: any) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-    const total = items.length;
-    const start = (page - 1) * pageSize;
-    const pagedItems = items.slice(start, start + pageSize);
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getManyAndCount();
 
     return {
-      items: pagedItems,
+      items,
       total,
       page,
       pageSize,
     };
   }
 
-  async rechargeWallet(userId: string, dto: RechargeWalletDto) {
-    const { amount, method } = dto;
-
-    this.logger.log(
-      `Recharge wallet request: userId=${userId}, amount=${amount}, method=${method}`,
-    );
-
+  async createRechargeIntent(userId: string, dto: RechargeWalletDto) {
+    const amount = Number(dto.amount);
+    const method = dto.method;
     const wallet = await this.walletRepository.findOne({
       where: { userId },
     });
     if (!wallet) throw new NotFoundException('Wallet not found');
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      // Create transaction record with status PENDING initially
-      const transaction = queryRunner.manager.create(WalletTransaction, {
-        walletId: wallet.id,
-        userId,
-        type: WalletTransactionType.DEPOSIT,
-        amount,
-        method,
-        status: WalletTransactionStatus.FAILED,
-        metadata: { rechargeAttempt: true },
-      });
-
-      const savedTransaction = await queryRunner.manager.save(transaction);
-
-      // Bypass payments if keys are missing or explicitly enabled
-      const bypass =
-        !this.configService.get<string>('TAP_SECRET_KEY') ||
-        (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() ===
-          'true';
-
-      let chargeResult: any = null;
-      let success = false;
-      let failureReason: string | null = null;
-
-      if (bypass) {
-        // Bypass mode: automatically succeed
-        success = true;
-        savedTransaction.reference = `bypass_${savedTransaction.id}`;
-        savedTransaction.status = WalletTransactionStatus.SUCCESS;
-        this.logger.log(
-          `Bypass mode: Wallet recharge succeeded for userId=${userId}`,
-        );
-      } else {
-        // Process payment through gateway
-        if (!this.tapService) {
-          throw new BadRequestException('Payment gateway not configured');
-        }
-
-        try {
-          const charge = await this.tapService.createCharge({
-            amount: Number(amount),
-            currency: 'SAR',
-            capture: true,
-            threeDS: 'required',
-            source: {
-              payment_method: method === 'credit_card' ? 'card' : 'card',
-            },
-            description: `Wallet recharge ${wallet.id}`,
-            metadata: {
-              walletId: wallet.id,
-              transactionId: savedTransaction.id,
-            },
-          });
-
-          chargeResult = charge;
-          const chargeStatus = charge.status?.toUpperCase();
-          success = ['CAPTURED', 'AUTHORIZED', 'SUCCEEDED'].includes(
-            chargeStatus || '',
-          );
-
-          if (success) {
-            savedTransaction.reference = charge.id;
-            savedTransaction.status = WalletTransactionStatus.SUCCESS;
-            this.logger.log(
-              `Wallet recharge succeeded: userId=${userId}, chargeId=${charge.id}`,
-            );
-          } else {
-            failureReason = `Payment gateway returned status: ${chargeStatus}`;
-            savedTransaction.failureReason = failureReason;
-            savedTransaction.status = WalletTransactionStatus.FAILED;
-            this.logger.warn(
-              `Wallet recharge failed: userId=${userId}, reason=${failureReason}`,
-            );
-          }
-        } catch (error: any) {
-          failureReason = error.message || 'Payment gateway error';
-          savedTransaction.failureReason = failureReason;
-          savedTransaction.status = WalletTransactionStatus.FAILED;
-          this.logger.error(
-            `Wallet recharge error: userId=${userId}, error=${failureReason}`,
-            error.stack,
-          );
-        }
-      }
-
-      // Update wallet if successful
-      if (success) {
-        wallet.balance = Number(wallet.balance) + Number(amount);
-        wallet.totalEarned = Number(wallet.totalEarned) + Number(amount);
-        wallet.lastTransactionAt = new Date();
-        await queryRunner.manager.save(wallet);
-      }
-
-      // Update transaction
-      savedTransaction.metadata = {
-        ...savedTransaction.metadata,
-        chargeResult,
-      };
-      await queryRunner.manager.save(savedTransaction);
-
-      await queryRunner.commitTransaction();
-
-      // Send notification if successful
-      if (success && this.notifications) {
-        await this.notifications.enqueue({
-          type: 'WALLET_RECHARGED',
-          to: { userId },
-          data: { amount, balance: wallet.balance },
-          channels: ['sms', 'push'],
-        });
-      }
-
-      return {
-        success,
-        transactionId: savedTransaction.id,
-        amount,
-        newBalance: wallet.balance,
-        failureReason,
-      };
-    } catch (error: any) {
-      await queryRunner.rollbackTransaction();
-      this.logger.error(
-        `Wallet recharge transaction error: userId=${userId}`,
-        error.stack,
-      );
-      throw error;
-    } finally {
-      await queryRunner.release();
+    if (method === PaymentMethod.WALLET) {
+      throw new BadRequestException('Wallet cannot be recharged using wallet');
     }
+    if (method === PaymentMethod.CASH) {
+      throw new BadRequestException(
+        'Cash is not supported for wallet recharge',
+      );
+    }
+
+    const existingPending = await this.paymentRepository.findOne({
+      where: {
+        status: PaymentStatus.PROCESSING,
+        method,
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (
+      existingPending &&
+      existingPending.webhookData?.flowType === 'wallet_recharge' &&
+      existingPending.webhookData?.userId === userId &&
+      Number(existingPending.amount) === amount
+    ) {
+      return {
+        paymentId: existingPending.id,
+        chargeId: existingPending.gatewayRef || '',
+        amount: Number(existingPending.amount),
+        currency: existingPending.currency,
+        status: existingPending.status,
+      };
+    }
+
+    const payment = this.paymentRepository.create({
+      amount,
+      currency: 'SAR',
+      status: PaymentStatus.PROCESSING,
+      method,
+      gatewayRef:
+        !this.configService.get<string>('MOYASAR_SECRET_KEY') ||
+        (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() ===
+          'true'
+          ? undefined
+          : '',
+      webhookData: {
+        flowType: 'wallet_recharge',
+        userId,
+        walletId: wallet.id,
+      },
+    });
+
+    const savedPayment = await this.paymentRepository.save(payment);
+    const bypass =
+      !this.configService.get<string>('MOYASAR_SECRET_KEY') ||
+      (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() ===
+        'true';
+
+    if (bypass) {
+      savedPayment.gatewayRef = `bypass_${savedPayment.id}`;
+      await this.paymentRepository.save(savedPayment);
+    }
+
+    return {
+      paymentId: savedPayment.id,
+      chargeId: savedPayment.gatewayRef || '',
+      amount: Number(savedPayment.amount),
+      currency: savedPayment.currency,
+      status: savedPayment.status,
+    };
   }
 
-  async deductWallet(userId: string, amount: number, bookingId: string) {
+  async completeRechargeFromPayment(
+    userId: string,
+    amount: number,
+    paymentId: string,
+    manager?: any,
+    method: PaymentMethod = PaymentMethod.CREDIT_CARD,
+  ) {
+    const walletRepository = manager
+      ? manager.getRepository(Wallet)
+      : this.walletRepository;
+    const transactionRepository = manager
+      ? manager.getRepository(WalletTransaction)
+      : this.transactionRepository;
+
+    const wallet = await walletRepository.findOne({
+      where: { userId },
+    });
+    if (!wallet) throw new NotFoundException('Wallet not found');
+
+    const existingTransaction = await transactionRepository.findOne({
+      where: {
+        userId,
+        reference: `payment_${paymentId}`,
+      },
+    });
+    if (existingTransaction) {
+      return {
+        success: true,
+        transactionId: existingTransaction.id,
+        amount,
+        newBalance: Number(wallet.balance),
+      };
+    }
+
+    wallet.balance = Number(wallet.balance) + Number(amount);
+    wallet.totalEarned = Number(wallet.totalEarned) + Number(amount);
+    wallet.lastTransactionAt = new Date();
+    await walletRepository.save(wallet);
+
+    const transaction = transactionRepository.create({
+      walletId: wallet.id,
+      userId,
+      type: WalletTransactionType.DEPOSIT,
+      amount,
+      status: WalletTransactionStatus.SUCCESS,
+      method,
+      reference: `payment_${paymentId}`,
+      metadata: {
+        flowType: 'wallet_recharge',
+        paymentId,
+      },
+    });
+    const savedTransaction = await transactionRepository.save(transaction);
+
+    return {
+      success: true,
+      transactionId: savedTransaction.id,
+      amount,
+      newBalance: Number(wallet.balance),
+    };
+  }
+
+  /**
+   * Deduct wallet balance. `relatedBookingId` must only be set when it exists in `bookings`
+   * (FK). For event/trip flows use `metadata` + `reference` instead.
+   */
+  async deductWallet(
+    userId: string,
+    amount: number,
+    link: {
+      reference: string;
+      relatedBookingId?: string | null;
+      metadata?: Record<string, unknown>;
+    },
+  ) {
     this.logger.log(
-      `Deduct wallet: userId=${userId}, amount=${amount}, bookingId=${bookingId}`,
+      `Deduct wallet: userId=${userId}, amount=${amount}, reference=${link.reference}, relatedBookingId=${link.relatedBookingId ?? 'none'}`,
     );
 
     const wallet = await this.walletRepository.findOne({
@@ -310,9 +276,11 @@ export class WalletService {
         type: WalletTransactionType.WITHDRAWAL,
         amount: deductAmount,
         status: WalletTransactionStatus.SUCCESS,
-        relatedBookingId: bookingId,
-        reference: `booking_${bookingId}`,
-        metadata: { bookingId },
+        ...(link.relatedBookingId
+          ? { relatedBookingId: link.relatedBookingId }
+          : {}),
+        reference: link.reference,
+        metadata: link.metadata ?? {},
       });
 
       await queryRunner.manager.save(transaction);

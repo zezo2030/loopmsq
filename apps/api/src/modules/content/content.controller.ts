@@ -14,6 +14,7 @@ import {
   ParseBoolPipe,
   ForbiddenException,
   BadRequestException,
+  GoneException,
   UploadedFile,
   UploadedFiles,
   UseInterceptors,
@@ -498,12 +499,12 @@ export class ContentController {
     @Query('durationHours', ParseIntPipe) durationHours: number,
     @Query('persons', ParseIntPipe) persons: number,
   ) {
-    const startDate = new Date(startTime);
-    return this.contentService.calculateBranchPrice(
-      id,
-      startDate,
-      durationHours,
-      persons,
+    void id;
+    void startTime;
+    void durationHours;
+    void persons;
+    throw new GoneException(
+      'Branch pricing has been removed. Use branch offers instead.',
     );
   }
 
@@ -615,12 +616,12 @@ export class ContentController {
     @Query('durationHours', ParseIntPipe) durationHours: number,
     @Query('persons', ParseIntPipe) persons: number,
   ) {
-    const startDate = new Date(startTime);
-    return this.contentService.calculateBranchPrice(
-      id,
-      startDate,
-      durationHours,
-      persons,
+    void id;
+    void startTime;
+    void durationHours;
+    void persons;
+    throw new GoneException(
+      'Branch pricing has been removed. Use branch offers instead.',
     );
   }
 

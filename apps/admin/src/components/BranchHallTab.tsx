@@ -46,7 +46,6 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
         name_en: branch.nameEn || branch.name_en,
         capacity: branch.capacity,
         isDecorated: branch.isDecorated,
-        price_hourlyRate: branch.priceConfig?.hourlyRate,
         description_ar: branch.descriptionAr || branch.description_ar,
         description_en: branch.descriptionEn || branch.description_en,
         features: branch.hallFeatures || branch.features,
@@ -63,9 +62,6 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
       nameEn: values.name_en,
       capacity: Number(values.capacity || 0),
       isDecorated: !!values.isDecorated,
-      hallPriceConfig: {
-        hourlyRate: Number(values.price_hourlyRate || 0),
-      },
       descriptionAr: values.description_ar || null,
       descriptionEn: values.description_en || null,
       hallFeatures: values.features?.length ? values.features : undefined,
@@ -127,11 +123,6 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
         </Row>
 
         <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item name="price_hourlyRate" label={t('branches.hourly_rate') || 'Hourly Rate'}>
-              <InputNumber min={0} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
           <Col span={6}>
             <Form.Item name="status" label={t('branches.status') || 'Status'}>
               <Select
@@ -144,10 +135,6 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
             </Form.Item>
           </Col>
         </Row>
-        <div style={{ color: '#6b7280', marginBottom: 16 }}>
-          {t('branches.pricing_formula_hint')}{' '}
-          {t('branches.addons_priced_separately') || 'Add-ons are priced separately during booking.'}
-        </div>
 
         <Form.Item name="features" label={t('branches.features') || 'المزايا'}>
           <Select mode="tags" placeholder={t('branches.features_ph') || 'أدخل المزايا'} />

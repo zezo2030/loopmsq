@@ -5,24 +5,36 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  ValidateIf,
 } from 'class-validator';
 
 export class ConfirmPaymentDto {
   @ApiPropertyOptional({ format: 'uuid' })
-  @ValidateIf((o) => !o.eventRequestId && !o.tripRequestId)
+  @IsOptional()
   @IsUUID()
   bookingId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
-  @ValidateIf((o) => !o.bookingId && !o.tripRequestId)
+  @IsOptional()
   @IsUUID()
   eventRequestId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
-  @ValidateIf((o) => !o.bookingId && !o.eventRequestId)
+  @IsOptional()
   @IsUUID()
   tripRequestId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Offer booking ID' })
+  @IsOptional()
+  @IsUUID()
+  offerBookingId?: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Subscription purchase ID',
+  })
+  @IsOptional()
+  @IsUUID()
+  subscriptionPurchaseId?: string;
 
   @ApiProperty({
     description: 'Internal payment id or external gateway payment id',

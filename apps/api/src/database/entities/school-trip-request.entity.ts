@@ -15,6 +15,7 @@ export enum TripRequestStatus {
   PENDING = 'pending',
   UNDER_REVIEW = 'under_review',
   APPROVED = 'approved',
+  DEPOSIT_PAID = 'deposit_paid',
   REJECTED = 'rejected',
   INVOICED = 'invoiced',
   PAID = 'paid',
@@ -50,6 +51,9 @@ export class SchoolTripRequest {
   @Column({ type: 'time', nullable: true })
   preferredTime: string | null;
 
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  selectedTimeSlot: string | null;
+
   @Column({ type: 'int', default: 2 })
   durationHours: number;
 
@@ -63,7 +67,7 @@ export class SchoolTripRequest {
   @Column({ type: 'varchar', length: 100 })
   contactPersonName: string;
 
-  @Column({ type: 'varchar', length: 20 })
+  @Column({ type: 'varchar', length: 255 })
   contactPhone: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
@@ -85,6 +89,41 @@ export class SchoolTripRequest {
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   quotedPrice: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  ticketPricePerStudent: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  ticketsSubtotal: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  addonsSubtotal: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  totalAmount: number;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  paymentOption: string | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  depositAmount: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  amountPaid: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  remainingAmount: number;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  pricingMonth: string | null;
+
+  @Column({ type: 'json', nullable: true })
+  pricingSnapshot: {
+    minimumStudents: number;
+    ticketPricePerStudent: number;
+    depositPercentage: number;
+    timeSlots: string[];
+  } | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   invoiceId: string;

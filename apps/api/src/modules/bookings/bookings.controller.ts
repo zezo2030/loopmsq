@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   ParseIntPipe,
   BadRequestException,
+  GoneException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -45,7 +46,10 @@ export class BookingsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 409, description: 'Hall not available' })
   async getQuote(@Body() quoteDto: BookingQuoteDto) {
-    return this.bookingsService.getQuote(quoteDto);
+    void quoteDto;
+    throw new GoneException(
+      'Direct booking quote has been removed. Use branch offers instead.',
+    );
   }
 
   @Post()
@@ -58,7 +62,11 @@ export class BookingsController {
     @CurrentUser() user: User,
     @Body() createBookingDto: CreateBookingDto,
   ) {
-    return this.bookingsService.createBooking(user.id, createBookingDto);
+    void user;
+    void createBookingDto;
+    throw new GoneException(
+      'Direct booking creation has been removed. Use branch offers instead.',
+    );
   }
 
   @Get()
@@ -188,7 +196,10 @@ export class BookingsController {
   })
   @ApiResponse({ status: 404, description: 'Booking not found' })
   async getBookingPricing(@Param('id', ParseUUIDPipe) id: string) {
-    return this.bookingsService.getBookingPricing(id);
+    void id;
+    throw new GoneException(
+      'Booking pricing has been removed. Use offer pricing instead.',
+    );
   }
 
   @Post(':id/cancel')
@@ -244,8 +255,11 @@ export class BookingsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Ticket not found' })
-  async getTicketByToken(@Param('token') token: string) {
-    return this.bookingsService.getTicketByToken(token);
+  async getTicketByToken(
+    @CurrentUser() user: User,
+    @Param('token') token: string,
+  ) {
+    return this.bookingsService.getTicketByToken(user.id, token);
   }
 
   @Get('staff/scans/me')
@@ -262,8 +276,7 @@ export class BookingsController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.STAFF, UserRole.BRANCH_MANAGER)
   @ApiOperation({
-    summary:
-      'Get scan statistics for current user (today, week, month, total)',
+    summary: 'Get scan statistics for current user (today, week, month, total)',
   })
   @ApiResponse({
     status: 200,

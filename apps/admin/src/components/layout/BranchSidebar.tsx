@@ -6,6 +6,8 @@ import {
   Tags,
   Percent,
   Calendar,
+  Ticket,
+  BadgeCheck,
   Users,
   BarChart3,
 } from 'lucide-react'
@@ -17,6 +19,8 @@ const navItems = [
   { key: 'offers', href: '/branch/offers', labelKey: 'cms.offers', icon: Tags },
   { key: 'coupons', href: '/branch/coupons', labelKey: 'cms.coupons', icon: Percent },
   { key: 'bookings', href: '/branch/bookings', labelKey: 'menu.bookings', icon: Calendar },
+  { key: 'offer-bookings', href: '/branch/offer-bookings', labelKey: 'menu.offerBookings', icon: Ticket },
+  { key: 'subscriptions', href: '/branch/subscriptions', labelKey: 'menu.subscriptions', icon: BadgeCheck },
   { key: 'staff', href: '/branch/staff', labelKey: 'menu.staff', icon: Users },
   { key: 'reports', href: '/branch/reports', labelKey: 'menu.reports', icon: BarChart3 },
 ]

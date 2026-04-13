@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  GoneException,
   HttpCode,
   HttpStatus,
   Post,
@@ -31,16 +30,13 @@ export class WalletController {
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Recharge wallet with payment gateway (DISABLED)' })
-  @ApiResponse({ status: 410, description: 'Wallet recharge disabled' })
+  @ApiOperation({ summary: 'Create wallet recharge payment intent' })
+  @ApiResponse({ status: 200, description: 'Wallet recharge intent created' })
   async rechargeWallet(
     @CurrentUser() user: User,
     @Body() dto: RechargeWalletDto,
   ) {
-    // Feature disabled: allow only converting points to wallet (loyalty redeem)
-    throw new GoneException(
-      'Wallet recharge is disabled. Use points conversion instead.',
-    );
+    return this.walletService.createRechargeIntent(user.id, dto);
   }
 
   @Get('me')

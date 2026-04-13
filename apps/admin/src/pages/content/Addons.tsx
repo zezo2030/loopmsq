@@ -7,11 +7,17 @@ import { useTranslation } from 'react-i18next'
 type Addon = {
   id: string
   name: string
+  category?: string
+  description?: string | null
+  imageUrl?: string | null
   price: number
   defaultQuantity: number
   isActive: boolean
+  metadata?: Record<string, any> | null
   branchId?: string | null
 }
+
+const SPECIAL_ADDON_CATEGORIES = ['event_private', 'event_balloon', 'event_cake', 'event_decor'] as const
 
 export default function Addons() {
   const { t } = useTranslation()
@@ -40,7 +46,12 @@ export default function Addons() {
       const params = new URLSearchParams()
       if (filters.branchId) params.set('branchId', filters.branchId)
       if (typeof filters.isActive === 'boolean') params.set('isActive', String(filters.isActive))
-      return apiGet(`/content/admin/addons${params.toString() ? `?${params}` : ''}`)
+      const allAddons = await apiGet(`/content/admin/addons${params.toString() ? `?${params}` : ''}`)
+      if (!Array.isArray(allAddons)) return []
+      return allAddons.filter((addon: Addon) => {
+        const category = addon.category || 'general'
+        return !SPECIAL_ADDON_CATEGORIES.includes(category as (typeof SPECIAL_ADDON_CATEGORIES)[number])
+      })
     },
   })
 
@@ -60,6 +71,8 @@ export default function Addons() {
   const columns = [
     { title: t('common.name') || 'Name', dataIndex: 'name' },
     { title: t('common.price') || 'Price', dataIndex: 'price', render: (v: number) => Number(v).toFixed(2) },
+    { title: 'Category', dataIndex: 'category', render: (v?: string) => v || 'general' },
+    { title: 'Image', dataIndex: 'imageUrl', render: (v?: string | null) => v ? <a href={v} target="_blank" rel="noreferrer">View</a> : '-' },
     { title: t('addons.default_qty') || 'Default Qty', dataIndex: 'defaultQuantity' },
     { title: t('common.active') || 'Active', dataIndex: 'isActive', render: (v: boolean) => v ? t('common.yes') || 'Yes' : t('common.no') || 'No' },
     { title: t('addons.branch') || 'Branch', dataIndex: 'branchId', render: (v?: string) => {
@@ -125,6 +138,19 @@ export default function Addons() {
           <Form.Item name="name" label={t('common.name') || 'Name'} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
+          <Form.Item name="category" label="Category" initialValue="general">
+            <Select
+              options={[
+                { value: 'general', label: 'General' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="description" label="Description">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item name="imageUrl" label="Image URL">
+            <Input />
+          </Form.Item>
           <Form.Item name="price" label={t('common.price') || 'Price'} rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} step={0.5} />
           </Form.Item>
@@ -149,5 +175,3 @@ export default function Addons() {
     </div>
   )
 }
-
-

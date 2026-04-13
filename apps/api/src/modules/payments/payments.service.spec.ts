@@ -3,6 +3,12 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
+import { OfferBooking } from '../../database/entities/offer-booking.entity';
+import {
+  OfferCategory,
+  OfferProduct,
+} from '../../database/entities/offer-product.entity';
+import { OfferTicket } from '../../database/entities/offer-ticket.entity';
 import {
   Payment,
   PaymentMethod,
@@ -15,7 +21,9 @@ import { RedisService } from '../../utils/redis.service';
 import { BookingsService } from '../bookings/bookings.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { OfferBookingsService } from '../offer-bookings/offer-bookings.service';
 import { ReferralsService } from '../referrals/referrals.service';
+import { SubscriptionPurchasesService } from '../subscription-purchases/subscription-purchases.service';
 import { WalletService } from '../wallet/wallet.service';
 import { PaymentsService } from './payments.service';
 
@@ -24,6 +32,10 @@ describe('PaymentsService', () => {
   let paymentRepo: jest.Mocked<Repository<Payment>>;
   let bookingRepo: jest.Mocked<Repository<Booking>>;
   let moyasarService: { retrievePayment: jest.Mock };
+  let qrCodeServiceMock: {
+    generateOfferTicketToken: jest.Mock;
+    hashToken: jest.Mock;
+  };
   let queryRunner: {
     connect: jest.Mock;
     startTransaction: jest.Mock;
@@ -115,6 +127,15 @@ describe('PaymentsService', () => {
       retrievePayment: jest.fn(),
     };
 
+    qrCodeServiceMock = {
+      generateOfferTicketToken: jest
+        .fn()
+        .mockImplementation((value: string) => `token:${value}`),
+      hashToken: jest
+        .fn()
+        .mockImplementation((value: string) => `hash:${value}`),
+    };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         PaymentsService,
@@ -130,7 +151,9 @@ describe('PaymentsService', () => {
         { provide: BookingsService, useValue: bookingsMock },
         { provide: MoyasarService, useValue: moyasarService },
         { provide: WalletService, useValue: {} },
-        { provide: QRCodeService, useValue: {} },
+        { provide: QRCodeService, useValue: qrCodeServiceMock },
+        { provide: OfferBookingsService, useValue: {} },
+        { provide: SubscriptionPurchasesService, useValue: {} },
       ],
     }).compile();
 
@@ -157,6 +180,116 @@ describe('PaymentsService', () => {
     expect(res.paymentId).toBe('internal-payment-1');
     expect(res.chargeId).toBe('');
     expect(res.status).toBe(PaymentStatus.PROCESSING);
+  });
+
+  it('creates offer-product intent using base price plus selected add-ons', async () => {
+    const offerRepo = {
+      findOne: jest.fn().mockResolvedValue({
+        id: 'offer-1',
+        isActive: true,
+        price: 100,
+        includedAddOns: [
+          { addonId: 'meal', name: 'Meal', price: 25 },
+          { addonId: 'drink', name: 'Drink', price: 10 },
+        ],
+      } as OfferProduct),
+    };
+
+    ((service as any).dataSource.getRepository as jest.Mock).mockImplementation(
+      (entity: unknown) => {
+        if (entity === OfferProduct) return offerRepo;
+        return {};
+      },
+    );
+
+    const res = await service.createIntent('user-1', {
+      offerProductId: 'offer-1',
+      acceptedTerms: true,
+      addOns: [
+        { id: 'meal', quantity: 2 },
+        { id: 'drink', quantity: 1 },
+      ],
+      method: PaymentMethod.CREDIT_CARD,
+    });
+
+    expect(res.amount).toBe(160);
+    expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      Payment,
+      expect.objectContaining({
+        amount: 160,
+      }),
+    );
+  });
+
+  it('seeds qrTokenHash before inserting offer tickets in post-payment booking creation', async () => {
+    const offerRepo = {
+      findOne: jest.fn().mockResolvedValue({
+        id: 'offer-1',
+        branchId: 'branch-1',
+        title: 'Lunch Offer',
+        description: 'desc',
+        imageUrl: null,
+        termsAndConditions: 'terms',
+        offerCategory: OfferCategory.TICKET_BASED,
+        ticketConfig: null,
+        hoursConfig: null,
+        includedAddOns: [],
+        price: 100,
+        currency: 'SAR',
+        isActive: true,
+        canRepeatInSameOrder: true,
+      } as OfferProduct),
+    };
+    const bookingRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((data) => data),
+      save: jest.fn().mockImplementation(async (booking) => ({
+        id: 'booking-1',
+        ...booking,
+      })),
+    };
+    const ticketRepo = {
+      create: jest.fn((data) => data),
+      save: jest
+        .fn()
+        .mockImplementationOnce(async (ticket) => ({
+          id: 'ticket-1',
+          ...ticket,
+        }))
+        .mockImplementationOnce(async (ticket) => ticket),
+    };
+    const paymentQueryRunner = {
+      manager: {
+        getRepository: jest.fn((entity) => {
+          if (entity === OfferProduct) return offerRepo;
+          if (entity === OfferBooking) return bookingRepo;
+          if (entity === OfferTicket) return ticketRepo;
+          return null;
+        }),
+      },
+    };
+
+    await (service as any).createOfferBookingAfterPayment(
+      paymentQueryRunner,
+      'user-1',
+      {
+        offerProductId: 'offer-1',
+        acceptedTerms: true,
+        addOns: [],
+      },
+    );
+
+    expect(ticketRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        qrTokenHash: expect.stringMatching(/^hash:token:pending-/),
+      }),
+    );
+    expect(ticketRepo.save).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        qrTokenHash: 'hash:token:ticket-1',
+      }),
+    );
   });
 
   it('confirms a booking payment after verifying the external Moyasar payment', async () => {

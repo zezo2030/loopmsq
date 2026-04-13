@@ -15,8 +15,8 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return running API message', () => {
+      expect(appController.getHello()).toBe('Booking Platform API is running!');
     });
   });
 });

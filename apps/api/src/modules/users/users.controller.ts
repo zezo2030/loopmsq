@@ -22,6 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -34,6 +35,22 @@ import { User } from '../../database/entities/user.entity';
 @ApiBearerAuth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Post()
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Create user (Admin/Branch Manager)' })
+  @ApiResponse({ status: 201, description: 'User created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 409, description: 'Email or phone already exists' })
+  async createUser(
+    @Body() createUserDto: CreateUserDto,
+    @CurrentUser() requester: User,
+  ) {
+    return this.usersService.createUser(createUserDto, requester);
+  }
 
   @Post('staff')
   @UseGuards(RolesGuard)
@@ -48,13 +65,11 @@ export class UsersController {
     @Body() createStaffDto: CreateStaffDto,
     @CurrentUser() requester: User,
   ) {
-    // Branch managers can only create staff/users in their own branch and cannot assign elevated roles
     if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
       if (!requester.branchId) {
         throw new Error('Branch not assigned to requester');
       }
       createStaffDto.branchId = requester.branchId as any;
-      // Limit roles to staff or user only
       const allowed = new Set([UserRole.STAFF, UserRole.USER]);
       createStaffDto.roles = (createStaffDto.roles || []).filter((r) =>
         allowed.has(r),

@@ -12,6 +12,7 @@ import * as bcrypt from 'bcryptjs';
 import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { CreateStaffDto } from './dto/create-staff.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { EncryptionService } from '../../utils/encryption.util';
 import { UserRole } from '../../common/decorators/roles.decorator';
@@ -125,6 +126,85 @@ export class UsersService {
       name: savedUser.name,
       roles: savedUser.roles,
       phone: phone,
+      language: savedUser.language,
+      isActive: savedUser.isActive,
+      createdAt: savedUser.createdAt,
+    };
+  }
+
+  async createUser(
+    createUserDto: CreateUserDto,
+    requester?: User,
+  ): Promise<Partial<User>> {
+    const { phone, name, email, password, language = 'ar' } = createUserDto;
+
+    if (phone) {
+      const encryptedPhone = this.encryptionService.encrypt(phone);
+      const existingPhoneUser = await this.userRepository.findOne({
+        where: { phone: encryptedPhone },
+      });
+      if (existingPhoneUser) {
+        throw new ConflictException('Phone number already exists');
+      }
+    }
+
+    if (email) {
+      const existingUser = await this.userRepository.findOne({
+        where: { email },
+      });
+      if (existingUser) {
+        throw new ConflictException('Email already exists');
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    const user = this.userRepository.create({
+      phone: phone ? this.encryptionService.encrypt(phone) : undefined,
+      name,
+      email,
+      passwordHash,
+      roles: [UserRole.USER],
+      language,
+      isActive: true,
+    });
+
+    let savedUser: User;
+    try {
+      savedUser = await this.userRepository.save(user);
+    } catch (e: any) {
+      if (e?.code === '23505') {
+        throw new ConflictException('Email or phone already exists');
+      }
+      if (e?.code === '22P02') {
+        throw new BadRequestException('Invalid input format');
+      }
+      throw e;
+    }
+
+    const wallet = this.walletRepository.create({
+      userId: savedUser.id,
+      balance: 0,
+      loyaltyPoints: 0,
+    });
+    try {
+      await this.walletRepository.save(wallet);
+    } catch (e: any) {
+      this.logger.error(
+        `Wallet creation failed for user ${savedUser.id}: ${e?.message || e}`,
+      );
+    }
+
+    this.logger.log(
+      `User created: ${savedUser.id} by ${requester?.id || 'system'}`,
+    );
+
+    return {
+      id: savedUser.id,
+      phone: phone,
+      email: savedUser.email,
+      name: savedUser.name,
+      roles: savedUser.roles,
       language: savedUser.language,
       isActive: savedUser.isActive,
       createdAt: savedUser.createdAt,

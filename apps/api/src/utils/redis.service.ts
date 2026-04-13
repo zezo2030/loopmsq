@@ -35,7 +35,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Reset-password OTP (separate key to avoid conflict with login/register OTP)
-  async setResetOTP(phone: string, otp: string, ttl: number = 300): Promise<void> {
+  async setResetOTP(
+    phone: string,
+    otp: string,
+    ttl: number = 300,
+  ): Promise<void> {
     await this.client.setex(`otp_reset:${phone}`, ttl, otp);
   }
 

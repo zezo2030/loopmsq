@@ -4,6 +4,7 @@ import {
   ConflictException,
   Logger,
   BadRequestException,
+  GoneException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,6 +13,10 @@ import { Branch } from '../../database/entities/branch.entity';
 import { Addon } from '../../database/entities/addon.entity';
 import { Offer } from '../../database/entities/offer.entity';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
+import {
+  EventRequest,
+  EventRequestStatus,
+} from '../../database/entities/event-request.entity';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { RedisService } from '../../utils/redis.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
@@ -32,6 +37,8 @@ export class ContentService {
     private offerRepository: Repository<Offer>,
     @InjectRepository(Booking)
     private bookingRepository: Repository<Booking>,
+    @InjectRepository(EventRequest)
+    private eventRequestRepository: Repository<EventRequest>,
     private redisService: RedisService,
     private configService: ConfigService,
     private realtime: RealtimeGateway,
@@ -53,6 +60,38 @@ export class ContentService {
 
   private calculateBookingEnd(start: Date, durationHours: number): Date {
     return new Date(start.getTime() + durationHours * 60 * 60 * 1000);
+  }
+
+  private async getActiveEventBlocks(
+    branchId: string,
+    searchStart: Date,
+    searchEnd: Date,
+  ): Promise<{ start: Date; end: Date }[]> {
+    const activeStatuses = [
+      EventRequestStatus.QUOTED,
+      EventRequestStatus.DEPOSIT_PAID,
+      EventRequestStatus.PAID,
+      EventRequestStatus.CONFIRMED,
+    ];
+
+    const events = await this.eventRequestRepository
+      .createQueryBuilder('event')
+      .where('event.branchId = :branchId', { branchId })
+      .andWhere('event.status IN (:...statuses)', { statuses: activeStatuses })
+      .andWhere('event.startTime < :searchEnd', { searchEnd })
+      .andWhere(
+        "(event.startTime + (event.durationHours || ' hours')::interval) > :searchStart",
+        { searchStart },
+      )
+      .getMany();
+
+    return events.map((event) => ({
+      start: new Date(event.startTime),
+      end: this.calculateBookingEnd(
+        new Date(event.startTime),
+        event.durationHours,
+      ),
+    }));
   }
 
   private countConsecutiveSlots(
@@ -91,7 +130,6 @@ export class ContentService {
     const {
       hallName_ar,
       hallName_en,
-      hallPriceConfig,
       hallCapacity,
       hallIsDecorated,
       hallDescription_ar,
@@ -105,9 +143,6 @@ export class ContentService {
     // Create branch with hall data merged
     const branch = this.branchRepository.create({
       ...branchData,
-      priceConfig: hallPriceConfig || {
-        hourlyRate: 100,
-      },
       isDecorated: hallIsDecorated ?? false,
       hallFeatures: hallFeatures || [],
       hallImages: hallImages || [],
@@ -196,7 +231,12 @@ export class ContentService {
       const now = new Date();
       const offers = await this.offerRepository.find({
         where: [
-          { branchId: id, isActive: true, startsAt: IsNull(), endsAt: IsNull() },
+          {
+            branchId: id,
+            isActive: true,
+            startsAt: IsNull(),
+            endsAt: IsNull(),
+          },
           {
             branchId: id,
             isActive: true,
@@ -252,7 +292,6 @@ export class ContentService {
     const {
       hallName_ar,
       hallName_en,
-      hallPriceConfig,
       hallCapacity,
       hallIsDecorated,
       hallDescription_ar,
@@ -267,11 +306,6 @@ export class ContentService {
     Object.assign(branch, branchData);
 
     // Update hall data if provided
-    if (hallPriceConfig) {
-      branch.priceConfig = {
-        hourlyRate: hallPriceConfig.hourlyRate,
-      };
-    }
     if (hallIsDecorated !== undefined) branch.isDecorated = hallIsDecorated;
     if (hallFeatures) branch.hallFeatures = hallFeatures;
     if (hallImages) branch.hallImages = hallImages;
@@ -508,7 +542,14 @@ export class ContentService {
           status: In(statuses),
           startTime: Between(searchStart, searchEnd),
         },
-        select: ['id', 'startTime', 'durationHours', 'status', 'persons'],
+        select: [
+          'id',
+          'startTime',
+          'durationHours',
+          'status',
+          'persons',
+          'metadata',
+        ],
       });
 
       let hasOverlap = false;
@@ -526,10 +567,31 @@ export class ContentService {
             `Overlap detected with booking ${booking.id}: ${booking.startTime.toISOString()} - ${bookingEnd.toISOString()}`,
           );
           hasOverlap = true;
-          // Sum persons for a conservative capacity check
+          // If this booking was created from a private event, treat as exclusive block
+          const metadata = booking.metadata;
+          if (metadata?.eventRequestId) {
+            totalOverlappingPersons = Infinity;
+            return;
+          }
           totalOverlappingPersons += (booking as any).persons ?? 0;
         }
       });
+
+      // Check for active event requests that exclusively block the slot
+      const eventBlocks = await this.getActiveEventBlocks(
+        branchId,
+        searchStart,
+        searchEnd,
+      );
+      const hasEventConflict = eventBlocks.some(
+        (block) => block.start < requestEnd && block.end > startTime,
+      );
+      if (hasEventConflict) {
+        this.logger.log(
+          `Time slot blocked by an active private event for branch ${branchId}`,
+        );
+        return false;
+      }
 
       // Capacity-aware: only block if capacity would be exceeded
       if (hasOverlap) {
@@ -686,7 +748,7 @@ export class ContentService {
           status: In(statuses),
           startTime: Between(searchStart, searchEnd),
         },
-        select: ['id', 'startTime', 'durationHours', 'persons'],
+        select: ['id', 'startTime', 'durationHours', 'persons', 'metadata'],
       });
 
       const normalizedBookings = existingBookings.map((booking) => {
@@ -696,14 +758,43 @@ export class ContentService {
           start: bookingStart,
           end: this.calculateBookingEnd(bookingStart, booking.durationHours),
           persons: (booking as any).persons ?? 0,
+          metadata: booking.metadata,
         };
       });
+
+      // Fetch active event blocks for exclusive time slot blocking
+      const eventBlocks = await this.getActiveEventBlocks(
+        branchId,
+        searchStart,
+        searchEnd,
+      );
 
       const reqPersons = Math.max(1, persons ?? 1);
 
       const canFitAt = (slotStart: Date, slotEnd: Date): boolean => {
+        // Exclusive block: any active private event overlapping this slot
+        const blockedByEvent = eventBlocks.some(
+          (block) => block.start < slotEnd && block.end > slotStart,
+        );
+        if (blockedByEvent) return false;
+
+        // Check for bookings created from events (metadata.eventRequestId)
+        const blockedByEventBooking = normalizedBookings.some(
+          (b) =>
+            b.start < slotEnd &&
+            b.end > slotStart &&
+            b.metadata?.eventRequestId != null,
+        );
+        if (blockedByEventBooking) return false;
+
+        // Existing capacity-based check for regular bookings
         const overlappingPersons = normalizedBookings
-          .filter((b) => b.start < slotEnd && b.end > slotStart)
+          .filter(
+            (b) =>
+              b.start < slotEnd &&
+              b.end > slotStart &&
+              !b.metadata?.eventRequestId,
+          )
           .reduce((sum, b) => sum + (b.persons || 0), 0);
         const remaining = (branch.capacity ?? 0) - overlappingPersons;
         return remaining >= reqPersons;
@@ -764,13 +855,20 @@ export class ContentService {
     persons: number;
     durationPricePerPerson: number;
   }> {
+    void branchId;
+    void startTime;
+    void durationHours;
+    void persons;
+    throw new GoneException(
+      'Branch pricing has been removed. Use branch offers instead.',
+    );
     const branch = await this.findBranchById(branchId);
-    if (!branch.priceConfig) {
+    if (!(branch as any).priceConfig) {
       throw new BadRequestException(
         'Branch does not have pricing configuration',
       );
     }
-    const { priceConfig } = branch;
+    const { priceConfig } = branch as any;
 
     // hourlyRate = price per person per hour (one ticket-hour unit)
     // Base hall amount = hourlyRate × durationHours × persons (ticket count)
@@ -793,37 +891,63 @@ export class ContentService {
   }
 
   // Add-ons fetching
-  async getBranchAddOns(
-    branchId: string,
-  ): Promise<
-    { id: string; name: string; price: number; defaultQuantity: number }[]
+  async getBranchAddOns(branchId?: string): Promise<
+    {
+      id: string;
+      name: string;
+      category: string;
+      description: string | null;
+      imageUrl: string | null;
+      price: number;
+      defaultQuantity: number;
+      metadata: Record<string, unknown> | null;
+    }[]
   > {
-    // Pull active add-ons for the branch
+    const where = branchId
+      ? [
+          { isActive: true, branchId },
+          { isActive: true, branchId: IsNull() },
+        ]
+      : [{ isActive: true, branchId: IsNull() }];
+
     const branchAddons = await this.addonRepository.find({
-      where: { isActive: true, branchId },
+      where,
+      order: { createdAt: 'DESC' },
     });
 
     return branchAddons.map((a) => ({
       id: a.id,
       name: a.name,
+      category: a.category || 'general',
+      description: a.description ?? null,
+      imageUrl: a.imageUrl ?? null,
       price: Number(a.price),
       defaultQuantity: a.defaultQuantity || 1,
+      metadata: a.metadata ?? null,
     }));
   }
 
   // Admin: CRUD for Addons
   async createAddon(data: {
     name: string;
+    category?: string;
+    description?: string;
+    imageUrl?: string;
     price: number;
     defaultQuantity?: number;
     isActive?: boolean;
+    metadata?: Record<string, unknown>;
     branchId?: string | null;
   }): Promise<Addon> {
     const addon = this.addonRepository.create({
       name: data.name,
+      category: data.category ?? 'general',
+      description: data.description ?? null,
+      imageUrl: data.imageUrl ?? null,
       price: data.price,
       defaultQuantity: data.defaultQuantity ?? 1,
       isActive: data.isActive ?? true,
+      metadata: data.metadata ?? null,
       branchId: data.branchId ?? null,
     });
     return this.addonRepository.save(addon);

@@ -31,6 +31,22 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
+  @Get('config')
+  @ApiOperation({ summary: 'Get private event booking config' })
+  @ApiQuery({ name: 'branchId', required: false, type: String })
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    type: String,
+    description: 'YYYY-MM-DD. When provided, returns only available slots',
+  })
+  getConfig(
+    @Query('branchId') branchId?: string,
+    @Query('date') date?: string,
+  ) {
+    return this.eventsService.getPublicConfig(branchId, date);
+  }
+
   @Post('requests')
   @ApiOperation({ summary: 'Create event request' })
   createRequest(@CurrentUser() user: any, @Body() dto: CreateEventRequestDto) {

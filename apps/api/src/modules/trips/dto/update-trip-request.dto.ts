@@ -72,7 +72,7 @@ export class UpdateTripRequestDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @Length(1, 10)
+  @Length(1, 50)
   preferredTime?: string;
 
   @ApiPropertyOptional()
@@ -81,23 +81,6 @@ export class UpdateTripRequestDto {
   @Min(1)
   @Max(24)
   durationHours?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @Length(2, 100)
-  contactPersonName?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @Length(5, 20)
-  contactPhone?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsEmail()
-  contactEmail?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -111,4 +94,13 @@ export class UpdateTripRequestDto {
   @ValidateNested({ each: true })
   @Type(() => UpdateAddOnDto)
   addOns?: UpdateAddOnDto[];
+
+  @ApiPropertyOptional({
+    description: 'Payment option for school trip booking',
+    enum: ['full', 'deposit'],
+  })
+  @IsOptional()
+  @IsString()
+  @Length(4, 20)
+  paymentOption?: string;
 }

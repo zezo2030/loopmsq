@@ -37,7 +37,7 @@ import {
 } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
 import '../../theme.css'
-import { formatTimeAr } from '../../utils/formatDateTimeDisplay'
+import { formatDateAr, formatLongDateAr, formatTimeAr } from '../../utils/formatDateTimeDisplay'
 
 type EventRequest = {
   id: string
@@ -75,7 +75,16 @@ type EventRequest = {
     quantity: number
   }>
   notes?: string
-  status: 'draft' | 'submitted' | 'under_review' | 'quoted' | 'invoiced' | 'paid' | 'confirmed' | 'rejected'
+  status:
+    | 'draft'
+    | 'submitted'
+    | 'under_review'
+    | 'quoted'
+    | 'invoiced'
+    | 'deposit_paid'
+    | 'paid'
+    | 'confirmed'
+    | 'rejected'
   quotedPrice?: number
   paymentMethod?: string
   createdAt: string
@@ -123,8 +132,12 @@ export default function EventDetail() {
       const eventData = await apiGet<EventRequest>(`/events/admin/${id}`)
       setEvent(eventData)
 
-      // Load tickets if event is paid or confirmed
-      if (eventData.status === 'paid' || eventData.status === 'confirmed') {
+      // Load tickets once payment is received (deposit/full) or confirmed
+      if (
+        eventData.status === 'deposit_paid' ||
+        eventData.status === 'paid' ||
+        eventData.status === 'confirmed'
+      ) {
         try {
           const ticketsData = await apiGet<Ticket[]>(`/events/requests/${id}/tickets`)
           setTickets(ticketsData || [])
@@ -190,6 +203,7 @@ export default function EventDetail() {
       case 'under_review': return 'warning'
       case 'quoted': return 'purple'
       case 'invoiced': return 'geekblue'
+      case 'deposit_paid': return 'blue'
       case 'paid': return 'cyan'
       case 'rejected': return 'error'
       case 'draft': return 'default'
@@ -204,6 +218,7 @@ export default function EventDetail() {
       case 'under_review': return 'قيد المراجعة'
       case 'quoted': return 'تم التسعير'
       case 'invoiced': return 'تم إرسال الفاتورة'
+      case 'deposit_paid': return 'تم دفع العربون'
       case 'paid': return 'تم الدفع'
       case 'confirmed': return 'مؤكد'
       case 'rejected': return 'مرفوض'
@@ -242,8 +257,9 @@ export default function EventDetail() {
       case 'quoted':
         return 1
       case 'invoiced':
+      case 'deposit_paid':
       case 'paid':
-        return 2
+        return 3
       case 'confirmed':
         return 3
       case 'rejected':
@@ -284,7 +300,7 @@ export default function EventDetail() {
       title: 'تاريخ الاستخدام',
       key: 'usage',
       render: () => (
-        <span>{event ? new Date(event.startTime).toLocaleDateString('ar-SA', { calendar: 'gregory' }) : ''}</span>
+        <span>{event ? formatDateAr(event.startTime) : ''}</span>
       )
     }
   ]
@@ -333,7 +349,12 @@ export default function EventDetail() {
                 status={
                   event.status === 'confirmed'
                     ? 'success'
-                    : event.status === 'quoted' || event.status === 'paid' || event.status === 'submitted' || event.status === 'under_review' || event.status === 'invoiced'
+                    : event.status === 'quoted' ||
+                      event.status === 'deposit_paid' ||
+                      event.status === 'paid' ||
+                      event.status === 'submitted' ||
+                      event.status === 'under_review' ||
+                      event.status === 'invoiced'
                     ? 'processing'
                     : event.status === 'rejected'
                     ? 'error'
@@ -341,6 +362,11 @@ export default function EventDetail() {
                 }
                 text={getStatusText(event.status)}
               />
+              {event.status === 'deposit_paid' && (
+                <Tag color="blue" style={{ borderRadius: '999px' }}>
+                  الحجز مؤكد بعربون
+                </Tag>
+              )}
             </Space>
             <p className="page-subtitle">
               <span style={{ fontSize: '18px', marginRight: '8px' }}>
@@ -492,13 +518,7 @@ export default function EventDetail() {
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <div>
                     <div style={{ fontWeight: '600', fontSize: '16px', color: '#1890ff' }}>
-                      {new Date(event.startTime).toLocaleDateString('ar-SA', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        calendar: 'gregory'
-                      })}
+                      {formatLongDateAr(event.startTime)}
                     </div>
                     <div style={{ fontSize: '18px', fontWeight: '600', marginTop: '4px' }}>
                       {formatTimeAr(event.startTime)}
@@ -617,14 +637,21 @@ export default function EventDetail() {
                       >
                         {getStatusText(event.status)}
                       </Tag>
+                      {event.status === 'deposit_paid' && (
+                        <div style={{ marginTop: '10px' }}>
+                          <Tag color="blue" style={{ borderRadius: '999px' }}>
+                            الحجز مؤكد بعربون
+                          </Tag>
+                        </div>
+                      )}
                     </div>
                     
                     <Descriptions column={1} size="small">
                       <Descriptions.Item label="تاريخ الإنشاء">
-                        {new Date(event.createdAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
+                        {formatDateAr(event.createdAt)}
                       </Descriptions.Item>
                       <Descriptions.Item label="آخر تحديث">
-                        {new Date(event.updatedAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
+                        {formatDateAr(event.updatedAt)}
                       </Descriptions.Item>
                       {event.paymentMethod && (
                         <Descriptions.Item label="طريقة الدفع">

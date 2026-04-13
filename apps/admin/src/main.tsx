@@ -15,6 +15,7 @@ import ClientsList from './pages/users/ClientsList'
 import UserDetail from './pages/users/UserDetail'
 import CreateStaff from './pages/users/CreateStaff'
 import CreateBranchManager from './pages/users/CreateBranchManager'
+import CreateUser from './pages/users/CreateUser'
 import BookingsList from './pages/bookings/BookingsList'
 import BookingDetail from './pages/bookings/BookingDetail'
 import CreateFreeTicket from './pages/bookings/CreateFreeTicket'
@@ -25,6 +26,8 @@ import EventDetail from './pages/events/EventDetail'
 import Notifications from './pages/notifications/Notifications'
 import Banners from './pages/cms/Banners'
 import Offers from './pages/cms/Offers'
+import OfferProducts from './pages/cms/OfferProducts'
+import SubscriptionPlans from './pages/cms/SubscriptionPlans'
 import Coupons from './pages/cms/Coupons'
 import Packages from './pages/cms/Packages'
 import Activities from './pages/cms/Activities'
@@ -32,11 +35,17 @@ import OrganizingBranches from './pages/cms/OrganizingBranches'
 import IntroVideo from './pages/cms/IntroVideo'
 import PaymentsList from './pages/finance/PaymentsList'
 import PaymentDetail from './pages/finance/PaymentDetail'
+import SubscriptionsList from './pages/transactions/SubscriptionsList'
+import OfferBookingsList from './pages/transactions/OfferBookingsList'
+import SubscriptionDetail from './pages/transactions/SubscriptionDetail'
+import OfferBookingDetail from './pages/transactions/OfferBookingDetail'
 import Loyalty from './pages/marketing/Loyalty'
 import Referrals from './pages/marketing/Referrals'
 import WalletsList from './pages/finance/WalletsList'
 import Branches from './pages/content/Branches'
 import Addons from './pages/content/Addons'
+import SchoolAddons from './pages/content/SchoolAddons'
+import PrivateEventAddons from './pages/content/PrivateEventAddons'
 import Reviews from './pages/feedback/Reviews'
 import Tickets from './pages/support/Tickets'
 import ReportsOverview from './pages/reports/Overview'
@@ -48,8 +57,12 @@ import NotFound from './pages/NotFound'
 import BranchDashboard from './pages-branch/Dashboard'
 import BranchInfo from './pages-branch/branch/BranchInfo'
 import BranchBookings from './pages-branch/bookings/BookingsList'
+import BranchOfferBookings from './pages-branch/offer-bookings/OfferBookingsList'
+import BranchOfferBookingDetail from './pages-branch/offer-bookings/OfferBookingDetail'
 import BranchStaff from './pages-branch/staff/StaffList'
 import BranchReports from './pages-branch/reports/Overview'
+import BranchSubscriptions from './pages-branch/subscriptions/SubscriptionsList'
+import BranchSubscriptionDetail from './pages-branch/subscriptions/SubscriptionDetail'
 import { useAuth } from './shared/auth'
 
 function RequireRoles(props: { roles: string[]; element: any }) {
@@ -81,6 +94,7 @@ const router = createBrowserRouter([
           { path: 'users', element: <UsersList /> },
           { path: 'users/:id', element: <UserDetail /> },
           { path: 'clients', element: <ClientsList /> },
+          { path: 'clients/new', element: <CreateUser /> },
           { path: 'staff/new', element: <CreateStaff /> },
           { path: 'branch-managers/new', element: <CreateBranchManager /> },
       
@@ -103,6 +117,8 @@ const router = createBrowserRouter([
           // CMS
           { path: 'cms/banners', element: <Banners /> },
           { path: 'cms/offers', element: <Offers /> },
+          { path: 'cms/offer-products', element: <OfferProducts /> },
+          { path: 'cms/subscription-plans', element: <SubscriptionPlans /> },
           { path: 'cms/coupons', element: <Coupons /> },
           { path: 'cms/packages', element: <Packages /> },
           { path: 'cms/activities', element: <Activities /> },
@@ -112,11 +128,17 @@ const router = createBrowserRouter([
           // Content
           { path: 'content/branches', element: <Branches /> },
           { path: 'content/addons', element: <Addons /> },
+          { path: 'content/school-addons', element: <SchoolAddons /> },
+          { path: 'content/private-event-addons', element: <PrivateEventAddons /> },
 
           // Finance
           { path: 'finance/payments', element: <PaymentsList /> },
           { path: 'finance/payments/:id', element: <PaymentDetail /> },
           { path: 'finance/wallets', element: <WalletsList /> },
+          { path: 'finance/subscriptions', element: <SubscriptionsList /> },
+          { path: 'finance/subscriptions/:id', element: <SubscriptionDetail /> },
+          { path: 'finance/offer-bookings', element: <OfferBookingsList /> },
+          { path: 'finance/offer-bookings/:id', element: <OfferBookingDetail /> },
 
           // Marketing
           { path: 'marketing/loyalty', element: <Loyalty /> },
@@ -140,6 +162,10 @@ const router = createBrowserRouter([
           { path: 'offers', element: <Offers /> },
           { path: 'coupons', element: <Coupons /> },
           { path: 'bookings', element: <BranchBookings /> },
+          { path: 'offer-bookings', element: <BranchOfferBookings /> },
+          { path: 'offer-bookings/:id', element: <BranchOfferBookingDetail /> },
+          { path: 'subscriptions', element: <BranchSubscriptions /> },
+          { path: 'subscriptions/:id', element: <BranchSubscriptionDetail /> },
           { path: 'staff', element: <BranchStaff /> },
           { path: 'reports', element: <BranchReports /> },
           { path: '*', element: <NotFound /> },

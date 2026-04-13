@@ -70,6 +70,9 @@ export class Booking {
   @Column({ type: 'varchar', length: 20, nullable: true })
   contactPhone: string;
 
+  @Column({ type: 'json', nullable: true })
+  metadata: Record<string, unknown> | null;
+
   @Column({ type: 'timestamp', nullable: true })
   cancelledAt: Date;
 

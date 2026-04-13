@@ -143,9 +143,14 @@ export class AuthController {
 
   @Post('forgot-password/otp/send')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send OTP to reset password (phone must be registered)' })
+  @ApiOperation({
+    summary: 'Send OTP to reset password (phone must be registered)',
+  })
   @ApiResponse({ status: 200, description: 'OTP sent successfully' })
-  @ApiResponse({ status: 400, description: 'Phone not registered or OTP disabled' })
+  @ApiResponse({
+    status: 400,
+    description: 'Phone not registered or OTP disabled',
+  })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async forgotPasswordSendOtp(@Body() dto: ForgotPasswordSendOtpDto) {
     return this.authService.forgotPasswordSendOtp(dto);

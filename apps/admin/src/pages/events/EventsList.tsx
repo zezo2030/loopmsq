@@ -17,7 +17,7 @@ import {
 } from '@ant-design/icons'
 import { apiGet } from '../../api'
 import '../../theme.css'
-import { formatTimeAr } from '../../utils/formatDateTimeDisplay'
+import { formatDateAr, formatTimeAr } from '../../utils/formatDateTimeDisplay'
 
 type EventRequest = {
   id: string
@@ -52,7 +52,16 @@ type EventRequest = {
     quantity: number
   }>
   notes?: string
-  status: 'draft' | 'submitted' | 'under_review' | 'quoted' | 'invoiced' | 'paid' | 'confirmed' | 'rejected'
+  status:
+    | 'draft'
+    | 'submitted'
+    | 'under_review'
+    | 'quoted'
+    | 'invoiced'
+    | 'deposit_paid'
+    | 'paid'
+    | 'confirmed'
+    | 'rejected'
   quotedPrice?: number
   createdAt: string
   updatedAt: string
@@ -215,6 +224,7 @@ export default function EventsList() {
       case 'under_review': return 'warning'
       case 'quoted': return 'purple'
       case 'invoiced': return 'geekblue'
+      case 'deposit_paid': return 'blue'
       case 'paid': return 'cyan'
       case 'rejected': return 'error'
       case 'draft': return 'default'
@@ -229,6 +239,7 @@ export default function EventsList() {
       case 'under_review': return 'قيد المراجعة'
       case 'quoted': return 'تم التسعير'
       case 'invoiced': return 'تم إرسال الفاتورة'
+      case 'deposit_paid': return 'تم دفع العربون'
       case 'paid': return 'تم الدفع'
       case 'confirmed': return 'مؤكد'
       case 'rejected': return 'مرفوض'
@@ -246,6 +257,7 @@ export default function EventsList() {
       case 'quoted':
       case 'invoiced':
         return <FileTextOutlined />
+      case 'deposit_paid':
       case 'paid':
         return <DollarOutlined />
       case 'rejected': 
@@ -326,7 +338,7 @@ export default function EventsList() {
           )}
           <div style={{ display: 'flex', alignItems: 'center', color: '#8c8c8c', fontSize: '12px' }}>
             <CalendarOutlined style={{ marginRight: '6px' }} />
-            {new Date(record.startTime).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
+            {formatDateAr(record.startTime)}
           </div>
           <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
             {formatTimeAr(record.startTime)} ({record.durationHours} ساعات)
@@ -378,6 +390,13 @@ export default function EventsList() {
           >
             {getStatusText(record.status)}
           </Tag>
+          {record.status === 'deposit_paid' && (
+            <div>
+              <Tag color="blue" style={{ borderRadius: '999px' }}>
+                الحجز مؤكد بعربون
+              </Tag>
+            </div>
+          )}
           {record.quotedPrice && (
             <div style={{ 
               fontSize: '14px', 
@@ -396,7 +415,7 @@ export default function EventsList() {
       render: (_: any, record: EventRequest) => (
         <div>
           <div style={{ fontWeight: '600', fontSize: '14px' }}>
-            {new Date(record.createdAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
+            {formatDateAr(record.createdAt)}
           </div>
           <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
             {formatTimeAr(record.createdAt)}
@@ -514,6 +533,7 @@ export default function EventsList() {
                   { label: 'قيد المراجعة', value: 'under_review' },
                   { label: 'تم التسعير', value: 'quoted' },
                   { label: 'تم إرسال الفاتورة', value: 'invoiced' },
+                  { label: 'تم دفع العربون', value: 'deposit_paid' },
                   { label: 'تم الدفع', value: 'paid' },
                   { label: 'مؤكد', value: 'confirmed' },
                   { label: 'مرفوض', value: 'rejected' },

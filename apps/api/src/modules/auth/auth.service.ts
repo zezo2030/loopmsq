@@ -674,9 +674,7 @@ export class AuthService {
     this.logger.log(
       `📱 [RESET PASSWORD OTP] Phone: ${normalizedPhone} | OTP: ${otp}`,
     );
-    console.log(
-      `\n🔐 [RESET PASSWORD] ${normalizedPhone} → OTP: ${otp}\n`,
-    );
+    console.log(`\n🔐 [RESET PASSWORD] ${normalizedPhone} → OTP: ${otp}\n`);
 
     await this.redisService.setResetOTP(
       normalizedPhone,

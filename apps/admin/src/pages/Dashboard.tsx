@@ -1,16 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Calendar, DollarSign, CheckCircle, XCircle, ChevronRight } from 'lucide-react'
+import { Calendar, DollarSign, CheckCircle, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { apiGet } from '../api'
 import { cn } from '@/lib/utils'
 import { formatDateTimeAr } from '@/utils/formatDateTimeDisplay'
 
 export default function Dashboard() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const [overviewAll, setOverviewAll] = useState<{
     bookings: { total: number; confirmed: number; cancelled: number }
     scans: number
@@ -134,18 +131,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/admin/bookings/free-ticket')}
-              className="border-primary text-primary hover:bg-primary/5"
-            >
-              <Calendar className="h-4 w-4" />
-              {t('dashboard.free_ticket')}
-            </Button>
-            <Button onClick={() => navigate('/admin/bookings')}>
-              <Calendar className="h-4 w-4" />
-              {t('dashboard.go_bookings') || 'الانتقال إلى الحجوزات'}
-            </Button>
+            
           </div>
         </div>
       </div>
@@ -246,13 +232,7 @@ export default function Dashboard() {
               <CardTitle className="text-lg font-bold text-slate-900">
                 {t('dashboard.recent_activity') || 'آخر الأنشطة'}
               </CardTitle>
-              <Button
-                variant="link"
-                className="font-medium text-primary h-auto p-0"
-                onClick={() => navigate('/admin/bookings')}
-              >
-                {t('common.view_all') || 'عرض الكل'} <ChevronRight className="h-4 w-4" />
-              </Button>
+
             </CardHeader>
             <CardContent>
               <div className="space-y-0">

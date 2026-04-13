@@ -33,16 +33,19 @@ export class LoyaltyController {
     return this.loyalty.getSummary(user.id);
   }
 
-  @Post('redeem')
+  @Post('redeem-ticket')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Redeem points for current user' })
-  async redeem(@CurrentUser() user: User, @Body() body: { points: number }) {
-    return this.loyalty.redeemPoints(user.id, body.points);
+  @ApiOperation({ summary: 'Redeem loyalty points for a free ticket' })
+  async redeemTicket(
+    @CurrentUser() user: User,
+    @Body() body: { branchId: string },
+  ) {
+    return this.loyalty.redeemForTicket(user.id, body.branchId);
   }
 
-  // Admin endpoints (assume guarded by roles at controller level later)
+  // Admin endpoints
   @Get('rules')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -61,8 +64,7 @@ export class LoyaltyController {
     @Body()
     body: {
       earnRate?: number;
-      redeemRate?: number;
-      minRedeemPoints?: number;
+      pointsPerTicket?: number;
       isActive?: boolean;
     },
   ) {
@@ -90,8 +92,7 @@ export class LoyaltyController {
     @Body()
     body: {
       earnRate?: number;
-      redeemRate?: number;
-      minRedeemPoints?: number;
+      pointsPerTicket?: number;
       isActive?: boolean;
     },
   ) {

@@ -7,19 +7,10 @@ import {
   IsEnum,
   IsNumber,
   IsBoolean,
-  ValidateNested,
+  Min,
+  Max,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-
-class PriceConfigDto {
-  @ApiProperty({
-    description: 'Price per person per hour (SAR); total base = rate × hours × persons',
-    example: 100,
-  })
-  @IsNumber()
-  hourlyRate: number;
-}
 
 export class CreateBranchDto {
   @ApiProperty({
@@ -146,7 +137,6 @@ export class CreateBranchDto {
   @IsString()
   videoCoverUrl?: string;
 
-  // Hall fields (optional - hall will be created automatically with defaults if not provided)
   @ApiProperty({
     description: 'Hall name in Arabic',
     example: 'قاعة الاحتفالات',
@@ -164,16 +154,6 @@ export class CreateBranchDto {
   @IsOptional()
   @IsString()
   hallName_en?: string;
-
-  @ApiProperty({
-    description: 'Hall pricing configuration',
-    type: PriceConfigDto,
-    required: false,
-  })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => PriceConfigDto)
-  hallPriceConfig?: PriceConfigDto;
 
   @ApiProperty({
     description: 'Hall capacity (number of people)',
@@ -257,4 +237,42 @@ export class CreateBranchDto {
   @IsOptional()
   @IsBoolean()
   hasSchoolTrips?: boolean;
+
+  @ApiProperty({
+    description:
+      'Minimum students required for school trip bookings at this branch',
+    example: 35,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  schoolTripMinimumStudents?: number;
+
+  @ApiProperty({
+    description: 'Deposit percentage for school trip bookings at this branch',
+    example: 20,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  schoolTripDepositPercentage?: number;
+
+  @ApiProperty({
+    description:
+      'Monthly ticket prices for school trips keyed by month number (1-12)',
+    example: {
+      '1': 45,
+      '2': 45,
+      '6': 50,
+      '7': 55,
+    },
+    required: false,
+  })
+  @IsOptional()
+  @IsObject()
+  schoolTripMonthlyPrices?: Record<string, number>;
 }

@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
 import {
   Payment,
   PaymentMethod,
@@ -27,6 +27,7 @@ import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { WebhookEventDto } from './dto/webhook-event.dto';
 import { RefundDto } from './dto/refund.dto';
 import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 import { RedisService } from '../../utils/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
@@ -37,6 +38,36 @@ import { MoyasarService } from '../../integrations/moyasar/moyasar.service';
 import { WalletService } from '../wallet/wallet.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { resolveEventTicketWindow } from '../../utils/event-ticket-window.util';
+import { OfferBookingsService } from '../offer-bookings/offer-bookings.service';
+import { SubscriptionPurchasesService } from '../subscription-purchases/subscription-purchases.service';
+import {
+  OfferBooking,
+  OfferBookingPaymentStatus,
+  OfferBookingStatus,
+} from '../../database/entities/offer-booking.entity';
+import {
+  SubscriptionPurchase,
+  SubscriptionPurchasePaymentStatus,
+  SubscriptionPurchaseStatus,
+} from '../../database/entities/subscription-purchase.entity';
+import {
+  SubscriptionPlan,
+  SubscriptionUsageMode,
+} from '../../database/entities/subscription-plan.entity';
+import {
+  OfferCategory,
+  OfferProduct,
+} from '../../database/entities/offer-product.entity';
+import {
+  OfferTicket,
+  OfferTicketKind,
+  OfferTicketStatus,
+} from '../../database/entities/offer-ticket.entity';
+import {
+  GiftOrder,
+  GiftPaymentStatus,
+  GiftStatus,
+} from '../../database/entities/gift-order.entity';
 
 @Injectable()
 export class PaymentsService {
@@ -58,7 +89,390 @@ export class PaymentsService {
     private readonly moyasarService?: MoyasarService,
     private readonly walletService?: WalletService,
     private readonly qrCodeService?: QRCodeService,
+    private readonly offerBookingsService?: OfferBookingsService,
+    private readonly subscriptionPurchasesService?: SubscriptionPurchasesService,
   ) {}
+
+  private normalizePaymentJson(value: unknown): Record<string, any> | null {
+    if (!value) return null;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+    return typeof value === 'object' ? (value as Record<string, any>) : null;
+  }
+
+  private serializePaymentJson(value: Record<string, any> | null | undefined) {
+    if (!value) return null;
+    return JSON.stringify(value);
+  }
+
+  private getPendingFlowContext(payment: Payment): Record<string, any> | null {
+    const context = this.normalizePaymentJson(payment.webhookData);
+    if (!context) return null;
+    if (context.flowType == null) return null;
+    return context;
+  }
+
+  private async ensureEventSlotStillAvailable(
+    manager: EntityManager,
+    eventRequest: EventRequest,
+  ): Promise<void> {
+    const eventStart = new Date(eventRequest.startTime);
+    const eventEnd = new Date(
+      eventStart.getTime() +
+        Number(eventRequest.durationHours || 0) * 60 * 60 * 1000,
+    );
+
+    const blockingEventStatuses = [
+      EventRequestStatus.PAID,
+      EventRequestStatus.DEPOSIT_PAID,
+      EventRequestStatus.CONFIRMED,
+    ];
+    const blockingBookingStatuses = [
+      BookingStatus.PENDING,
+      BookingStatus.CONFIRMED,
+      BookingStatus.COMPLETED,
+    ];
+
+    const conflictingEvent = await manager
+      .getRepository(EventRequest)
+      .createQueryBuilder('event')
+      .where('event.branchId = :branchId', { branchId: eventRequest.branchId })
+      .andWhere('event.id != :eventRequestId', {
+        eventRequestId: eventRequest.id,
+      })
+      .andWhere('event.status IN (:...statuses)', {
+        statuses: blockingEventStatuses,
+      })
+      .andWhere('event.startTime < :endTime', { endTime: eventEnd })
+      .andWhere(
+        "(event.startTime + (event.durationHours || ' hours')::interval) > :startTime",
+        { startTime: eventStart },
+      )
+      .getOne();
+
+    if (conflictingEvent) {
+      throw new BadRequestException(
+        'هذا الموعد للفعالية الخاصة تم حجزه للتو من مستخدم آخر',
+      );
+    }
+
+    const conflictingBooking = await manager
+      .getRepository(Booking)
+      .createQueryBuilder('booking')
+      .where('booking.branchId = :branchId', {
+        branchId: eventRequest.branchId,
+      })
+      .andWhere('booking.status IN (:...statuses)', {
+        statuses: blockingBookingStatuses,
+      })
+      .andWhere('booking.startTime < :endTime', { endTime: eventEnd })
+      .andWhere(
+        "(booking.startTime + (booking.durationHours || ' hours')::interval) > :startTime",
+        { startTime: eventStart },
+      )
+      .getOne();
+
+    if (conflictingBooking) {
+      throw new BadRequestException(
+        'هذا الموعد للفعالية الخاصة تم حجزه للتو من مستخدم آخر',
+      );
+    }
+  }
+
+  private addCalendarMonths(baseDate: Date, months: number): Date {
+    const result = new Date(baseDate);
+    const originalDay = result.getDate();
+    result.setMonth(result.getMonth() + months);
+    if (result.getDate() !== originalDay) {
+      result.setDate(0);
+    }
+    return result;
+  }
+
+  private resolveOfferAddOns(
+    offer: OfferProduct,
+    selected?: { id: string; quantity: number }[],
+  ) {
+    const catalog = new Map(
+      (offer.includedAddOns || []).map((item: any) => [
+        item.addonId,
+        {
+          id: item.addonId,
+          name: item.name,
+          price: Number(item.price || 0),
+        },
+      ]),
+    );
+
+    if (!selected?.length) {
+      return [];
+    }
+
+    return selected.map((addOn) => {
+      const matched = catalog.get(addOn.id);
+      if (!matched) {
+        throw new BadRequestException(
+          `Selected add-on is not available: ${addOn.id}`,
+        );
+      }
+
+      return {
+        id: matched.id,
+        name: matched.name,
+        price: matched.price,
+        quantity: addOn.quantity,
+      };
+    });
+  }
+
+  private async createOfferBookingAfterPayment(
+    queryRunner: any,
+    userId: string,
+    context: Record<string, any>,
+  ): Promise<OfferBooking> {
+    const offerRepo = queryRunner.manager.getRepository(OfferProduct);
+    const bookingRepo = queryRunner.manager.getRepository(OfferBooking);
+    const ticketRepo = queryRunner.manager.getRepository(OfferTicket);
+
+    const offer = await offerRepo.findOne({
+      where: { id: context.offerProductId },
+    });
+    if (!offer) throw new NotFoundException('Offer product not found');
+    if (!offer.isActive) throw new BadRequestException('Offer is not active');
+
+    const now = new Date();
+    if (offer.startsAt && offer.startsAt > now) {
+      throw new BadRequestException('Offer is not available yet');
+    }
+    if (offer.endsAt && offer.endsAt < now) {
+      throw new BadRequestException('Offer has expired');
+    }
+    if (!context.acceptedTerms) {
+      throw new BadRequestException(
+        'Offer terms and conditions must be accepted',
+      );
+    }
+
+    if (!offer.canRepeatInSameOrder) {
+      const existingBooking = await bookingRepo.findOne({
+        where: {
+          userId,
+          offerProductId: offer.id,
+          status: OfferBookingStatus.ACTIVE,
+        },
+      });
+      if (existingBooking) {
+        throw new BadRequestException(
+          'Cannot repeat this offer — an active booking already exists',
+        );
+      }
+    }
+
+    const selectedAddOns = this.resolveOfferAddOns(offer, context.addOns);
+
+    const subtotal = Number(offer.price);
+    const addonsTotal = selectedAddOns.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    );
+    const totalPrice = subtotal + addonsTotal;
+
+    const buildOfferTypeSummary = () => {
+      if (offer.offerCategory === OfferCategory.HOUR_BASED) {
+        const duration = Number(offer.hoursConfig?.durationHours || 0);
+        const bonus = Number(offer.hoursConfig?.bonusHours || 0);
+        const isOpenTime = offer.hoursConfig?.isOpenTime === true;
+        if (isOpenTime) return 'open_time';
+        if (duration > 0 && bonus > 0) return `${duration}_plus_${bonus}_hours`;
+        if (duration > 0) return `${duration}_hours`;
+      }
+
+      const paid = Number(offer.ticketConfig?.paidTicketCount || 1);
+      const free = Number(offer.ticketConfig?.freeTicketCount || 0);
+      if (free > 0) return `${paid}_plus_${free}_tickets`;
+      return 'single_entry';
+    };
+
+    const booking = bookingRepo.create({
+      userId,
+      branchId: offer.branchId,
+      offerProductId: offer.id,
+      offerSnapshot: {
+        id: offer.id,
+        title: offer.title,
+        description: offer.description,
+        imageUrl: offer.imageUrl,
+        termsAndConditions: offer.termsAndConditions,
+        offerCategory: offer.offerCategory,
+        offerType: buildOfferTypeSummary(),
+        ticketMode: 'single_ticket',
+        price: Number(offer.price),
+        currency: offer.currency,
+        ticketConfig: offer.ticketConfig,
+        hoursConfig: offer.hoursConfig,
+        includedAddOns: offer.includedAddOns,
+        ticketCount: 1,
+        paidTicketsCount: 1,
+        freeTicketsCount: 0,
+        durationHours: offer.hoursConfig?.durationHours ?? null,
+        bonusHours: offer.hoursConfig?.bonusHours ?? 0,
+        isOpenTime: offer.hoursConfig?.isOpenTime ?? false,
+        includedItems: (offer.includedAddOns || []).map(
+          (item: any) => item.name,
+        ),
+      },
+      selectedAddOns: selectedAddOns.length === 0 ? null : selectedAddOns,
+      subtotal,
+      addonsTotal,
+      totalPrice,
+      paymentStatus: OfferBookingPaymentStatus.COMPLETED,
+      status: OfferBookingStatus.ACTIVE,
+      contactPhone: context.contactPhone || undefined,
+    });
+
+    const savedBooking = await bookingRepo.save(booking);
+
+    const createTicket = async (ticketKind: OfferTicketKind) => {
+      const provisionalQrToken = this.qrCodeService!.generateOfferTicketToken(
+        `pending-${savedBooking.id}-${Date.now()}`,
+      );
+      const ticket = ticketRepo.create({
+        offerBookingId: savedBooking.id,
+        userId,
+        branchId: offer.branchId,
+        offerProductId: offer.id,
+        ticketKind,
+        qrTokenHash: this.qrCodeService!.hashToken(provisionalQrToken),
+        status: OfferTicketStatus.VALID,
+        metadata: {
+          offerTitle: offer.title,
+          offerCategory: offer.offerCategory,
+          offerType: buildOfferTypeSummary(),
+          termsAndConditions: offer.termsAndConditions || null,
+          includedAddOns: offer.includedAddOns || [],
+          hoursConfig: offer.hoursConfig || null,
+        },
+      });
+      const savedTicket = await ticketRepo.save(ticket);
+      const rawToken = this.qrCodeService!.generateOfferTicketToken(
+        savedTicket.id,
+      );
+      savedTicket.qrTokenHash = this.qrCodeService!.hashToken(rawToken);
+      savedTicket.metadata = {
+        ...(savedTicket.metadata || {}),
+        qrData: rawToken,
+      };
+      await ticketRepo.save(savedTicket);
+    };
+
+    await createTicket(
+      offer.offerCategory === OfferCategory.HOUR_BASED
+        ? OfferTicketKind.TIMED
+        : OfferTicketKind.STANDARD,
+    );
+
+    return savedBooking;
+  }
+
+  private async createSubscriptionPurchaseAfterPayment(
+    queryRunner: any,
+    userId: string,
+    context: Record<string, any>,
+  ): Promise<SubscriptionPurchase> {
+    const planRepo = queryRunner.manager.getRepository(SubscriptionPlan);
+    const purchaseRepo =
+      queryRunner.manager.getRepository(SubscriptionPurchase);
+
+    const plan = await planRepo.findOne({
+      where: { id: context.subscriptionPlanId },
+    });
+    if (!plan) throw new NotFoundException('Subscription plan not found');
+    if (!plan.isActive)
+      throw new BadRequestException('Subscription plan is not active');
+
+    const now = new Date();
+    if (plan.startsAt && plan.startsAt > now) {
+      throw new BadRequestException('Subscription plan is not available yet');
+    }
+    if (plan.endsAt && plan.endsAt < now) {
+      throw new BadRequestException('Subscription plan has expired');
+    }
+    if (!context.acceptedTerms) {
+      throw new BadRequestException(
+        'Subscription terms and conditions must be accepted',
+      );
+    }
+
+    const existingActive = await purchaseRepo.findOne({
+      where: {
+        userId,
+        branchId: plan.branchId,
+        status: SubscriptionPurchaseStatus.ACTIVE,
+      },
+    });
+    if (existingActive) {
+      throw new BadRequestException(
+        'User already has an active subscription in this branch',
+      );
+    }
+
+    const totalHours = plan.totalHours != null ? Number(plan.totalHours) : null;
+    const dailyHoursLimit =
+      plan.dailyHoursLimit != null ? Number(plan.dailyHoursLimit) : null;
+    const startedAt = new Date();
+    const endsAt = this.addCalendarMonths(startedAt, plan.durationMonths);
+    const rawToken = this.qrCodeService!.generateSubscriptionToken(
+      `subscription-${userId}-${Date.now()}`,
+    );
+    const qrTokenHash = this.qrCodeService!.hashToken(rawToken);
+
+    const purchase = purchaseRepo.create({
+      userId,
+      branchId: plan.branchId,
+      subscriptionPlanId: plan.id,
+      planSnapshot: {
+        id: plan.id,
+        title: plan.title,
+        description: plan.description,
+        imageUrl: plan.imageUrl,
+        price: Number(plan.price),
+        currency: plan.currency,
+        totalHours,
+        dailyHoursLimit,
+        usageMode: plan.usageMode,
+        durationType: plan.durationType,
+        durationMonths: plan.durationMonths,
+        mealItems: plan.mealItems || [],
+        termsAndConditions: plan.termsAndConditions || null,
+      },
+      totalHours,
+      remainingHours:
+        plan.usageMode === SubscriptionUsageMode.DAILY_UNLIMITED
+          ? null
+          : totalHours,
+      dailyHoursLimit,
+      startedAt,
+      endsAt,
+      status: SubscriptionPurchaseStatus.ACTIVE,
+      paymentStatus: SubscriptionPurchasePaymentStatus.COMPLETED,
+      qrTokenHash,
+      metadata: {
+        acceptedTerms: true,
+        acceptedTermsAt: startedAt.toISOString(),
+        termsAndConditions: plan.termsAndConditions || null,
+        qrData: rawToken,
+        loyaltyRewardApplied: !!context.loyaltyRewardApplied,
+      },
+    });
+
+    return purchaseRepo.save(purchase);
+  }
 
   async createIntent(userId: string, dto: CreatePaymentIntentDto) {
     let booking: Booking | null = null;
@@ -66,6 +480,7 @@ export class PaymentsService {
     let tripRequest: SchoolTripRequest | null = null;
     let customerUser: any = null;
     let amountToPay: number = 0;
+    let deferredFlowContext: Record<string, any> | null = null;
 
     // Check for Booking
     if (dto.bookingId) {
@@ -94,18 +509,29 @@ export class PaymentsService {
 
       if (!eventRequest) throw new NotFoundException('Event request not found');
 
-      // Allow QUOTED directly. Also strict check for status.
-      if (eventRequest.status !== EventRequestStatus.QUOTED) {
-        throw new BadRequestException(
-          'Event request not payable (must be QUOTED)',
-        );
+      if (
+        eventRequest.status !== EventRequestStatus.QUOTED &&
+        eventRequest.status !== EventRequestStatus.DEPOSIT_PAID
+      ) {
+        throw new BadRequestException('Event request not payable');
       }
-      if (!eventRequest.quotedPrice) {
+      const totalAmount = Number(
+        eventRequest.totalAmount ?? eventRequest.quotedPrice ?? 0,
+      );
+      if (totalAmount <= 0) {
         throw new BadRequestException('Event request has no quoted price');
       }
 
       customerUser = eventRequest.requester;
-      amountToPay = Number(eventRequest.quotedPrice);
+      amountToPay =
+        eventRequest.status === EventRequestStatus.DEPOSIT_PAID
+          ? Number(eventRequest.remainingAmount ?? 0)
+          : eventRequest.paymentOption === 'deposit'
+            ? Number(eventRequest.depositAmount ?? 0)
+            : totalAmount;
+      if (amountToPay <= 0) {
+        throw new BadRequestException('Event request does not require payment');
+      }
 
       // Check for existing payments for this event request
       // We need to fetch payments linked to this eventRequestId manually
@@ -138,18 +564,30 @@ export class PaymentsService {
 
       if (!tripRequest) throw new NotFoundException('Trip request not found');
 
-      // Only allow payment for approved trips
-      if (tripRequest.status !== TripRequestStatus.APPROVED) {
-        throw new BadRequestException(
-          'Trip request not payable (must be APPROVED)',
-        );
+      if (
+        tripRequest.status !== TripRequestStatus.APPROVED &&
+        tripRequest.status !== TripRequestStatus.DEPOSIT_PAID
+      ) {
+        throw new BadRequestException('Trip request not payable');
       }
-      if (!tripRequest.quotedPrice) {
-        throw new BadRequestException('Trip request has no quoted price');
+      const totalAmount = Number(
+        tripRequest.totalAmount ?? tripRequest.quotedPrice ?? 0,
+      );
+      if (totalAmount <= 0) {
+        throw new BadRequestException('Trip request has no payable amount');
       }
 
       customerUser = tripRequest.requester;
-      amountToPay = Number(tripRequest.quotedPrice);
+      amountToPay =
+        tripRequest.status === TripRequestStatus.DEPOSIT_PAID
+          ? Number(tripRequest.remainingAmount ?? totalAmount)
+          : tripRequest.paymentOption === 'deposit'
+            ? Number(tripRequest.depositAmount ?? 0)
+            : totalAmount;
+
+      if (amountToPay <= 0) {
+        throw new BadRequestException('Trip request does not require payment');
+      }
 
       // Check for existing payments
       const existingPayment = await this.paymentRepository.findOne({
@@ -171,9 +609,119 @@ export class PaymentsService {
           status: existingPayment.status,
         };
       }
+    }
+    // Check for Offer Booking
+    else if (dto.offerBookingId) {
+      const offerBookingRepo = this.dataSource.getRepository(OfferBooking);
+      const offerBooking = await offerBookingRepo.findOne({
+        where: { id: dto.offerBookingId, userId },
+      });
+      if (!offerBooking) throw new NotFoundException('Offer booking not found');
+      if (offerBooking.paymentStatus !== 'pending')
+        throw new BadRequestException('Offer booking not payable');
+      customerUser = { id: userId } as any;
+      amountToPay = Number(offerBooking.totalPrice);
+    }
+    // Check for Subscription Purchase
+    else if (dto.subscriptionPurchaseId) {
+      const subPurchaseRepo =
+        this.dataSource.getRepository(SubscriptionPurchase);
+      const subPurchase = await subPurchaseRepo.findOne({
+        where: { id: dto.subscriptionPurchaseId, userId },
+      });
+      if (!subPurchase)
+        throw new NotFoundException('Subscription purchase not found');
+      if (subPurchase.paymentStatus !== 'pending')
+        throw new BadRequestException('Subscription purchase not payable');
+      customerUser = { id: userId } as any;
+      amountToPay = Number(
+        (
+          await this.dataSource
+            .getRepository(SubscriptionPlan)
+            .findOne({ where: { id: subPurchase.subscriptionPlanId } })
+        )?.price ?? 0,
+      );
+    } else if (dto.offerProductId) {
+      const offer = await this.dataSource.getRepository(OfferProduct).findOne({
+        where: { id: dto.offerProductId },
+      });
+      if (!offer) throw new NotFoundException('Offer product not found');
+      if (!offer.isActive) throw new BadRequestException('Offer is not active');
+      if (!dto.acceptedTerms) {
+        throw new BadRequestException(
+          'Offer terms and conditions must be accepted',
+        );
+      }
+      const now = new Date();
+      if (offer.startsAt && offer.startsAt > now) {
+        throw new BadRequestException('Offer is not available yet');
+      }
+      if (offer.endsAt && offer.endsAt < now) {
+        throw new BadRequestException('Offer has expired');
+      }
+
+      const selectedAddOns = this.resolveOfferAddOns(offer, dto.addOns);
+      const addonsTotal = selectedAddOns.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      );
+
+      customerUser = { id: userId } as any;
+      amountToPay = Number(offer.price) + addonsTotal;
+      deferredFlowContext = {
+        flowType: 'offer_product',
+        userId,
+        offerProductId: offer.id,
+        addOns: dto.addOns || [],
+        contactPhone: dto.contactPhone || null,
+        acceptedTerms: true,
+      };
+    } else if (dto.subscriptionPlanId) {
+      if (!dto.acceptedTerms) {
+        throw new BadRequestException(
+          'Subscription terms and conditions must be accepted',
+        );
+      }
+      if (!this.subscriptionPurchasesService) {
+        throw new BadRequestException(
+          'Subscription purchases service not available',
+        );
+      }
+      // Must match app quote (loyalty free sixth purchase, etc.); previously used full plan.price only.
+      const quote = await this.subscriptionPurchasesService.getQuote(userId, {
+        subscriptionPlanId: dto.subscriptionPlanId,
+      });
+      customerUser = { id: userId } as any;
+      amountToPay = Number(quote.totalPrice);
+      deferredFlowContext = {
+        flowType: 'subscription_plan',
+        userId,
+        subscriptionPlanId: dto.subscriptionPlanId,
+        acceptedTerms: true,
+        loyaltyRewardApplied:
+          !!quote.loyalty && quote.loyalty.isEligibleForFreePurchase === true,
+      };
+    } else if (dto.giftOrderId) {
+      const giftOrderRepo = this.dataSource.getRepository(GiftOrder);
+      const giftOrder = await giftOrderRepo.findOne({
+        where: { id: dto.giftOrderId, senderUserId: userId },
+      });
+      if (!giftOrder) {
+        throw new NotFoundException('Gift order not found');
+      }
+      if (giftOrder.paymentStatus !== GiftPaymentStatus.PENDING) {
+        throw new BadRequestException('Gift order is not payable');
+      }
+      customerUser = { id: userId } as any;
+      amountToPay = Number(giftOrder.total);
+      deferredFlowContext = {
+        flowType: 'gift_order',
+        userId,
+        giftOrderId: giftOrder.id,
+      };
     } else {
       throw new BadRequestException(
-        'bookingId, eventRequestId, or tripRequestId is required',
+        'A payable target or pay-first product id is required',
       );
     }
 
@@ -215,11 +763,16 @@ export class PaymentsService {
       ? booking.id
       : eventRequest
         ? eventRequest.id
-        : dto.tripRequestId;
+        : dto.tripRequestId ||
+          dto.offerBookingId ||
+          dto.subscriptionPurchaseId ||
+          dto.offerProductId ||
+          dto.subscriptionPlanId ||
+          dto.giftOrderId;
     const idempotencyKey = `pay:intent:${uniqueId}:${dto.method}`;
     const exists = await this.redisService.get(idempotencyKey);
     if (exists) {
-      return JSON.parse(exists);
+      return exists;
     }
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -254,6 +807,16 @@ export class PaymentsService {
         paymentData.eventRequestId = eventRequest.id;
       } else if (dto.tripRequestId) {
         paymentData.tripRequestId = dto.tripRequestId;
+      } else if (dto.offerBookingId) {
+        paymentData.offerBookingId = dto.offerBookingId;
+      } else if (dto.subscriptionPurchaseId) {
+        paymentData.subscriptionPurchaseId = dto.subscriptionPurchaseId;
+      } else if (dto.giftOrderId) {
+        paymentData.giftOrderId = dto.giftOrderId;
+      }
+      if (deferredFlowContext) {
+        paymentData.webhookData =
+          this.serializePaymentJson(deferredFlowContext);
       }
 
       const payment = queryRunner.manager.create(Payment, paymentData);
@@ -309,7 +872,18 @@ export class PaymentsService {
     let booking: Booking | null = null;
     let eventRequest: EventRequest | null = null;
     let tripRequest: SchoolTripRequest | null = null;
+    let offerBooking: OfferBooking | null = null;
+    let subscriptionPurchase: SubscriptionPurchase | null = null;
+    let giftOrder: GiftOrder | null = null;
     let payment: Payment | null = null;
+    let walletRechargeResult:
+      | {
+          success: boolean;
+          transactionId: string;
+          amount: number;
+          newBalance: number;
+        }
+      | undefined;
 
     // First try to find by booking
     if (dto.bookingId) {
@@ -386,6 +960,45 @@ export class PaymentsService {
               'Trip request not found or access denied',
             );
           payment = loadedPayment;
+        } else if (loadedPayment.offerBookingId) {
+          offerBooking = await this.dataSource
+            .getRepository(OfferBooking)
+            .findOne({
+              where: { id: loadedPayment.offerBookingId, userId },
+            });
+          if (!offerBooking) {
+            throw new NotFoundException(
+              'Offer booking not found or access denied',
+            );
+          }
+          payment = loadedPayment;
+        } else if (loadedPayment.subscriptionPurchaseId) {
+          subscriptionPurchase = await this.dataSource
+            .getRepository(SubscriptionPurchase)
+            .findOne({
+              where: {
+                id: loadedPayment.subscriptionPurchaseId,
+                userId,
+              },
+            });
+          if (!subscriptionPurchase) {
+            throw new NotFoundException(
+              'Subscription purchase not found or access denied',
+            );
+          }
+          payment = loadedPayment;
+        } else if (loadedPayment.giftOrderId) {
+          giftOrder = await this.dataSource.getRepository(GiftOrder).findOne({
+            where: { id: loadedPayment.giftOrderId, senderUserId: userId },
+          });
+          if (!giftOrder) {
+            throw new NotFoundException(
+              'Gift order not found or access denied',
+            );
+          }
+          payment = loadedPayment;
+        } else if (this.getPendingFlowContext(loadedPayment)) {
+          payment = loadedPayment;
         } else {
           // Orphan payment?
           throw new NotFoundException('Payment entity context lost');
@@ -396,14 +1009,49 @@ export class PaymentsService {
     // If client passed external gateway payment id, map it to latest pending payment by context.
     if (
       !payment &&
-      (dto.bookingId || dto.eventRequestId || dto.tripRequestId)
+      (dto.bookingId ||
+        dto.eventRequestId ||
+        dto.tripRequestId ||
+        dto.offerBookingId ||
+        dto.subscriptionPurchaseId)
     ) {
       externalGatewayPaymentId = dto.paymentId;
+
+      if (dto.offerBookingId) {
+        offerBooking = await this.dataSource
+          .getRepository(OfferBooking)
+          .findOne({
+            where: { id: dto.offerBookingId, userId },
+          });
+        if (!offerBooking) {
+          throw new NotFoundException(
+            'Offer booking not found or access denied',
+          );
+        }
+      }
+
+      if (dto.subscriptionPurchaseId) {
+        subscriptionPurchase = await this.dataSource
+          .getRepository(SubscriptionPurchase)
+          .findOne({
+            where: { id: dto.subscriptionPurchaseId, userId },
+          });
+        if (!subscriptionPurchase) {
+          throw new NotFoundException(
+            'Subscription purchase not found or access denied',
+          );
+        }
+      }
+
       payment = await this.paymentRepository.findOne({
         where: {
           ...(dto.bookingId ? { bookingId: dto.bookingId } : {}),
           ...(dto.eventRequestId ? { eventRequestId: dto.eventRequestId } : {}),
           ...(dto.tripRequestId ? { tripRequestId: dto.tripRequestId } : {}),
+          ...(dto.offerBookingId ? { offerBookingId: dto.offerBookingId } : {}),
+          ...(dto.subscriptionPurchaseId
+            ? { subscriptionPurchaseId: dto.subscriptionPurchaseId }
+            : {}),
           status: PaymentStatus.PROCESSING,
         },
         order: { createdAt: 'DESC' },
@@ -411,8 +1059,18 @@ export class PaymentsService {
     }
 
     if (!payment) throw new NotFoundException('Payment not found');
-    if (payment.status === PaymentStatus.COMPLETED)
+    if (payment.status === PaymentStatus.COMPLETED) {
+      if (payment.offerBookingId && this.offerBookingsService) {
+        await this.offerBookingsService.confirmPayment(payment.offerBookingId);
+      }
+      if (payment.subscriptionPurchaseId && this.subscriptionPurchasesService) {
+        await this.subscriptionPurchasesService.confirmPayment(
+          payment.subscriptionPurchaseId,
+        );
+      }
       return { success: true, paymentId: payment.id };
+    }
+    const pendingFlowContext = this.getPendingFlowContext(payment);
 
     // Ensure payment context entities are loaded before any downstream logic.
     // This avoids null access (e.g. booking/event/trip id) for flows that
@@ -447,24 +1105,115 @@ export class PaymentsService {
       }
     }
 
+    if (!offerBooking && payment.offerBookingId) {
+      offerBooking = await this.dataSource.getRepository(OfferBooking).findOne({
+        where: { id: payment.offerBookingId, userId },
+      });
+      if (!offerBooking) {
+        throw new NotFoundException('Offer booking not found or access denied');
+      }
+    }
+
+    if (!subscriptionPurchase && payment.subscriptionPurchaseId) {
+      subscriptionPurchase = await this.dataSource
+        .getRepository(SubscriptionPurchase)
+        .findOne({
+          where: { id: payment.subscriptionPurchaseId, userId },
+        });
+      if (!subscriptionPurchase) {
+        throw new NotFoundException(
+          'Subscription purchase not found or access denied',
+        );
+      }
+    }
+
+    if (!giftOrder && payment.giftOrderId) {
+      giftOrder = await this.dataSource.getRepository(GiftOrder).findOne({
+        where: { id: payment.giftOrderId, senderUserId: userId },
+      });
+      if (!giftOrder) {
+        throw new NotFoundException('Gift order not found or access denied');
+      }
+    }
+
     // Handle wallet payments
-    if (payment.method === PaymentMethod.WALLET) {
+    if (
+      payment.method === PaymentMethod.WALLET &&
+      pendingFlowContext?.flowType !== 'wallet_recharge'
+    ) {
       if (!this.walletService) {
         throw new BadRequestException('Wallet service not available');
       }
-      // Deduct from wallet
-      // Use booking.id, eventRequest.id, or tripRequest.id
-      const refId = booking
-        ? booking.id
+      // Deduct from wallet. Only `bookings.id` may be stored in relatedBookingId (FK).
+      const walletLink = booking
+        ? {
+            relatedBookingId: booking.id,
+            reference: `booking_${booking.id}`,
+            metadata: { bookingId: booking.id, paymentId: payment.id },
+          }
         : eventRequest
-          ? eventRequest.id
+          ? {
+              relatedBookingId: null,
+              reference: `event_request_${eventRequest.id}`,
+              metadata: {
+                eventRequestId: eventRequest.id,
+                paymentId: payment.id,
+              },
+            }
           : tripRequest
-            ? tripRequest.id
-            : null;
-      if (!refId) {
+            ? {
+                relatedBookingId: null,
+                reference: `trip_request_${tripRequest.id}`,
+                metadata: {
+                  tripRequestId: tripRequest.id,
+                  paymentId: payment.id,
+                },
+              }
+            : offerBooking
+              ? {
+                  relatedBookingId: null,
+                  reference: `offer_booking_${offerBooking.id}`,
+                  metadata: {
+                    offerBookingId: offerBooking.id,
+                    paymentId: payment.id,
+                  },
+                }
+              : subscriptionPurchase
+                ? {
+                    relatedBookingId: null,
+                    reference: `subscription_purchase_${subscriptionPurchase.id}`,
+                    metadata: {
+                      subscriptionPurchaseId: subscriptionPurchase.id,
+                      paymentId: payment.id,
+                    },
+                  }
+                : giftOrder
+                  ? {
+                      relatedBookingId: null,
+                      reference: `gift_order_${giftOrder.id}`,
+                      metadata: {
+                        giftOrderId: giftOrder.id,
+                        paymentId: payment.id,
+                      },
+                    }
+                  : pendingFlowContext
+                    ? {
+                        relatedBookingId: null,
+                        reference: `payment_${pendingFlowContext.flowType}_${payment.id}`,
+                        metadata: {
+                          ...pendingFlowContext,
+                          paymentId: payment.id,
+                        },
+                      }
+                    : null;
+      if (!walletLink) {
         throw new BadRequestException('Payment context id is missing');
       }
-      await this.walletService.deductWallet(userId, payment.amount, refId);
+      await this.walletService.deductWallet(
+        userId,
+        payment.amount,
+        walletLink,
+      );
     } else {
       const bypass =
         !this.configService.get<string>('MOYASAR_SECRET_KEY') ||
@@ -511,6 +1260,8 @@ export class PaymentsService {
     await queryRunner.connect();
     let transactionStarted = false;
     let savedBooking: Booking | null = null;
+    let createdOfferBooking: OfferBooking | null = null;
+    let createdSubscriptionPurchase: SubscriptionPurchase | null = null;
 
     try {
       await queryRunner.startTransaction();
@@ -523,220 +1274,371 @@ export class PaymentsService {
       }
       await queryRunner.manager.save(payment);
 
-      if (booking) {
+      if (pendingFlowContext?.flowType === 'wallet_recharge') {
+        if (!this.walletService) {
+          throw new BadRequestException('Wallet service not available');
+        }
+
+        walletRechargeResult =
+          await this.walletService.completeRechargeFromPayment(
+            userId,
+            Number(payment.amount),
+            payment.id,
+            queryRunner.manager,
+            payment.method,
+          );
+      } else if (pendingFlowContext?.flowType === 'offer_product') {
+        createdOfferBooking = await this.createOfferBookingAfterPayment(
+          queryRunner,
+          userId,
+          pendingFlowContext,
+        );
+        payment.offerBookingId = createdOfferBooking.id;
+        payment.webhookData = this.serializePaymentJson({
+          ...pendingFlowContext,
+          createdOfferBookingId: createdOfferBooking.id,
+        });
+        await queryRunner.manager.save(payment);
+      } else if (pendingFlowContext?.flowType === 'subscription_plan') {
+        createdSubscriptionPurchase =
+          await this.createSubscriptionPurchaseAfterPayment(
+            queryRunner,
+            userId,
+            pendingFlowContext,
+          );
+        payment.subscriptionPurchaseId = createdSubscriptionPurchase.id;
+        payment.webhookData = this.serializePaymentJson({
+          ...pendingFlowContext,
+          createdSubscriptionPurchaseId: createdSubscriptionPurchase.id,
+        });
+        await queryRunner.manager.save(payment);
+      } else if (pendingFlowContext?.flowType === 'gift_order') {
+        const giftOrderRepo = queryRunner.manager.getRepository(GiftOrder);
+        const giftOrder = await giftOrderRepo.findOne({
+          where: { id: pendingFlowContext.giftOrderId },
+        });
+        if (giftOrder) {
+          const claimToken = crypto.randomBytes(32).toString('hex');
+          const claimTokenHash = crypto
+            .createHash('sha256')
+            .update(claimToken)
+            .digest('hex');
+          const expiryDays = Number(
+            this.configService.get<string>('GIFT_CLAIM_EXPIRY_DAYS') || 30,
+          );
+          const claimTokenExpiresAt = new Date();
+          claimTokenExpiresAt.setDate(
+            claimTokenExpiresAt.getDate() + expiryDays,
+          );
+
+          giftOrder.paymentStatus = GiftPaymentStatus.PAID;
+          giftOrder.claimTokenHash = claimTokenHash;
+          giftOrder.claimTokenExpiresAt = claimTokenExpiresAt;
+          giftOrder.whatsappMessageStatus = 'pending' as any;
+          await giftOrderRepo.save(giftOrder);
+
+          payment.webhookData = this.serializePaymentJson({
+            ...pendingFlowContext,
+            claimToken,
+          });
+          await queryRunner.manager.save(payment);
+        }
+      } else if (booking) {
         booking.status = BookingStatus.CONFIRMED;
         await queryRunner.manager.save(booking);
       } else if (eventRequest) {
-        // Update event request status
-        eventRequest.status = EventRequestStatus.CONFIRMED;
-        eventRequest.paymentMethod = payment.method;
-        await queryRunner.manager.save(eventRequest);
-
-        // Create shadow Booking for tickets
-        const newBooking = queryRunner.manager.create(Booking, {
-          userId: eventRequest.requesterId,
-          branchId: eventRequest.branchId,
-          startTime: eventRequest.startTime,
-          durationHours: eventRequest.durationHours,
-          persons: eventRequest.persons,
-          totalPrice: eventRequest.quotedPrice || 0,
-          status: BookingStatus.CONFIRMED,
-          addOns: eventRequest.addOns,
-          specialRequests: eventRequest.notes,
-        });
-        savedBooking = await queryRunner.manager.save(newBooking);
-
-        // Generate Tickets with unique QR token hashes
-        const tickets: Ticket[] = [];
-        const { validFrom, validUntil } = resolveEventTicketWindow(
-          eventRequest.startTime,
-          eventRequest.durationHours,
+        await this.ensureEventSlotStillAvailable(
+          queryRunner.manager,
+          eventRequest,
         );
-        for (let i = 0; i < eventRequest.persons; i++) {
-          // Generate unique QR token and hash for each ticket
+
+        const totalAmount = Number(
+          eventRequest.totalAmount ?? eventRequest.quotedPrice ?? 0,
+        );
+        const existingPaidAmount = Number(eventRequest.amountPaid ?? 0);
+        const newPaidAmount =
+          Math.round((existingPaidAmount + Number(payment.amount)) * 100) / 100;
+        const remainingAmount = Math.max(
+          0,
+          Math.round((totalAmount - newPaidAmount) * 100) / 100,
+        );
+
+        eventRequest.amountPaid = newPaidAmount as any;
+        eventRequest.remainingAmount = remainingAmount as any;
+        eventRequest.paymentMethod = payment.method;
+        eventRequest.status =
+          remainingAmount > 0
+            ? EventRequestStatus.DEPOSIT_PAID
+            : EventRequestStatus.CONFIRMED;
+
+        if (eventRequest.bookingId) {
+          savedBooking = await queryRunner.manager.findOne(Booking, {
+            where: { id: eventRequest.bookingId },
+          });
+        }
+
+        if (!savedBooking) {
+          const newBooking = queryRunner.manager.create(Booking, {
+            userId: eventRequest.requesterId,
+            branchId: eventRequest.branchId,
+            startTime: eventRequest.startTime,
+            durationHours: eventRequest.durationHours,
+            persons: eventRequest.persons,
+            totalPrice:
+              eventRequest.totalAmount || eventRequest.quotedPrice || 0,
+            status: BookingStatus.CONFIRMED,
+            addOns: eventRequest.addOns,
+            specialRequests: eventRequest.notes,
+            metadata: {
+              eventRequestId: eventRequest.id,
+              selectedTimeSlot: eventRequest.selectedTimeSlot,
+              paymentOption: eventRequest.paymentOption,
+              amountPaid: newPaidAmount,
+              remainingAmount,
+            },
+          });
+          savedBooking = await queryRunner.manager.save(newBooking);
+          eventRequest.bookingId = savedBooking.id;
+        } else {
+          savedBooking.metadata = {
+            ...(savedBooking.metadata || {}),
+            eventRequestId: eventRequest.id,
+            selectedTimeSlot: eventRequest.selectedTimeSlot,
+            paymentOption: eventRequest.paymentOption,
+            amountPaid: newPaidAmount,
+            remainingAmount,
+          };
+          await queryRunner.manager.save(savedBooking);
+        }
+
+        const ticketCount = await queryRunner.manager.count(Ticket, {
+          where: { bookingId: savedBooking.id },
+        });
+        if (ticketCount === 0) {
+          const { validFrom, validUntil } = resolveEventTicketWindow(
+            eventRequest.startTime,
+            eventRequest.durationHours,
+          );
           const qrToken = this.qrCodeService
             ? this.qrCodeService.generateQRToken(
                 savedBooking.id,
-                `${savedBooking.id}-${i}`,
+                `${savedBooking.id}-private-group`,
               )
-            : `${savedBooking.id}-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+            : `${savedBooking.id}-private-group-${Date.now()}-${Math.random().toString(36).substring(7)}`;
           const qrTokenHash = this.qrCodeService
             ? this.qrCodeService.generateQRTokenHash(qrToken)
-            : require('crypto')
-                .createHash('sha256')
-                .update(qrToken)
-                .digest('hex');
+            : crypto.createHash('sha256').update(qrToken).digest('hex');
 
-          const t = queryRunner.manager.create(Ticket, {
+          const groupTicket = queryRunner.manager.create(Ticket, {
             bookingId: savedBooking.id,
             qrTokenHash,
             status: TicketStatus.VALID,
-            personCount: 1,
+            personCount: eventRequest.persons,
             validFrom,
             validUntil,
           });
-          tickets.push(t);
-        }
-        await queryRunner.manager.save(tickets);
+          await queryRunner.manager.save(groupTicket);
 
-        // Force logic to send ticket notification for this new booking
-        // We can reuse 'booking' variable or handle specific notification below
-        // Let's rely on standard flow or add specific notification here
-        await this.notifications.enqueue({
-          type: 'TICKETS_ISSUED',
-          to: { userId: eventRequest.requesterId },
-          data: { bookingId: savedBooking.id },
-          channels: ['sms', 'push'],
-        });
+          await this.notifications.enqueue({
+            type: 'TICKETS_ISSUED',
+            to: { userId: eventRequest.requesterId },
+            data: { bookingId: savedBooking.id },
+            channels: ['sms', 'push'],
+          });
+        }
+
+        await queryRunner.manager.save(eventRequest);
       } else if (tripRequest) {
         // Handle school trip request payment completion
         const tripRepo = this.dataSource.getRepository(SchoolTripRequest);
+        const totalAmount = Number(
+          tripRequest.totalAmount ?? tripRequest.quotedPrice ?? 0,
+        );
+        const existingPaidAmount = Number(tripRequest.amountPaid ?? 0);
+        const newPaidAmount =
+          Math.round((existingPaidAmount + Number(payment.amount)) * 100) / 100;
+        const remainingAmount = Math.max(
+          0,
+          Math.round((totalAmount - newPaidAmount) * 100) / 100,
+        );
 
-        // Update trip request status
-        tripRequest.status = TripRequestStatus.PAID;
+        tripRequest.amountPaid = newPaidAmount as any;
+        tripRequest.remainingAmount = remainingAmount as any;
         tripRequest.paymentMethod = payment.method;
+
+        tripRequest.status =
+          remainingAmount > 0
+            ? TripRequestStatus.DEPOSIT_PAID
+            : TripRequestStatus.PAID;
         await queryRunner.manager.save(tripRequest);
 
-        // Create Booking for the trip
-        const studentsList = tripRequest.studentsList || [];
-        const studentsCount =
-          studentsList.length > 0
-            ? studentsList.length
-            : tripRequest.studentsCount || 0;
-        const adultsCount = tripRequest.accompanyingAdults || 0;
-        const totalPersons = studentsCount + adultsCount;
+        // Check if a booking already exists (e.g. deposit was paid earlier)
+        const existingTripBooking = await queryRunner.manager
+          .createQueryBuilder(Booking, 'booking')
+          .where("booking.metadata->>'tripRequestId' = :id", {
+            id: tripRequest.id,
+          })
+          .andWhere('booking.status != :cancelled', {
+            cancelled: BookingStatus.CANCELLED,
+          })
+          .getOne();
 
-        const newBooking = queryRunner.manager.create(Booking, {
-          userId: tripRequest.requesterId,
-          branchId: (tripRequest as any).branchId,
-          startTime: tripRequest.preferredDate,
-          durationHours: tripRequest.durationHours || 24,
-          persons: totalPersons,
-          totalPrice: tripRequest.quotedPrice || 0,
-          status: BookingStatus.CONFIRMED,
-        });
-        savedBooking = await queryRunner.manager.save(newBooking);
+        if (existingTripBooking) {
+          savedBooking = existingTripBooking;
+          savedBooking.metadata = {
+            ...(savedBooking.metadata || {}),
+            amountPaid: newPaidAmount,
+            remainingAmount,
+          };
+          await queryRunner.manager.save(savedBooking);
+          payment.bookingId = savedBooking.id;
+          await queryRunner.manager.save(payment);
 
-        // Generate tickets for each student/adult.
-        const tickets: Ticket[] = [];
-
-        // Generate tickets for students - use studentsList if available, otherwise create generic tickets
-        if (studentsList.length > 0) {
-          // Create tickets with student names from the list
-          for (let i = 0; i < studentsList.length; i++) {
-            const student = studentsList[i];
-            const qrToken = this.qrCodeService
-              ? this.qrCodeService.generateQRToken(
-                  savedBooking.id,
-                  `${savedBooking.id}-student-${i}`,
-                )
-              : `${savedBooking.id}-student-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-            const qrTokenHash = this.qrCodeService
-              ? this.qrCodeService.generateQRTokenHash(qrToken)
-              : require('crypto')
-                  .createHash('sha256')
-                  .update(qrToken)
-                  .digest('hex');
-
-            const t = queryRunner.manager.create(Ticket, {
-              bookingId: savedBooking.id,
-              qrTokenHash,
-              status: TicketStatus.VALID,
-              personCount: 1,
-              holderName: student.name || `طالب ${i + 1}`,
-              validFrom: null,
-              validUntil: null,
-              metadata: {
-                tripType: 'school',
-                role: 'student',
-              },
-            });
-            tickets.push(t);
+          if (remainingAmount === 0) {
+            tripRequest.status = TripRequestStatus.COMPLETED;
+            await queryRunner.manager.save(tripRequest);
           }
         } else {
-          // Create generic tickets if studentsList is empty but studentsCount exists
-          for (let i = 0; i < studentsCount; i++) {
-            const qrToken = this.qrCodeService
-              ? this.qrCodeService.generateQRToken(
-                  savedBooking.id,
-                  `${savedBooking.id}-student-${i}`,
-                )
-              : `${savedBooking.id}-student-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-            const qrTokenHash = this.qrCodeService
-              ? this.qrCodeService.generateQRTokenHash(qrToken)
-              : require('crypto')
-                  .createHash('sha256')
-                  .update(qrToken)
-                  .digest('hex');
+          const studentsList = tripRequest.studentsList || [];
+          const studentsCount =
+            studentsList.length > 0
+              ? studentsList.length
+              : tripRequest.studentsCount || 0;
+          const adultsCount = tripRequest.accompanyingAdults || 0;
+          const totalPersons = studentsCount + adultsCount;
 
-            const t = queryRunner.manager.create(Ticket, {
-              bookingId: savedBooking.id,
-              qrTokenHash,
-              status: TicketStatus.VALID,
-              personCount: 1,
-              holderName: `طالب ${i + 1}`,
-              validFrom: null,
-              validUntil: null,
-              metadata: {
-                tripType: 'school',
-                role: 'student',
-              },
-            });
-            tickets.push(t);
+          const slotStartLabel =
+            tripRequest.selectedTimeSlot || tripRequest.preferredTime;
+          let tripStartTime = tripRequest.preferredDate;
+          if (slotStartLabel) {
+            const [start] = slotStartLabel.split('-');
+            const [hour, minute] = start.split(':').map(Number);
+            const preferredDate = new Date(tripRequest.preferredDate);
+            tripStartTime = new Date(
+              preferredDate.getFullYear(),
+              preferredDate.getMonth(),
+              preferredDate.getDate(),
+              hour,
+              minute,
+              0,
+              0,
+            );
           }
-        }
 
-        // Generate placeholder tickets for accompanying adults
-        for (let i = 0; i < adultsCount; i++) {
-          const qrToken = this.qrCodeService
-            ? this.qrCodeService.generateQRToken(
-                savedBooking.id,
-                `${savedBooking.id}-adult-${i}`,
-              )
-            : `${savedBooking.id}-adult-${i}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-          const qrTokenHash = this.qrCodeService
-            ? this.qrCodeService.generateQRTokenHash(qrToken)
-            : require('crypto')
+          const newBooking = queryRunner.manager.create(Booking, {
+            userId: tripRequest.requesterId,
+            branchId: (tripRequest as any).branchId,
+            startTime: tripStartTime,
+            durationHours: tripRequest.durationHours || 2,
+            persons: totalPersons,
+            totalPrice: tripRequest.totalAmount || tripRequest.quotedPrice || 0,
+            status: BookingStatus.CONFIRMED,
+            addOns: (tripRequest.addOns || []).map((item: any) => ({
+              id: item.id,
+              name: item.name ?? '',
+              price: Number(item.price ?? 0),
+              quantity: Number(item.quantity ?? 1),
+            })),
+            metadata: {
+              tripType: 'school',
+              tripRequestId: tripRequest.id,
+              paymentOption: tripRequest.paymentOption,
+              amountPaid: newPaidAmount,
+              remainingAmount,
+            },
+          });
+          savedBooking = await queryRunner.manager.save(newBooking);
+
+          payment.bookingId = savedBooking.id;
+          await queryRunner.manager.save(payment);
+
+          const tripQrPayload = `trip_${savedBooking.id}`;
+          const tripQrTokenHash = this.qrCodeService
+            ? this.qrCodeService.generateQRTokenHash(tripQrPayload)
+            : crypto
                 .createHash('sha256')
-                .update(qrToken)
+                .update(tripQrPayload)
                 .digest('hex');
+          const holderName =
+            studentsList.length > 0
+              ? `${studentsList[0]?.name || tripRequest.schoolName} +${Math.max(
+                  0,
+                  totalPersons - 1,
+                )}`
+              : tripRequest.schoolName;
 
-          const t = queryRunner.manager.create(Ticket, {
+          const groupTicket = queryRunner.manager.create(Ticket, {
             bookingId: savedBooking.id,
-            qrTokenHash,
+            qrTokenHash: tripQrTokenHash,
             status: TicketStatus.VALID,
-            personCount: 1,
-            holderName: `مرافق ${i + 1}`,
+            personCount: totalPersons,
+            holderName,
             validFrom: null,
             validUntil: null,
             metadata: {
               tripType: 'school',
-              role: 'adult',
+              studentsCount,
+              adultsCount,
+              totalPersons,
+              schoolName: tripRequest.schoolName,
+              preferredDate:
+                tripRequest.preferredDate?.toISOString?.() ??
+                tripRequest.preferredDate,
+              preferredTime: tripRequest.preferredTime,
+              selectedTimeSlot: tripRequest.selectedTimeSlot,
             },
           });
-          tickets.push(t);
+          await queryRunner.manager.save(groupTicket);
+
+          if (remainingAmount === 0) {
+            tripRequest.status = TripRequestStatus.COMPLETED;
+            await queryRunner.manager.save(tripRequest);
+          }
+
+          await this.notifications.enqueue({
+            type: 'TICKETS_ISSUED',
+            to: { userId: tripRequest.requesterId },
+            data: {
+              bookingId: savedBooking.id,
+              tripRequestId: tripRequest.id,
+              ticketsCount: 1,
+            },
+            channels: ['sms', 'push'],
+          });
         }
-        await queryRunner.manager.save(tickets);
-
-        // Update trip request to completed
-        tripRequest.status = TripRequestStatus.COMPLETED;
-        await queryRunner.manager.save(tripRequest);
-
-        // Send notification
-        await this.notifications.enqueue({
-          type: 'TICKETS_ISSUED',
-          to: { userId: tripRequest.requesterId },
-          data: {
-            bookingId: savedBooking.id,
-            tripRequestId: tripRequest.id,
-            ticketsCount: tickets.length,
-          },
-          channels: ['sms', 'push'],
-        });
       }
 
       await queryRunner.commitTransaction();
       transactionStarted = false;
+
+      if (pendingFlowContext?.flowType === 'wallet_recharge') {
+        await this.notifications.enqueue({
+          type: 'PAYMENT_SUCCESS',
+          to: { userId },
+          data: { amount: payment.amount, currency: payment.currency },
+          channels: ['sms', 'push'],
+        });
+
+        if (walletRechargeResult) {
+          await this.notifications.enqueue({
+            type: 'WALLET_RECHARGED',
+            to: { userId },
+            data: {
+              amount: Number(payment.amount),
+              currency: payment.currency,
+              balance: walletRechargeResult.newBalance,
+            },
+            channels: ['sms', 'push'],
+          });
+        }
+
+        return {
+          success: true,
+          paymentId: payment.id,
+          transactionId: walletRechargeResult?.transactionId,
+          walletBalance: walletRechargeResult?.newBalance,
+        };
+      }
 
       // Post-confirmation actions (tickets, notifications) - outside transaction
       // Use savedBooking if it was created, otherwise use booking.id, or null if neither exists
@@ -745,13 +1647,17 @@ export class PaymentsService {
         : booking
           ? booking.id
           : null;
-      const targetId = booking
-        ? booking.id
-        : eventRequest
-          ? eventRequest.id
-          : tripRequest
-            ? tripRequest.id
-            : payment.bookingId || payment.eventRequestId || payment.tripRequestId;
+      const targetId =
+        createdOfferBooking?.id ??
+        createdSubscriptionPurchase?.id ??
+        booking?.id ??
+        eventRequest?.id ??
+        tripRequest?.id ??
+        payment.bookingId ??
+        payment.eventRequestId ??
+        payment.tripRequestId ??
+        payment.offerBookingId ??
+        payment.subscriptionPurchaseId;
       if (!targetId) {
         throw new BadRequestException('Payment target id is missing');
       }
@@ -770,6 +1676,70 @@ export class PaymentsService {
         this.logger.error(
           `Failed to issue tickets post-payment: ${e?.message || e}`,
         );
+      }
+
+      // Handle offer booking payment confirmation
+      if (payment.offerBookingId && this.offerBookingsService) {
+        try {
+          await this.offerBookingsService.confirmPayment(
+            payment.offerBookingId,
+          );
+        } catch (e) {
+          this.logger.error(
+            `Failed to confirm offer booking payment: ${e?.message || e}`,
+          );
+        }
+      }
+
+      // Handle subscription purchase payment confirmation
+      if (payment.subscriptionPurchaseId && this.subscriptionPurchasesService) {
+        try {
+          await this.subscriptionPurchasesService.confirmPayment(
+            payment.subscriptionPurchaseId,
+          );
+        } catch (e) {
+          this.logger.error(
+            `Failed to confirm subscription purchase payment: ${e?.message || e}`,
+          );
+        }
+      }
+
+      // Handle gift order post-confirmation: WhatsApp invite + push notification
+      if (
+        pendingFlowContext?.flowType === 'gift_order' &&
+        pendingFlowContext.giftOrderId
+      ) {
+        try {
+          const giftOrderRepo = this.dataSource.getRepository(GiftOrder);
+          const giftOrder = await giftOrderRepo.findOne({
+            where: { id: pendingFlowContext.giftOrderId },
+          });
+          if (giftOrder) {
+            const claimToken = this.normalizePaymentJson(
+              payment.webhookData,
+            )?.claimToken;
+            const deepLinkUrl = claimToken
+              ? `https://app.loop.com/gifts/claim?token=${claimToken}`
+              : '';
+
+            await this.notifications.enqueue({
+              type: 'GIFT_INVITE' as any,
+              to: { phone: giftOrder.normalizedRecipientPhone },
+              data: {
+                branchName: giftOrder.sourceProductSnapshot?.title || '',
+                productTitle: giftOrder.sourceProductSnapshot?.title || '',
+                senderName: giftOrder.showSenderInfo
+                  ? giftOrder.senderDisplayNameSnapshot
+                  : '',
+                deepLinkUrl,
+                giftOrderId: giftOrder.id,
+              },
+              channels: ['whatsapp', 'push'],
+            });
+          }
+        } catch (e) {
+          this.logger.error(`Failed to send gift invite: ${e?.message || e}`);
+        }
       }
 
       // Notify payment success and booking confirmed
@@ -848,12 +1818,90 @@ export class PaymentsService {
         payment.status = PaymentStatus.COMPLETED;
         payment.paidAt = new Date();
         await this.paymentRepository.save(payment);
+        const pendingFlowContext = this.getPendingFlowContext(payment);
+        if (
+          pendingFlowContext?.flowType &&
+          !payment.offerBookingId &&
+          !payment.subscriptionPurchaseId
+        ) {
+          await this.dataSource.transaction(async (manager) => {
+            const qr = manager.getRepository(Payment);
+            const reloadedPayment = await qr.findOne({
+              where: { id: payment.id },
+            });
+            if (!reloadedPayment) return;
+            const reloadedContext = this.getPendingFlowContext(reloadedPayment);
+            if (
+              reloadedPayment.offerBookingId ||
+              reloadedPayment.subscriptionPurchaseId
+            ) {
+              return;
+            }
+
+            if (pendingFlowContext.flowType === 'offer_product') {
+              const createdOfferBooking =
+                await this.createOfferBookingAfterPayment(
+                  { manager },
+                  (reloadedContext?.userId as string) || '',
+                  pendingFlowContext,
+                );
+              reloadedPayment.offerBookingId = createdOfferBooking.id;
+            } else if (pendingFlowContext.flowType === 'wallet_recharge') {
+              await this.walletService?.completeRechargeFromPayment(
+                (reloadedContext?.userId as string) || '',
+                Number(reloadedPayment.amount),
+                reloadedPayment.id,
+                manager,
+                reloadedPayment.method,
+              );
+            } else if (pendingFlowContext.flowType === 'subscription_plan') {
+              const createdPurchase =
+                await this.createSubscriptionPurchaseAfterPayment(
+                  { manager },
+                  (reloadedContext?.userId as string) || '',
+                  pendingFlowContext,
+                );
+              reloadedPayment.subscriptionPurchaseId = createdPurchase.id;
+            }
+
+            await manager.save(Payment, reloadedPayment);
+          });
+        }
         if (
           payment.booking &&
           payment.booking.status !== BookingStatus.CONFIRMED
         ) {
           payment.booking.status = BookingStatus.CONFIRMED;
           await this.bookingRepository.save(payment.booking);
+        }
+
+        // Handle offer booking payment
+        if (payment.offerBookingId && this.offerBookingsService) {
+          try {
+            await this.offerBookingsService.confirmPayment(
+              payment.offerBookingId,
+            );
+          } catch (e) {
+            this.logger.error(
+              `Webhook: Failed to confirm offer booking: ${e?.message || e}`,
+            );
+          }
+        }
+
+        // Handle subscription purchase payment
+        if (
+          payment.subscriptionPurchaseId &&
+          this.subscriptionPurchasesService
+        ) {
+          try {
+            await this.subscriptionPurchasesService.confirmPayment(
+              payment.subscriptionPurchaseId,
+            );
+          } catch (e) {
+            this.logger.error(
+              `Webhook: Failed to confirm subscription purchase: ${e?.message || e}`,
+            );
+          }
         }
       }
     }
@@ -910,12 +1958,16 @@ export class PaymentsService {
   async getPaymentById(userId: string, id: string) {
     const payment = await this.paymentRepository.findOne({
       where: { id },
-      relations: ['booking'],
+      relations: ['booking', 'offerBooking', 'subscriptionPurchase'],
     });
     if (!payment) throw new NotFoundException('Payment not found');
 
     // Owner or admin/ staff guarded at controller for other routes; here enforce owner check
-    if (payment.booking?.userId !== userId) {
+    const isOwner =
+      payment.booking?.userId === userId ||
+      payment.offerBooking?.userId === userId ||
+      payment.subscriptionPurchase?.userId === userId;
+    if (!isOwner) {
       throw new NotFoundException('Payment not found');
     }
     return payment;

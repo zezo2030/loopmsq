@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
 import { Booking } from '../../database/entities/booking.entity';
+import { SchoolTripRequest } from '../../database/entities/school-trip-request.entity';
 import { Ticket } from '../../database/entities/ticket.entity';
 import { User } from '../../database/entities/user.entity';
 import { Offer } from '../../database/entities/offer.entity';
@@ -15,7 +16,7 @@ import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Booking, Ticket, User, Offer]),
+    TypeOrmModule.forFeature([Booking, Ticket, User, Offer, SchoolTripRequest]),
     ContentModule,
     CouponsModule,
     NotificationsModule,

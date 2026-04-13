@@ -29,12 +29,46 @@ type Branch = {
   videoCoverUrl?: string | null
   latitude?: number | null
   longitude?: number | null
-  priceConfig?: {
-    hourlyRate: number
-  }
   hasEventBookings?: boolean
   hasSchoolTrips?: boolean
+  schoolTripMinimumStudents?: number | null
+  schoolTripDepositPercentage?: number | null
+  schoolTripMonthlyPrices?: Record<string, number> | null
 }
+
+const schoolTripMonths = Array.from({ length: 12 }, (_, index) => index + 1)
+
+const buildBranchFormValues = (branch: Branch) => ({
+  name_ar: branch.name_ar,
+  name_en: branch.name_en,
+  location: branch.location,
+  capacity: branch.capacity,
+  description_ar: branch.description_ar,
+  description_en: branch.description_en,
+  contactPhone: branch.contactPhone,
+  amenities: branch.amenities,
+  status: branch.status,
+  workingHours: branch.workingHours || {},
+  latitude: branch.latitude,
+  longitude: branch.longitude,
+  videoUrl: branch.videoUrl,
+  videoCoverUrl: branch.videoCoverUrl,
+  hasEventBookings: branch.hasEventBookings !== false,
+  hasSchoolTrips: branch.hasSchoolTrips !== false,
+  schoolTripMinimumStudents: branch.schoolTripMinimumStudents ?? 35,
+  schoolTripDepositPercentage: branch.schoolTripDepositPercentage ?? 20,
+  schoolTripMonthlyPrices: branch.schoolTripMonthlyPrices || {},
+})
+
+const normalizeMonthlyPrices = (prices?: Record<string, unknown>) =>
+  schoolTripMonths.reduce<Record<string, number>>((acc, month) => {
+    const raw = prices?.[String(month)]
+    const value = typeof raw === 'number' ? raw : Number(raw)
+    if (Number.isFinite(value) && value >= 0) {
+      acc[String(month)] = value
+    }
+    return acc
+  }, {})
 
 export default function Branches() {
   const { t } = useTranslation()
@@ -156,46 +190,10 @@ export default function Branches() {
       key: 'actions',
       render: (_: any, r: Branch) => (
         <Space>
-          <Button size="small" onClick={() => { setSelectedBranch(r); setActiveTab('details'); setVideoCoverUrl(r.videoCoverUrl || null); form.setFieldsValue({
-            name_ar: r.name_ar,
-            name_en: r.name_en,
-            location: r.location,
-            capacity: r.capacity,
-            description_ar: r.description_ar,
-            description_en: r.description_en,
-            contactPhone: r.contactPhone,
-            amenities: r.amenities,
-            status: r.status,
-            workingHours: r.workingHours || {},
-            latitude: r.latitude,
-            longitude: r.longitude,
-            videoUrl: r.videoUrl,
-            videoCoverUrl: r.videoCoverUrl,
-            hourlyRate: r.priceConfig?.hourlyRate,
-            hasEventBookings: r.hasEventBookings !== false,
-            hasSchoolTrips: r.hasSchoolTrips !== false,
-          }); setEditing(r) }}>
+          <Button size="small" onClick={() => { setSelectedBranch(r); setActiveTab('details'); setVideoCoverUrl(r.videoCoverUrl || null); form.setFieldsValue(buildBranchFormValues(r)); setEditing(r) }}>
             {t('common.view_details') || 'View Details'}
           </Button>
-          <Button size="small" disabled={!canEdit} onClick={() => { setEditing(r); setVideoCoverUrl(r.videoCoverUrl || null); form.setFieldsValue({
-            name_ar: r.name_ar,
-            name_en: r.name_en,
-            location: r.location,
-            capacity: r.capacity,
-            description_ar: r.description_ar,
-            description_en: r.description_en,
-            contactPhone: r.contactPhone,
-            amenities: r.amenities,
-            status: r.status,
-            workingHours: r.workingHours || {},
-            latitude: r.latitude,
-            longitude: r.longitude,
-            videoUrl: r.videoUrl,
-            videoCoverUrl: r.videoCoverUrl,
-            hourlyRate: r.priceConfig?.hourlyRate,
-            hasEventBookings: r.hasEventBookings !== false,
-            hasSchoolTrips: r.hasSchoolTrips !== false,
-          }); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
+          <Button size="small" disabled={!canEdit} onClick={() => { setEditing(r); setVideoCoverUrl(r.videoCoverUrl || null); form.setFieldsValue(buildBranchFormValues(r)); setOpen(true) }}>{t('common.edit') || 'تعديل'}</Button>
           <Select
             value={r.status}
             style={{ width: 160 }}
@@ -223,23 +221,7 @@ export default function Branches() {
                 {t('common.back') || 'Back to List'}
               </Button>
               <Button type="primary" disabled={!canEdit} onClick={() => { setEditing(selectedBranch); setVideoCoverUrl(selectedBranch.videoCoverUrl || null); form.setFieldsValue({
-                name_ar: selectedBranch.name_ar,
-                name_en: selectedBranch.name_en,
-                location: selectedBranch.location,
-                capacity: selectedBranch.capacity,
-                description_ar: selectedBranch.description_ar,
-                description_en: selectedBranch.description_en,
-                contactPhone: selectedBranch.contactPhone,
-                amenities: selectedBranch.amenities,
-                status: selectedBranch.status,
-                workingHours: selectedBranch.workingHours || {},
-                latitude: selectedBranch.latitude,
-                longitude: selectedBranch.longitude,
-                videoUrl: selectedBranch.videoUrl,
-                videoCoverUrl: selectedBranch.videoCoverUrl,
-                hourlyRate: selectedBranch.priceConfig?.hourlyRate,
-                hasEventBookings: selectedBranch.hasEventBookings !== false,
-                hasSchoolTrips: selectedBranch.hasSchoolTrips !== false,
+                ...buildBranchFormValues(selectedBranch),
               }); setOpen(true) }}>
                 {t('common.edit') || 'Edit'}
               </Button>
@@ -268,19 +250,24 @@ export default function Branches() {
                       <strong>{t('branches.allow_school_trip_requests') || 'School trips'}:</strong>{' '}
                       {selectedBranch.hasSchoolTrips !== false ? (t('common.yes') || 'Yes') : (t('common.no') || 'No')}
                     </p>
+                    <p>
+                      <strong>{t('branches.school_trip_minimum_students') || 'الحد الأدنى لطلاب الرحلات المدرسية'}:</strong>{' '}
+                      {selectedBranch.schoolTripMinimumStudents ?? 35}
+                    </p>
+                    <p>
+                      <strong>{t('branches.school_trip_deposit_percentage') || 'نسبة عربون الرحلات المدرسية'}:</strong>{' '}
+                      {selectedBranch.schoolTripDepositPercentage ?? 20}%
+                    </p>
+                    <p>
+                      <strong>{t('branches.school_trip_monthly_prices') || 'أسعار الرحلات المدرسية حسب الشهر'}:</strong>{' '}
+                      {schoolTripMonths.map((month) => `${month}: ${selectedBranch.schoolTripMonthlyPrices?.[String(month)] ?? 45}`).join(' | ')}
+                    </p>
                     {selectedBranch.description_ar && <p><strong>{t('branches.description_ar') || 'الوصف (AR)'}:</strong> {selectedBranch.description_ar}</p>}
                     {selectedBranch.description_en && <p><strong>{t('branches.description_en') || 'الوصف (EN)'}:</strong> {selectedBranch.description_en}</p>}
                     {selectedBranch.coverImage && (
                       <div style={{ marginTop: 16 }}>
                         <strong>{t('branches.cover_image') || 'صورة الغلاف'}:</strong>
                         <Image src={resolveFileUrl(selectedBranch.coverImage)} width={200} height={150} style={{ marginTop: 8, objectFit: 'cover', borderRadius: 8 }} />
-                      </div>
-                    )}
-                    {selectedBranch.priceConfig && (
-                      <div style={{ marginTop: 16, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
-                        <strong style={{ display: 'block', marginBottom: 8 }}>{t('branches.pricing_config') || 'إعدادات التسعير'}:</strong>
-                                                <p><strong>{t('branches.hourly_rate') || 'السعر بالساعة'}:</strong> {selectedBranch.priceConfig.hourlyRate} {t('common.currency') || 'ريال'}</p>
-                        <p style={{ marginBottom: 0 }}>{t('branches.pricing_formula_hint')}{' '}{t('branches.addons_priced_separately') || 'Add-ons are priced separately during booking.'}</p>
                       </div>
                     )}
                   </div>
@@ -356,16 +343,12 @@ export default function Branches() {
               videoCoverUrl: values.videoCoverUrl || null,
               hasEventBookings: values.hasEventBookings !== false,
               hasSchoolTrips: values.hasSchoolTrips !== false,
+              schoolTripMinimumStudents: Number(values.schoolTripMinimumStudents || 35),
+              schoolTripDepositPercentage: Number(values.schoolTripDepositPercentage || 20),
+              schoolTripMonthlyPrices: normalizeMonthlyPrices(values.schoolTripMonthlyPrices),
             }
             if (values.workingHours) {
               payload.workingHours = values.workingHours
-            }
-            // Preserve explicit 0 values instead of falling back to legacy defaults.
-            const hasPricingConfig = [values.hourlyRate].some((value) => value !== undefined && value !== null && value !== '')
-            if (hasPricingConfig) {
-              payload.hallPriceConfig = {
-                hourlyRate: Number(values.hourlyRate ?? 0),
-              }
             }
             if (!canEdit) { message.error(t('errors.forbidden') || 'Forbidden'); return }
 
@@ -464,6 +447,41 @@ export default function Branches() {
             initialValue={true}
           >
             <Switch />
+          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="schoolTripMinimumStudents"
+                label={t('branches.school_trip_minimum_students') || 'الحد الأدنى لطلاب الرحلات المدرسية'}
+                initialValue={35}
+              >
+                <InputNumber min={1} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="schoolTripDepositPercentage"
+                label={t('branches.school_trip_deposit_percentage') || 'نسبة عربون الرحلات المدرسية'}
+                initialValue={20}
+              >
+                <InputNumber min={0} max={100} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item label={t('branches.school_trip_monthly_prices') || 'أسعار الرحلات المدرسية حسب الشهر'}>
+            <Row gutter={[12, 12]}>
+              {schoolTripMonths.map((month) => (
+                <Col span={8} key={month}>
+                  <Form.Item
+                    name={['schoolTripMonthlyPrices', String(month)]}
+                    label={t(`months.${month}`) || `${month}`}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <InputNumber min={0} style={{ width: '100%' }} placeholder="45" />
+                  </Form.Item>
+                </Col>
+              ))}
+            </Row>
           </Form.Item>
           <Form.Item name="workingHours" label={t('branches.working_hours') || 'أوقات العمل'}>
             <WorkingHoursEditor />
@@ -641,25 +659,6 @@ export default function Branches() {
             </Space>
           </Form.Item>
 
-          {/* Pricing Configuration */}
-          <Card title={t('branches.pricing_config') || 'Pricing Configuration'} style={{ marginBottom: 16 }}>
-            <Row gutter={16}>
-              <Col span={24}>
-                <Form.Item 
-                  name="hourlyRate" 
-                  label={t('branches.hourly_rate') || 'Hourly Rate'} 
-                  rules={[{ required: true, message: t('branches.hourly_rate_required') || 'Hourly rate is required' }]} 
-                  tooltip={t('branches.hourly_rate_tooltip') || 'Price charged for each booked hour'}
-                >
-                  <InputNumber min={0} step={10} style={{ width: '100%' }} placeholder="100" />
-                </Form.Item>
-              </Col>
-            </Row>
-            <div style={{ color: '#6b7280', fontSize: 12 }}>
-              {t('branches.addons_priced_separately') || 'Add-ons are priced separately during booking.'}
-            </div>
-          </Card>
-          
           {/* Cover Image */}
           <Form.Item label={t('branches.cover_image') || 'صورة الغلاف'}>
             <Space direction="vertical" style={{ width: '100%' }}>

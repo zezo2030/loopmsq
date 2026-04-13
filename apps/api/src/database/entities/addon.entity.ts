@@ -19,6 +19,15 @@ export class Addon {
   @Column({ type: 'varchar', length: 150 })
   name: string;
 
+  @Column({ type: 'varchar', length: 50, default: 'general' })
+  category: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  imageUrl: string | null;
+
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
@@ -27,6 +36,9 @@ export class Addon {
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
+
+  @Column({ type: 'json', nullable: true })
+  metadata: Record<string, unknown> | null;
 
   @CreateDateColumn()
   createdAt: Date;

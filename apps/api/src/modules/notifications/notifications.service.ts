@@ -27,8 +27,14 @@ export interface EnqueueNotification {
     | 'ADMIN_MESSAGE'
     | 'LOYALTY_EARN'
     | 'LOYALTY_REDEEM'
+    | 'LOYALTY_TICKET_REDEEMED'
     | 'RATING_REQUEST'
-    | 'WALLET_RECHARGED';
+    | 'WALLET_RECHARGED'
+    | 'OFFER_PURCHASE_SUCCESS'
+    | 'SUBSCRIPTION_PURCHASE_SUCCESS'
+    | 'GIFT_INVITE'
+    | 'GIFT_CLAIMED'
+    | 'GIFT_EXPIRED';
   to: { phone?: string; email?: string; userId?: string };
   template?: string;
   data: Record<string, unknown>;
@@ -121,7 +127,6 @@ export class NotificationsService {
     }
 
     if (n.channels.includes('whatsapp') && (n.to.phone || resolved.phone)) {
-      // WhatsApp supports OTP messages only
       if (n.type === 'OTP') {
         jobs.push(
           this.whatsappQueue.add(
@@ -129,6 +134,25 @@ export class NotificationsService {
             {
               to: n.to.phone || resolved.phone!,
               otp: String(n.data.otp),
+              lang,
+            },
+            {
+              attempts: 5,
+              backoff: { type: 'exponential', delay: 2000 },
+              removeOnComplete: true,
+              ...(n.delayMs ? { delay: n.delayMs } : {}),
+              ...(n.jobId ? { jobId: n.jobId } : {}),
+            },
+          ),
+        );
+      } else if (n.type === 'GIFT_INVITE') {
+        jobs.push(
+          this.whatsappQueue.add(
+            'send',
+            {
+              to: n.to.phone || resolved.phone!,
+              type: 'gift_invite',
+              data: n.data,
               lang,
             },
             {
@@ -286,6 +310,7 @@ export class NotificationsService {
   }
 
   private renderSubject(n: EnqueueNotification, lang: 'ar' | 'en'): string {
+    const d = n.data as any;
     switch (n.type) {
       case 'OTP':
         return lang === 'ar' ? 'رمز التحقق' : 'Your OTP Code';
@@ -295,6 +320,10 @@ export class NotificationsService {
         return lang === 'ar' ? 'تذكير بالحجز' : 'Booking Reminder';
       case 'BOOKING_END':
         return lang === 'ar' ? 'انتهاء الحجز' : 'Booking Ended';
+      case 'LOYALTY_TICKET_REDEEMED':
+        return lang === 'ar'
+          ? 'تذكرة من نقاط الولاء'
+          : 'Free ticket from loyalty points';
       case 'RATING_REQUEST':
         return lang === 'ar' ? 'تقييم تجربتك' : 'Rate Your Experience';
       case 'BOOKING_CANCELLED':
@@ -309,6 +338,20 @@ export class NotificationsService {
         return lang === 'ar' ? 'حالة طلب الرحلة' : 'Trip Request Status';
       case 'EVENT_STATUS':
         return lang === 'ar' ? 'حالة طلب المناسبة' : 'Event Request Status';
+      case 'OFFER_PURCHASE_SUCCESS':
+        return lang === 'ar'
+          ? 'تم شراء العرض بنجاح'
+          : 'Offer Purchase Confirmed';
+      case 'SUBSCRIPTION_PURCHASE_SUCCESS':
+        return lang === 'ar'
+          ? 'تم شراء الاشتراك بنجاح'
+          : 'Subscription Purchase Confirmed';
+      case 'GIFT_INVITE':
+        return lang === 'ar' ? 'لقد received هدية!' : 'You received a gift!';
+      case 'GIFT_CLAIMED':
+        return lang === 'ar' ? 'تم استلام الهدية' : 'Gift Claimed';
+      case 'GIFT_EXPIRED':
+        return lang === 'ar' ? 'انتهت صلاحية الهدية' : 'Gift Expired';
       default:
         return lang === 'ar' ? 'تنبيه' : 'Notification';
     }
@@ -376,6 +419,10 @@ export class NotificationsService {
         return lang === 'ar'
           ? `تم استبدال ${d.points} نقطة بقيمة ${d.credit}. المتبقي: ${d.totalPoints}`
           : `Redeemed ${d.points} points for ${d.credit}. Remaining: ${d.totalPoints}`;
+      case 'LOYALTY_TICKET_REDEEMED':
+        return lang === 'ar'
+          ? `تم استبدال ${d.pointsRedeemed} نقطة مقابل تذكرة مجانية في ${d.branchName || d.branchId}. رصيد النقاط المتبقي: ${d.totalPoints}.`
+          : `Redeemed ${d.pointsRedeemed} points for a free ticket at ${d.branchName || d.branchId}. Remaining points: ${d.totalPoints}.`;
       case 'RATING_REQUEST':
         return lang === 'ar'
           ? `نود معرفة رأيك بخدمتنا لحجزك رقم ${d.bookingId}. شاركنا تقييمك وملاحظاتك.`
@@ -384,6 +431,26 @@ export class NotificationsService {
         return lang === 'ar'
           ? `تم شحن محفظتك بمبلغ ${d.amount} ${d.currency || 'SAR'}. الرصيد الحالي: ${d.balance || 0} ${d.currency || 'SAR'}.`
           : `Your wallet has been recharged with ${d.amount} ${d.currency || 'SAR'}. Current balance: ${d.balance || 0} ${d.currency || 'SAR'}.`;
+      case 'OFFER_PURCHASE_SUCCESS':
+        return lang === 'ar'
+          ? `تم شراء العرض "${d.offerTitle}" بنجاح! تم إصدار ${d.ticketCount} تذكرة.`
+          : `You purchased the offer "${d.offerTitle}" successfully! ${d.ticketCount} ticket(s) issued.`;
+      case 'SUBSCRIPTION_PURCHASE_SUCCESS':
+        return lang === 'ar'
+          ? `تم شراء الاشتراك "${d.planTitle}" بنجاح! ساعاتك: ${d.totalHours}.`
+          : `You purchased the subscription "${d.planTitle}" successfully! Your hours: ${d.totalHours}.`;
+      case 'GIFT_INVITE':
+        return lang === 'ar'
+          ? `لقد أرسل ${d.senderName || 'شخص'} لك هدية: ${d.productTitle} من ${d.branchName}. استلمها الآن! ${d.deepLinkUrl || ''}`
+          : `${d.senderName || 'Someone'} sent you a gift: ${d.productTitle} from ${d.branchName}. Claim it now! ${d.deepLinkUrl || ''}`;
+      case 'GIFT_CLAIMED':
+        return lang === 'ar'
+          ? `تم استلام هديتك "${d.productTitle}" بنجاح!`
+          : `Your gift "${d.productTitle}" has been claimed!`;
+      case 'GIFT_EXPIRED':
+        return lang === 'ar'
+          ? `انتهت صلاحية هديتك "${d.productTitle}". تم بدء عملية الاسترداد.`
+          : `Your gift "${d.productTitle}" has expired. A refund has been initiated.`;
       default:
         return String(d.message || (lang === 'ar' ? 'تنبيه' : 'Notification'));
     }

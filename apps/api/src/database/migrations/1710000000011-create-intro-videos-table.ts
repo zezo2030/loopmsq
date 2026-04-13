@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateIntroVideosTable1710000000011
-  implements MigrationInterface
-{
+export class CreateIntroVideosTable1710000000011 implements MigrationInterface {
   name = 'CreateIntroVideosTable1710000000011';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

@@ -4,7 +4,10 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Logger,
+  GoneException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,8 +18,13 @@ import {
   MoreThanOrEqual,
   IsNull,
   Between,
+  In,
 } from 'typeorm';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
+import {
+  SchoolTripRequest,
+  TripRequestStatus,
+} from '../../database/entities/school-trip-request.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
 import { User } from '../../database/entities/user.entity';
@@ -43,6 +51,8 @@ export class BookingsService {
   constructor(
     @InjectRepository(Booking)
     private bookingRepository: Repository<Booking>,
+    @InjectRepository(SchoolTripRequest)
+    private tripRequestRepository: Repository<SchoolTripRequest>,
     @InjectRepository(Ticket)
     private ticketRepository: Repository<Ticket>,
     @InjectRepository(User)
@@ -59,6 +69,44 @@ export class BookingsService {
     private realtime?: RealtimeGateway,
   ) {
     this.slotMinutes = getBookingSlotMinutes(this.configService);
+  }
+
+  /**
+   * Resolve a ticket from the raw QR/string payload (hashed lookup + Redis share mapping).
+   * School-trip legacy rows may store plain `trip_<bookingId>` in qrTokenHash.
+   */
+  private async resolveTicketFromQrToken(qrToken: string): Promise<Ticket | null> {
+    if (qrToken.startsWith('trip_')) {
+      const schoolTripHash = this.qrCodeService.generateQRTokenHash(qrToken);
+      let schoolTripTicket = await this.ticketRepository.findOne({
+        where: { qrTokenHash: schoolTripHash },
+        relations: ['booking', 'booking.branch', 'booking.user'],
+      });
+      // Backward compatibility: some older rows stored plain `trip_<bookingId>`
+      if (!schoolTripTicket) {
+        schoolTripTicket = await this.ticketRepository.findOne({
+          where: { qrTokenHash: qrToken },
+          relations: ['booking', 'booking.branch', 'booking.user'],
+        });
+      }
+      return schoolTripTicket;
+    }
+
+    let mappedHash: string | null = null;
+    try {
+      mappedHash = await this.redisService
+        .getClient()
+        .get(`share:qr:${qrToken}`);
+    } catch {
+      mappedHash = null;
+    }
+    const qrTokenHash =
+      mappedHash || this.qrCodeService.generateQRTokenHash(qrToken);
+    let ticket = await this.ticketRepository.findOne({
+      where: { qrTokenHash },
+      relations: ['booking', 'booking.branch', 'booking.user'],
+    });
+    return ticket;
   }
 
   private ensureSlotAlignment(start: Date) {
@@ -89,6 +137,10 @@ export class BookingsService {
     bonusTickets: number;
     appliedOfferId: string | null;
   }> {
+    void quoteDto;
+    throw new GoneException(
+      'Direct booking quote has been removed. Use branch offers instead.',
+    );
     try {
       this.logger.log(`Getting quote for branch: ${quoteDto.branchId}`);
 
@@ -144,7 +196,7 @@ export class BookingsService {
       const branch = await this.contentService.findBranchById(branchId);
       this.logger.log(`Found branch: ${branch.name_en}`);
 
-      if (!branch.priceConfig) {
+      if (!(branch as any).priceConfig) {
         throw new BadRequestException(
           'Branch does not have pricing configuration',
         );
@@ -166,37 +218,39 @@ export class BookingsService {
       );
       const addOnById = new Map(availableAddOns.map((a) => [a.id, a]));
 
-      const addOnsCost = addOns.reduce((total, addOn) => {
-        const addOnPrice = addOnById.get(addOn.id)?.price ?? 0;
-        return total + addOnPrice * addOn.quantity;
-      }, 0);
+      const addOnsCost =
+        (addOns ?? []).length > 0
+          ? (addOns ?? []).reduce((total, addOn) => {
+              const addOnPrice = addOnById.get(addOn.id)?.price ?? 0;
+              return total + addOnPrice * addOn.quantity;
+            }, 0)
+          : 0;
 
       // Apply offer: percentage/fixed reduce price; BOGO adds extra tickets only (no price discount)
       const subtotalBeforeDiscounts = pricing.totalPrice + addOnsCost;
-      const {
-        offerDiscount,
-        appliedOfferId,
-        bonusTickets,
-      } = await this.resolveBestBranchOffer(
-        branchId,
-        null,
-        subtotalBeforeDiscounts,
-        new Date(startTime),
-        persons,
-      );
+      const { offerDiscount, appliedOfferId, bonusTickets } =
+        await this.resolveBestBranchOffer(
+          branchId,
+          null,
+          subtotalBeforeDiscounts,
+          new Date(startTime),
+          persons,
+        );
 
       // Apply coupon discount
       let discount = 0;
       if (couponCode) {
         this.logger.log(`Applying coupon: ${couponCode}`);
         discount = await this.calculateCouponDiscount(
-          couponCode,
+          couponCode ?? '',
           Math.max(0, subtotalBeforeDiscounts - offerDiscount),
           branchId,
           null, // No hallId anymore
         );
         this.logger.log(`Discount applied: ${discount}`);
       }
+
+      const normalizedAddOns = addOns ?? [];
 
       const totalPrice = Math.max(
         0,
@@ -207,16 +261,19 @@ export class BookingsService {
         branchId: branch.id,
         branchName: branch.name_en,
         pricing,
-        addOns: addOns.map((addOn) => {
-          const resolvedAddOn = addOnById.get(addOn.id);
-          const price = resolvedAddOn?.price ?? 0;
-          return {
-            ...addOn,
-            name: resolvedAddOn?.name,
-            price,
-            total: price * addOn.quantity,
-          };
-        }),
+        addOns:
+          normalizedAddOns.length > 0
+            ? normalizedAddOns.map((addOn) => {
+                const resolvedAddOn = addOnById.get(addOn.id);
+                const price = resolvedAddOn?.price ?? 0;
+                return {
+                  ...addOn,
+                  name: resolvedAddOn?.name,
+                  price,
+                  total: price * addOn.quantity,
+                };
+              })
+            : [],
         discount: Math.round((offerDiscount + discount) * 100) / 100,
         totalPrice: Math.round(totalPrice * 100) / 100,
         bonusTickets,
@@ -237,6 +294,11 @@ export class BookingsService {
     userId: string,
     createBookingDto: CreateBookingDto,
   ): Promise<Booking> {
+    void userId;
+    void createBookingDto;
+    throw new GoneException(
+      'Direct booking creation has been removed. Use branch offers instead.',
+    );
     const {
       branchId,
       startTime,
@@ -767,23 +829,14 @@ export class BookingsService {
     success: boolean;
     ticket?: Ticket;
     booking?: Booking;
+    isLoyaltyTicket?: boolean;
     message: string;
+    errorCode?: string;
+    ticketBranchName?: string;
   }> {
     const { qrToken } = scanTicketDto;
 
-    // Resolve ephemeral QR token mapping from Redis if exists, else hash directly
-    let mappedHash: string | null = null;
-    try {
-      mappedHash = await this.redisService.get(`share:qr:${qrToken}`);
-    } catch {
-      mappedHash = null;
-    }
-    const qrTokenHash =
-      mappedHash || this.qrCodeService.generateQRTokenHash(qrToken);
-    const ticket = await this.ticketRepository.findOne({
-      where: { qrTokenHash },
-      relations: ['booking', 'booking.branch', 'booking.user'],
-    });
+    const ticket = await this.resolveTicketFromQrToken(qrToken);
 
     if (!ticket) {
       return {
@@ -792,14 +845,18 @@ export class BookingsService {
       };
     }
 
-    // Enforce branch restriction: staff can only scan tickets for their branch (if staff has branch)
+    // Enforce branch restriction: staff/branch manager must belong to a branch and it must match the booking
     const staff = await this.userRepository.findOne({ where: { id: staffId } });
-    if (staff?.branchId && staff.branchId !== ticket.booking.branchId) {
+    if (!staff?.branchId || staff.branchId !== ticket.booking.branchId) {
+      const b = ticket.booking?.branch;
+      const ticketBranchName = b?.name_ar || b?.name_en || undefined;
       return {
         success: false,
         ticket,
         booking: ticket.booking,
-        message: 'Not allowed',
+        message: 'Branch mismatch',
+        errorCode: 'BRANCH_MISMATCH',
+        ticketBranchName,
       };
     }
 
@@ -830,11 +887,26 @@ export class BookingsService {
     // - It remains valid for booking.durationHours from that moment
     const now = new Date();
 
+    const isLoyaltyTicket =
+      Boolean((ticket.metadata as any)?.isLoyaltyTicket) ||
+      Boolean((ticket.booking as any)?.metadata?.isLoyaltyTicket);
     const isSchoolTripTicket =
       (ticket.metadata as any)?.tripType === 'school' ||
       ticket.qrTokenHash.startsWith('trip_');
 
-    if (isSchoolTripTicket) {
+    if (isLoyaltyTicket) {
+      const endOfDay = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        23,
+        59,
+        59,
+        999,
+      );
+      ticket.validFrom = now;
+      ticket.validUntil = endOfDay;
+    } else if (isSchoolTripTicket) {
       if (!ticket.validFrom || !ticket.validUntil) {
         const bookingStart = new Date(ticket.booking.startTime as any);
         const dayStart = new Date(
@@ -896,6 +968,7 @@ export class BookingsService {
       success: true,
       ticket,
       booking: ticket.booking,
+      isLoyaltyTicket,
       message: 'Ticket validated successfully',
     };
   }
@@ -1048,27 +1121,141 @@ export class BookingsService {
     }
   }
 
-  async getTicketByToken(token: string): Promise<{
+  async getTicketByToken(
+    staffId: string,
+    token: string,
+  ): Promise<{
     ticket: Ticket;
-    booking: Booking;
+    booking: Booking | Record<string, unknown>;
+    tripRequest: Partial<SchoolTripRequest> | null;
   }> {
-    // Accept ephemeral share tokens (resolve to qrTokenHash if present)
-    const redis = this.redisService.getClient();
-    const mappedHash = await redis.get(`share:qr:${token}`);
-    const qrTokenHash =
-      mappedHash || this.qrCodeService.generateQRTokenHash(token);
-    const ticket = await this.ticketRepository.findOne({
-      where: { qrTokenHash },
-      relations: ['booking', 'booking.branch', 'booking.user'],
-    });
+    const ticket = await this.resolveTicketFromQrToken(token);
 
     if (!ticket) {
       throw new NotFoundException('Ticket not found');
     }
 
+    const staff = await this.userRepository.findOne({ where: { id: staffId } });
+    if (!staff?.branchId || staff.branchId !== ticket.booking.branchId) {
+      const b = ticket.booking?.branch;
+      const ticketBranchName = b?.name_ar || b?.name_en || '';
+      throw new HttpException(
+        {
+          errorCode: 'BRANCH_MISMATCH',
+          ticketBranchName,
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const booking = ticket.booking;
+    const bookingDate = booking.startTime
+      ? new Date(booking.startTime).toISOString().slice(0, 10)
+      : null;
+
+    const isSchoolTripTicket =
+      (ticket.metadata as any)?.tripType === 'school' ||
+      ticket.qrTokenHash.startsWith('trip_');
+
+    let tripRequest: SchoolTripRequest | null = null;
+    const tripRequestId = (booking.metadata as any)?.tripRequestId;
+
+    if (isSchoolTripTicket) {
+      if (tripRequestId) {
+        tripRequest = await this.tripRequestRepository.findOne({
+          where: { id: tripRequestId },
+        });
+      }
+
+      // Fallback to fuzzy matching if not found by ID
+      if (!tripRequest && bookingDate) {
+        tripRequest = await this.tripRequestRepository.findOne({
+          where: {
+            requesterId: booking.userId,
+            branchId: booking.branchId,
+            preferredDate: bookingDate as any,
+          },
+          order: { updatedAt: 'DESC' },
+        });
+
+        const bookingTotal = Number(booking.totalPrice ?? 0);
+        if (
+          tripRequest &&
+          Number(tripRequest.totalAmount ?? tripRequest.quotedPrice ?? 0) !==
+            bookingTotal
+        ) {
+          tripRequest = await this.tripRequestRepository.findOne({
+            where: {
+              requesterId: booking.userId,
+              branchId: booking.branchId,
+              status: In([
+                TripRequestStatus.DEPOSIT_PAID,
+                TripRequestStatus.PAID,
+                TripRequestStatus.COMPLETED,
+              ]) as any,
+            },
+            order: { updatedAt: 'DESC' },
+          });
+        }
+      }
+    }
+
+    const bookingResponse: Booking | Record<string, unknown> =
+      isSchoolTripTicket && tripRequest
+        ? this.buildSchoolTripBookingResponse(booking, tripRequest)
+        : booking;
+
     return {
       ticket,
-      booking: ticket.booking,
+      booking: bookingResponse,
+      tripRequest: tripRequest
+        ? {
+            id: tripRequest.id,
+            schoolName: tripRequest.schoolName,
+            studentsCount: tripRequest.studentsCount,
+            accompanyingAdults: tripRequest.accompanyingAdults,
+            contactPersonName: tripRequest.contactPersonName,
+            contactPhone: tripRequest.contactPhone,
+            contactEmail: tripRequest.contactEmail,
+            specialRequirements: tripRequest.specialRequirements,
+            status: tripRequest.status,
+            paymentOption: tripRequest.paymentOption,
+            ticketPricePerStudent: tripRequest.ticketPricePerStudent,
+            ticketsSubtotal: tripRequest.ticketsSubtotal,
+            addonsSubtotal: tripRequest.addonsSubtotal,
+            totalAmount: tripRequest.totalAmount,
+            depositAmount: tripRequest.depositAmount,
+            amountPaid: tripRequest.amountPaid,
+            remainingAmount: tripRequest.remainingAmount,
+            addOns: tripRequest.addOns,
+            preferredDate: tripRequest.preferredDate,
+            preferredTime: tripRequest.preferredTime,
+            selectedTimeSlot: tripRequest.selectedTimeSlot,
+            durationHours: tripRequest.durationHours,
+          }
+        : null,
+    };
+  }
+
+  private buildSchoolTripBookingResponse(
+    booking: Booking,
+    tripRequest: SchoolTripRequest,
+  ): Record<string, unknown> {
+    const raw = booking as unknown as Record<string, unknown>;
+    const metadata =
+      raw.metadata && typeof raw.metadata === 'object'
+        ? { ...(raw.metadata as Record<string, unknown>) }
+        : raw.metadata;
+
+    return {
+      ...raw,
+      metadata,
+      event: null,
+      eventName: tripRequest.schoolName,
+      event_name: tripRequest.schoolName,
+      hall: null,
+      hallName: null,
+      hall_name: null,
     };
   }
 
@@ -1456,8 +1643,7 @@ export class BookingsService {
     if (o.discountType === 'bogo') {
       const buy = Math.max(1, Math.floor(Number(o.buyCount ?? 1)));
       const free = Math.max(1, Math.floor(Number(o.freeCount ?? 1)));
-      const bonusTickets =
-        persons >= 1 ? Math.floor(persons / buy) * free : 0;
+      const bonusTickets = persons >= 1 ? Math.floor(persons / buy) * free : 0;
       return { discount: 0, bonusTickets };
     }
     const d =
@@ -1544,6 +1730,11 @@ export class BookingsService {
     persons: number;
     durationPricePerPerson: number;
   }> {
+    void bookingId;
+    throw new GoneException(
+      'Booking pricing has been removed. Use offer pricing instead.',
+    );
+
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
       relations: ['branch'],
@@ -1553,16 +1744,18 @@ export class BookingsService {
       throw new NotFoundException('Booking not found');
     }
 
-    if (!booking.branchId) {
+    const existingBooking = booking as Booking;
+
+    if (!existingBooking.branchId) {
       throw new BadRequestException('Booking has no associated branch');
     }
 
     // Calculate pricing using the same logic as quote calculation
     const pricing = await this.contentService.calculateBranchPrice(
-      booking.branchId,
-      booking.startTime,
-      booking.durationHours,
-      booking.persons,
+      existingBooking.branchId,
+      existingBooking.startTime,
+      existingBooking.durationHours,
+      existingBooking.persons,
     );
 
     return pricing;

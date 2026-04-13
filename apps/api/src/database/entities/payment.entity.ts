@@ -11,6 +11,9 @@ import {
 import { Booking } from './booking.entity';
 import { EventRequest } from './event-request.entity';
 import { SchoolTripRequest } from './school-trip-request.entity';
+import { OfferBooking } from './offer-booking.entity';
+import { SubscriptionPurchase } from './subscription-purchase.entity';
+import { GiftOrder } from './gift-order.entity';
 
 export enum PaymentStatus {
   PENDING = 'pending',
@@ -38,6 +41,9 @@ export enum PaymentMethod {
 @Index(['bookingId', 'status'])
 @Index(['eventRequestId', 'status'])
 @Index(['tripRequestId', 'status'])
+@Index(['offerBookingId', 'status'])
+@Index(['subscriptionPurchaseId', 'status'])
+@Index(['giftOrderId'])
 @Index(['transactionId'])
 @Index(['paidAt'])
 export class Payment {
@@ -52,6 +58,15 @@ export class Payment {
 
   @Column({ type: 'uuid', nullable: true })
   tripRequestId: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  offerBookingId: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  subscriptionPurchaseId: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  giftOrderId: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   gatewayRef: string;
@@ -107,4 +122,22 @@ export class Payment {
   @ManyToOne(() => SchoolTripRequest, { nullable: true })
   @JoinColumn({ name: 'tripRequestId' })
   tripRequest: SchoolTripRequest;
+
+  @ManyToOne(() => OfferBooking, (booking) => booking.payments, {
+    nullable: true,
+  })
+  @JoinColumn({ name: 'offerBookingId' })
+  offerBooking: OfferBooking;
+
+  @ManyToOne(() => SubscriptionPurchase, (purchase) => purchase.payments, {
+    nullable: true,
+  })
+  @JoinColumn({ name: 'subscriptionPurchaseId' })
+  subscriptionPurchase: SubscriptionPurchase;
+
+  @ManyToOne(() => GiftOrder, (giftOrder) => giftOrder.payments, {
+    nullable: true,
+  })
+  @JoinColumn({ name: 'giftOrderId' })
+  giftOrder: GiftOrder;
 }

@@ -6,7 +6,8 @@ import {
   SearchOutlined, 
   EyeOutlined, 
   EditOutlined,
-  CustomerServiceOutlined
+  CustomerServiceOutlined,
+  PlusOutlined
 } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
@@ -160,9 +161,18 @@ export default function ClientsList() {
               {t('users.clients.subtitle') || 'عرض وإدارة جميع العملاء المسجلين في النظام'}
             </p>
           </div>
-          <Tag color="green" style={{ fontSize: '16px', padding: '8px 16px', fontWeight: '600' }}>
-            {filteredClients.length} {t('users.clients.total') || 'عميل'}
-          </Tag>
+          <Space size="middle">
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />}
+              onClick={() => navigate('/admin/clients/new')}
+            >
+              {t('users.add_client') || 'إضافة عميل'}
+            </Button>
+            <Tag color="green" style={{ fontSize: '16px', padding: '8px 16px', fontWeight: '600' }}>
+              {filteredClients.length} {t('users.clients.total') || 'عميل'}
+            </Tag>
+          </Space>
         </div>
       </div>
 

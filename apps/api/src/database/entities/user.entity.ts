@@ -11,6 +11,8 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { UserRole } from '../../common/decorators/roles.decorator';
+
+export { UserRole };
 import { Booking } from './booking.entity';
 import { Wallet } from './wallet.entity';
 import { Branch } from './branch.entity';

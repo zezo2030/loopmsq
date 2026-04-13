@@ -1,6 +1,7 @@
 export function getApiBase(): string {
-  const base = (import.meta as any).env?.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE
-  return (typeof base === 'string' && base) ? base : 'http://localhost:3000/api/v1'
+  const raw = (import.meta as any).env?.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE
+  const trimmed = typeof raw === 'string' ? raw.trim().replace(/\/+$/, '') : ''
+  return trimmed || 'http://localhost:3000/api/v1'
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

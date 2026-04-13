@@ -25,3 +25,34 @@ export {
 } from './support-ticket.entity';
 export { Role } from './role.entity';
 export { DeviceToken } from './device-token.entity';
+export { OfferProduct, OfferCategory } from './offer-product.entity';
+export {
+  OfferBooking,
+  OfferBookingPaymentStatus,
+  OfferBookingStatus,
+} from './offer-booking.entity';
+export {
+  OfferTicket,
+  OfferTicketKind,
+  OfferTicketStatus,
+} from './offer-ticket.entity';
+export {
+  SubscriptionPlan,
+  SubscriptionDurationType,
+  SubscriptionUsageMode,
+} from './subscription-plan.entity';
+export {
+  SubscriptionPurchase,
+  SubscriptionPurchaseStatus,
+  SubscriptionPurchasePaymentStatus,
+} from './subscription-purchase.entity';
+export { SubscriptionUsageLog } from './subscription-usage-log.entity';
+export {
+  GiftOrder,
+  GiftType,
+  GiftPaymentStatus,
+  GiftStatus,
+  FinalAssetType,
+  WhatsAppStatus,
+} from './gift-order.entity';
+export { GiftOrderEvent } from './gift-order-event.entity';

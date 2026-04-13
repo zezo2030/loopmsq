@@ -216,4 +216,79 @@ export class WhatsAppProvider {
     );
     // Do not throw to avoid breaking auth flow when WhatsApp fails.
   }
+
+  async sendGiftInvite(
+    to: string,
+    payload: {
+      branchName: string;
+      productTitle: string;
+      senderName?: string;
+      deepLinkUrl: string;
+    },
+    lang: 'ar' | 'en' = 'ar',
+  ): Promise<void> {
+    await this.loadConfig();
+
+    if (!this.http || !this.phoneNumberId) {
+      this.logger.warn('WhatsApp not configured, skipping gift invite send');
+      return;
+    }
+
+    const cleanPhone = to.replace(/^\+/, '').replace(/\s/g, '');
+    const templateName =
+      this.configService.get<string>('WHATSAPP_GIFT_TEMPLATE_NAME') ||
+      'gift_invite';
+    const languageCandidates = this.getLanguageCandidates(lang);
+
+    for (const languageCode of languageCandidates) {
+      try {
+        await this.http.post('/messages', {
+          messaging_product: 'whatsapp',
+          to: cleanPhone,
+          type: 'template',
+          template: {
+            name: templateName,
+            language: { code: languageCode },
+            components: [
+              {
+                type: 'body',
+                parameters: [
+                  { type: 'text', text: payload.branchName },
+                  { type: 'text', text: payload.productTitle },
+                  {
+                    type: 'text',
+                    text: payload.senderName || '',
+                  },
+                  { type: 'text', text: payload.deepLinkUrl },
+                ],
+              },
+            ],
+          },
+        });
+
+        this.logger.log(
+          `WhatsApp gift invite sent to ${to} using template "${templateName}"`,
+        );
+        return;
+      } catch (e: any) {
+        const errorMessage = e.response?.data?.error?.message || String(e);
+        const errorCode = e.response?.data?.error?.code;
+        const isRetryable =
+          errorCode === 132001 || errorCode === 132005 || errorCode === 132015;
+
+        if (
+          isRetryable &&
+          languageCandidates.indexOf(languageCode) <
+            languageCandidates.length - 1
+        ) {
+          continue;
+        }
+
+        this.logger.error(
+          `WhatsApp gift invite failed: ${errorMessage} (Code: ${errorCode})`,
+        );
+        return;
+      }
+    }
+  }
 }

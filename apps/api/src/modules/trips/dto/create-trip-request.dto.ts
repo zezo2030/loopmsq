@@ -21,14 +21,16 @@ class AddOnDto {
   @IsString()
   id: string;
 
-  @ApiProperty({ description: 'Add-on name', example: 'Meals' })
+  @ApiPropertyOptional({ description: 'Add-on name', example: 'Meals' })
+  @IsOptional()
   @IsString()
-  name: string;
+  name?: string;
 
-  @ApiProperty({ description: 'Add-on price', example: 20 })
+  @ApiPropertyOptional({ description: 'Add-on price', example: 20 })
+  @IsOptional()
   @IsInt()
   @Min(0)
-  price: number;
+  price?: number;
 
   @ApiProperty({ description: 'Quantity', example: 1 })
   @IsInt()
@@ -47,7 +49,7 @@ export class CreateTripRequestDto {
   schoolName: string;
 
   @ApiPropertyOptional({
-    description: 'Students count (optional, will be set from Excel file)',
+    description: 'Students count',
   })
   @IsOptional()
   @IsInt()
@@ -69,7 +71,7 @@ export class CreateTripRequestDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @Length(1, 10)
+  @Length(1, 50)
   preferredTime?: string;
 
   @ApiPropertyOptional()
@@ -78,21 +80,6 @@ export class CreateTripRequestDto {
   @Min(1)
   @Max(24)
   durationHours?: number;
-
-  @ApiProperty()
-  @IsString()
-  @Length(2, 100)
-  contactPersonName: string;
-
-  @ApiProperty()
-  @IsString()
-  @Length(5, 20)
-  contactPhone: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsEmail()
-  contactEmail?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -111,4 +98,13 @@ export class CreateTripRequestDto {
   @IsOptional()
   @IsEnum(PaymentMethod)
   paymentMethod?: PaymentMethod;
+
+  @ApiProperty({
+    description: 'Payment option for school trip booking',
+    enum: ['full', 'deposit'],
+    example: 'deposit',
+  })
+  @IsString()
+  @Length(4, 20)
+  paymentOption: string;
 }

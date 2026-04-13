@@ -37,6 +37,11 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
 import { SearchModule } from './modules/search/search.module';
 import { AdminConfigModule } from './modules/admin-config/admin-config.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { OfferProductsModule } from './modules/offer-products/offer-products.module';
+import { OfferBookingsModule } from './modules/offer-bookings/offer-bookings.module';
+import { SubscriptionPlansModule } from './modules/subscription-plans/subscription-plans.module';
+import { SubscriptionPurchasesModule } from './modules/subscription-purchases/subscription-purchases.module';
+import { GiftOrdersModule } from './modules/gift-orders/gift-orders.module';
 
 // Resolve uploads root dynamically to support local and Docker paths, with env override
 const defaultUploadsCandidates = [
@@ -158,6 +163,11 @@ function resolveUploadsRootFromEnvOrDefault(config?: ConfigService): string {
     SearchModule,
     AdminConfigModule,
     RealtimeModule,
+    OfferProductsModule,
+    OfferBookingsModule,
+    SubscriptionPlansModule,
+    SubscriptionPurchasesModule,
+    GiftOrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],
