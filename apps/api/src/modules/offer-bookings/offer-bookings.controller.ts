@@ -229,6 +229,24 @@ export class OfferBookingsController {
     };
   }
 
+  @Get('staff/offer-tickets/scans/me')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.STAFF, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Get offer scans for current staff user' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'dateFrom', required: false, type: String })
+  @ApiQuery({ name: 'dateTo', required: false, type: String })
+  async getMyOfferScans(
+    @CurrentUser() user: User,
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 50,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.service.findStaffScans(user.id, page, limit, dateFrom, dateTo);
+  }
+
   @Post('staff/offer-tickets/scan')
   @UseGuards(RolesGuard)
   @Roles(UserRole.STAFF, UserRole.BRANCH_MANAGER)

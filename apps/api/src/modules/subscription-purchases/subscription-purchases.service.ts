@@ -162,6 +162,86 @@ export class SubscriptionPurchasesService {
     return result;
   }
 
+  private isValidUsageMode(value: unknown): value is SubscriptionUsageMode {
+    return (
+      value === SubscriptionUsageMode.FLEXIBLE_TOTAL_HOURS ||
+      value === SubscriptionUsageMode.DAILY_LIMITED ||
+      value === SubscriptionUsageMode.DAILY_UNLIMITED
+    );
+  }
+
+  /**
+   * Resolve purchase usage mode defensively so legacy snapshots do not regress
+   * unlimited daily subscriptions into limited/hour-based behavior.
+   */
+  private resolvePurchaseUsageMode(
+    purchase: SubscriptionPurchase,
+  ): SubscriptionUsageMode {
+    const hasUnlimitedShape =
+      purchase.totalHours == null &&
+      purchase.dailyHoursLimit == null &&
+      purchase.remainingHours == null;
+
+    if (hasUnlimitedShape) {
+      return SubscriptionUsageMode.DAILY_UNLIMITED;
+    }
+
+    const snapshotMode = purchase.planSnapshot?.usageMode;
+    if (this.isValidUsageMode(snapshotMode)) {
+      return snapshotMode;
+    }
+
+    const planMode = purchase.subscriptionPlan?.usageMode;
+    if (this.isValidUsageMode(planMode)) {
+      return planMode;
+    }
+
+    const hasTotalHours = purchase.totalHours != null;
+    const hasDailyLimit = purchase.dailyHoursLimit != null;
+
+    if (hasDailyLimit) {
+      return SubscriptionUsageMode.DAILY_LIMITED;
+    }
+
+    return SubscriptionUsageMode.FLEXIBLE_TOTAL_HOURS;
+  }
+
+  private isDailyCrossBranchPurchase(purchase: SubscriptionPurchase): boolean {
+    const usageMode = this.resolvePurchaseUsageMode(purchase);
+    if (
+      usageMode === SubscriptionUsageMode.DAILY_UNLIMITED ||
+      usageMode === SubscriptionUsageMode.DAILY_LIMITED ||
+      usageMode === SubscriptionUsageMode.FLEXIBLE_TOTAL_HOURS
+    ) {
+      return true;
+    }
+
+    // Legacy snapshots may still contain older naming.
+    const legacySnapshotMode = purchase.planSnapshot?.usageMode
+      ?.toString()
+      .toLowerCase()
+      .trim();
+    if (
+      legacySnapshotMode === 'daily_limited' ||
+      legacySnapshotMode === 'daily_unlimited' ||
+      legacySnapshotMode === 'monthly_pool' ||
+      legacySnapshotMode === 'unlimited'
+    ) {
+      return true;
+    }
+
+    // Fallback heuristic: any explicit daily cap implies a daily plan.
+    const snapshotDailyCap = Number(purchase.planSnapshot?.dailyHoursLimit);
+    if (
+      purchase.dailyHoursLimit != null ||
+      (Number.isFinite(snapshotDailyCap) && snapshotDailyCap > 0)
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
   /**
    * Create a subscription purchase and initiate payment.
    */
@@ -529,9 +609,19 @@ export class SubscriptionPurchasesService {
     purchase: SubscriptionPurchase,
   ): Promise<void> {
     const staff = await this.userRepo.findOne({ where: { id: staffId } });
+
+    // Daily-based subscriptions are valid cross-branch by business rule.
+    // Only pooled total-hours subscriptions remain branch-restricted.
+    if (this.isDailyCrossBranchPurchase(purchase)) {
+      return;
+    }
+
     if (!staff?.branchId || staff.branchId !== purchase.branchId) {
       const b = purchase.branch;
       const ticketBranchName = b?.name_ar || b?.name_en || '';
+      this.logger.warn(
+        `Subscription BRANCH_MISMATCH: staffId=${staffId}, staffBranch=${staff?.branchId || 'none'}, purchaseId=${purchase.id}, purchaseBranch=${purchase.branchId}, resolvedUsageMode=${this.resolvePurchaseUsageMode(purchase)}, snapshotUsageMode=${purchase.planSnapshot?.usageMode ?? 'none'}`,
+      );
       throw new HttpException(
         {
           errorCode: 'BRANCH_MISMATCH',
@@ -584,12 +674,10 @@ export class SubscriptionPurchasesService {
       .getRawOne();
 
     const dailyUsedToday = Number(dailyUsedResult?.sum || 0);
-    const usageMode =
-      purchase.planSnapshot?.usageMode ||
-      purchase.subscriptionPlan?.usageMode ||
-      SubscriptionUsageMode.DAILY_LIMITED;
+    const usageMode = this.resolvePurchaseUsageMode(purchase);
     const dailyRemainingToday =
-      purchase.dailyHoursLimit != null
+      usageMode !== SubscriptionUsageMode.DAILY_UNLIMITED &&
+        purchase.dailyHoursLimit != null
         ? Number(purchase.dailyHoursLimit) - dailyUsedToday
         : null;
 
@@ -603,7 +691,7 @@ export class SubscriptionPurchasesService {
         dailyUsedToday,
         dailyRemainingToday,
         usageMode,
-        canDeductHours: usageMode !== SubscriptionUsageMode.DAILY_UNLIMITED,
+        canDeductHours: true,
         startedAt: purchase.startedAt,
         endsAt: purchase.endsAt,
       },
@@ -633,7 +721,7 @@ export class SubscriptionPurchasesService {
   async deductHours(dto: DeductHoursDto, staffId: string) {
     const purchase = await this.purchaseRepo.findOne({
       where: { id: dto.subscriptionPurchaseId },
-      relations: ['branch'],
+      relations: ['branch', 'subscriptionPlan'],
     });
 
     if (!purchase) {
@@ -666,16 +754,12 @@ export class SubscriptionPurchasesService {
       throw new BadRequestException('Hours must be a positive multiple of 0.5');
     }
 
-    const usageMode =
-      purchase.planSnapshot?.usageMode || SubscriptionUsageMode.DAILY_LIMITED;
+    const usageMode = this.resolvePurchaseUsageMode(purchase);
 
-    if (usageMode === SubscriptionUsageMode.DAILY_UNLIMITED) {
-      throw new BadRequestException(
-        'Unlimited daily subscriptions do not require hour deduction',
-      );
-    }
-
-    if (hours > Number(purchase.remainingHours || 0)) {
+    if (
+      usageMode !== SubscriptionUsageMode.DAILY_UNLIMITED &&
+      hours > Number(purchase.remainingHours || 0)
+    ) {
       throw new BadRequestException('Hours exceed remaining hours');
     }
 
@@ -705,22 +789,27 @@ export class SubscriptionPurchasesService {
     }
 
     const remainingHoursBefore = Number(purchase.remainingHours || 0);
-    const remainingHoursAfter = remainingHoursBefore - hours;
+    const remainingHoursAfter =
+      usageMode === SubscriptionUsageMode.DAILY_UNLIMITED
+        ? remainingHoursBefore
+        : remainingHoursBefore - hours;
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // Update purchase
-      purchase.remainingHours = remainingHoursAfter;
+      // Update purchase only for finite-hour subscriptions.
+      if (usageMode !== SubscriptionUsageMode.DAILY_UNLIMITED) {
+        purchase.remainingHours = remainingHoursAfter;
 
-      if (remainingHoursAfter <= 0) {
-        purchase.status = SubscriptionPurchaseStatus.DEPLETED;
-        purchase.remainingHours = 0;
+        if (remainingHoursAfter <= 0) {
+          purchase.status = SubscriptionPurchaseStatus.DEPLETED;
+          purchase.remainingHours = 0;
+        }
+
+        await queryRunner.manager.save(SubscriptionPurchase, purchase);
       }
-
-      await queryRunner.manager.save(SubscriptionPurchase, purchase);
 
       // Create usage log
       const usageLog = queryRunner.manager.create(SubscriptionUsageLog, {
@@ -744,9 +833,12 @@ export class SubscriptionPurchasesService {
 
       return {
         success: true,
-        message: 'Hours deducted successfully',
+        message: 'Hours set successfully',
         subscription: {
-          remainingHours: remainingHoursAfter,
+          remainingHours:
+            usageMode === SubscriptionUsageMode.DAILY_UNLIMITED
+              ? purchase.remainingHours
+              : remainingHoursAfter,
           dailyUsedToday: dailyUsedToday + hours,
           dailyRemainingToday:
             dailyRemainingToday != null ? dailyRemainingToday - hours : null,
@@ -783,13 +875,64 @@ export class SubscriptionPurchasesService {
   ) {
     const purchase = await this.purchaseRepo.findOne({
       where: { id: purchaseId },
-      relations: ['branch'],
+      relations: ['branch', 'subscriptionPlan'],
     });
     if (!purchase) {
       throw new NotFoundException('Subscription not found');
     }
     await this.assertStaffSubscriptionBranch(staffId, purchase);
     return this.findUsageLogs(purchaseId, page, limit);
+  }
+
+  async findUsageLogsByStaff(
+    staffId: string,
+    page: number = 1,
+    limit: number = 50,
+    dateFrom?: string,
+    dateTo?: string,
+  ) {
+    const from = dateFrom ? new Date(dateFrom) : undefined;
+    const to = dateTo ? new Date(dateTo) : undefined;
+
+    const qb = this.usageLogRepo
+      .createQueryBuilder('log')
+      .leftJoinAndSelect('log.subscriptionPurchase', 'purchase')
+      .leftJoinAndSelect('purchase.user', 'user')
+      .leftJoinAndSelect('purchase.branch', 'purchaseBranch')
+      .leftJoinAndSelect('log.branch', 'logBranch')
+      .where('log.staffId = :staffId', { staffId })
+      .orderBy('log.createdAt', 'DESC')
+      .skip((Math.max(page, 1) - 1) * Math.max(limit, 1))
+      .take(Math.max(limit, 1));
+
+    if (from && !Number.isNaN(from.getTime())) {
+      qb.andWhere('log.createdAt >= :from', { from });
+    }
+    if (to && !Number.isNaN(to.getTime())) {
+      qb.andWhere('log.createdAt <= :to', { to });
+    }
+
+    const [logs, total] = await qb.getManyAndCount();
+
+    return {
+      logs: logs.map((log) => ({
+        id: log.id,
+        subscriptionPurchaseId: log.subscriptionPurchaseId,
+        deductedHours: Number(log.deductedHours),
+        notes: log.notes,
+        createdAt: log.createdAt,
+        customerName: log.subscriptionPurchase?.user?.name || 'Unknown',
+        branchName:
+          log.branch?.name_ar ||
+          log.branch?.name_en ||
+          log.subscriptionPurchase?.branch?.name_ar ||
+          log.subscriptionPurchase?.branch?.name_en ||
+          'Unknown Branch',
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   /**
@@ -1061,10 +1204,7 @@ export class SubscriptionPurchasesService {
             purchase.subscriptionPlan?.title ||
             purchase.planSnapshot?.title ||
             'Subscription',
-          usageMode:
-            purchase.subscriptionPlan?.usageMode ||
-            purchase.planSnapshot?.usageMode ||
-            SubscriptionUsageMode.DAILY_LIMITED,
+          usageMode: this.resolvePurchaseUsageMode(purchase),
           durationMonths:
             purchase.subscriptionPlan?.durationMonths ||
             purchase.planSnapshot?.durationMonths ||
@@ -1149,10 +1289,7 @@ export class SubscriptionPurchasesService {
           purchase.subscriptionPlan?.title ||
           purchase.planSnapshot?.title ||
           'Subscription',
-        usageMode:
-          purchase.subscriptionPlan?.usageMode ||
-          purchase.planSnapshot?.usageMode ||
-          SubscriptionUsageMode.DAILY_LIMITED,
+        usageMode: this.resolvePurchaseUsageMode(purchase),
         durationMonths:
           purchase.subscriptionPlan?.durationMonths ||
           purchase.planSnapshot?.durationMonths ||

@@ -1261,15 +1261,65 @@ export class BookingsService {
     };
   }
 
-  async getStaffScans(staffId: string): Promise<{
-    scans: Ticket[];
+  async getStaffScans(
+    staffId: string,
+    page: number = 1,
+    limit: number = 50,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Promise<{
+    scans: Array<{
+      id: string;
+      bookingId: string;
+      ticketType: string;
+      status: string;
+      scannedAt: Date;
+      customerName: string;
+      branchName: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
   }> {
-    const scans = await this.ticketRepository.find({
-      where: { staffId },
-      order: { scannedAt: 'DESC' },
-      relations: ['booking', 'booking.branch'],
-    } as any);
-    return { scans };
+    const from = dateFrom ? new Date(dateFrom) : undefined;
+    const to = dateTo ? new Date(dateTo) : undefined;
+
+    const qb = this.ticketRepository
+      .createQueryBuilder('ticket')
+      .leftJoinAndSelect('ticket.booking', 'booking')
+      .leftJoinAndSelect('booking.branch', 'branch')
+      .where('ticket.staffId = :staffId', { staffId })
+      .andWhere('ticket.scannedAt IS NOT NULL')
+      .orderBy('ticket.scannedAt', 'DESC')
+      .skip((Math.max(page, 1) - 1) * Math.max(limit, 1))
+      .take(Math.max(limit, 1));
+
+    if (from && !Number.isNaN(from.getTime())) {
+      qb.andWhere('ticket.scannedAt >= :from', { from });
+    }
+    if (to && !Number.isNaN(to.getTime())) {
+      qb.andWhere('ticket.scannedAt <= :to', { to });
+    }
+
+    const [tickets, total] = await qb.getManyAndCount();
+
+    return {
+      scans: tickets.map((ticket) => ({
+        id: ticket.id,
+        bookingId: ticket.bookingId,
+        ticketType: 'booking',
+        status: ticket.status,
+        scannedAt: ticket.scannedAt,
+        customerName: ticket.holderName || 'Unknown',
+        branchName:
+          ticket.booking?.branch?.name_ar ||
+          ticket.booking?.branch?.name_en ||
+          'Unknown Branch',
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   async getStaffScanStats(staffId: string): Promise<{

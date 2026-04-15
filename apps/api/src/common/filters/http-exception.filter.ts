@@ -19,8 +19,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
     const status = exception.getStatus();
+    const exceptionResponse = exception.getResponse() as any;
     const rawMessage =
-      (exception.getResponse() as any)?.message || exception.message || null;
+      exceptionResponse?.errorCode || exceptionResponse?.message || exception.message || null;
     let translated: string | string[] | null = rawMessage;
     if (typeof rawMessage === 'string' && rawMessage.includes('.')) {
       try {

@@ -268,8 +268,24 @@ export class BookingsController {
   @ApiOperation({
     summary: 'List tickets scanned by current staff or branch manager',
   })
-  async getMyScans(@CurrentUser() user: User) {
-    return this.bookingsService.getStaffScans(user.id);
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'dateFrom', required: false, type: String })
+  @ApiQuery({ name: 'dateTo', required: false, type: String })
+  async getMyScans(
+    @CurrentUser() user: User,
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 50,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.bookingsService.getStaffScans(
+      user.id,
+      page,
+      limit,
+      dateFrom,
+      dateTo,
+    );
   }
 
   @Get('staff/scans/me/stats')

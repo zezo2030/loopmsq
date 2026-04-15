@@ -585,6 +585,53 @@ export class OfferBookingsService {
     throw new BadRequestException('Invalid ticket kind');
   }
 
+  async findStaffScans(
+    staffId: string,
+    page: number = 1,
+    limit: number = 50,
+    dateFrom?: string,
+    dateTo?: string,
+  ) {
+    const from = dateFrom ? new Date(dateFrom) : undefined;
+    const to = dateTo ? new Date(dateTo) : undefined;
+
+    const qb = this.ticketRepo
+      .createQueryBuilder('ticket')
+      .leftJoinAndSelect('ticket.user', 'user')
+      .leftJoinAndSelect('ticket.branch', 'branch')
+      .where('ticket.staffId = :staffId', { staffId })
+      .andWhere('ticket.scannedAt IS NOT NULL')
+      .orderBy('ticket.scannedAt', 'DESC')
+      .skip((Math.max(page, 1) - 1) * Math.max(limit, 1))
+      .take(Math.max(limit, 1));
+
+    if (from && !Number.isNaN(from.getTime())) {
+      qb.andWhere('ticket.scannedAt >= :from', { from });
+    }
+    if (to && !Number.isNaN(to.getTime())) {
+      qb.andWhere('ticket.scannedAt <= :to', { to });
+    }
+
+    const [scans, total] = await qb.getManyAndCount();
+
+    return {
+      scans: scans.map((ticket) => ({
+        id: ticket.id,
+        status: ticket.status,
+        ticketKind: ticket.ticketKind,
+        scannedAt: ticket.scannedAt,
+        customerName: ticket.user?.name || 'Unknown',
+        branchName:
+          ticket.branch?.name_ar ||
+          ticket.branch?.name_en ||
+          'Unknown Branch',
+      })),
+      total,
+      page,
+      limit,
+    };
+  }
+
   /**
    * Find offer by ID.
    */
