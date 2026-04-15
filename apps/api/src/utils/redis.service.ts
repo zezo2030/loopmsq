@@ -102,6 +102,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.client.del(key);
   }
 
+  /**
+   * List user bookings are cached per page as `user:{id}:bookings:{page}:{limit}`.
+   * Invalidate all variants (plain `user:{id}:bookings` never matched those keys).
+   */
+  async invalidateUserBookingsListCache(userId: string): Promise<void> {
+    const pattern = `user:${userId}:bookings:*`;
+    let cursor = '0';
+    do {
+      const [next, keys] = await this.client.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        100,
+      );
+      cursor = next;
+      if (keys.length > 0) {
+        await this.client.del(...keys);
+      }
+    } while (cursor !== '0');
+    await this.client.del(`user:${userId}:bookings`);
+  }
+
   async exists(key: string): Promise<boolean> {
     return (await this.client.exists(key)) === 1;
   }

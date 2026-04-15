@@ -17,6 +17,8 @@ import { SubscriptionUsageLog } from './subscription-usage-log.entity';
 import { Payment } from './payment.entity';
 
 export enum SubscriptionPurchaseStatus {
+  /** Awaiting successful payment; not shown as a real subscription to the user. */
+  PENDING_PAYMENT = 'pending_payment',
   ACTIVE = 'active',
   DEPLETED = 'depleted',
   EXPIRED = 'expired',

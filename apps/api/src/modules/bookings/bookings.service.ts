@@ -372,8 +372,8 @@ export class BookingsService {
 
       this.logger.log(`Booking created: ${savedBooking.id} for user ${userId}`);
 
-      // Clear cache
-      await this.redisService.del(`user:${userId}:bookings`);
+      // Clear cache (all paginated keys user:{id}:bookings:*)
+      await this.redisService.invalidateUserBookingsListCache(userId);
       // #region agent log
       fetch(
         'http://127.0.0.1:7242/ingest/2e2472bd-ae94-4601-b07f-fbff218202a0',
@@ -387,7 +387,7 @@ export class BookingsService {
             location: 'bookings.service.ts:createBooking',
             message: 'Cleared bookings cache after creation',
             data: {
-              cacheKeyCleared: `user:${userId}:bookings`,
+              cacheKeyCleared: `user:${userId}:bookings:*`,
               userId,
             },
             timestamp: Date.now(),
@@ -1090,7 +1090,9 @@ export class BookingsService {
 
       if (booking.userId) {
         try {
-          await this.redisService.del(`user:${booking.userId}:bookings`);
+          await this.redisService.invalidateUserBookingsListCache(
+            booking.userId,
+          );
         } catch (e) {
           this.logger.warn(
             `Failed to clear cache for user ${booking.userId}: ${e}`,
@@ -1491,7 +1493,9 @@ export class BookingsService {
       );
 
       // Clear cache
-      await this.redisService.del(`user:${userIdOrRequesterId}:bookings`);
+      await this.redisService.invalidateUserBookingsListCache(
+        userIdOrRequesterId,
+      );
 
       // Cancel any scheduled notifications for this booking
       await this.notifications.cancelScheduledForBooking(booking.id);
@@ -1833,7 +1837,7 @@ export class BookingsService {
       );
 
       // Clear cache
-      await this.redisService.del(`user:${dto.userId}:bookings`);
+      await this.redisService.invalidateUserBookingsListCache(dto.userId);
 
       // Send notification to user
       await this.notifications.enqueue({
@@ -1916,7 +1920,7 @@ export class BookingsService {
       );
 
       // Clear cache
-      await this.redisService.del(`user:${dto.userId}:bookings`);
+      await this.redisService.invalidateUserBookingsListCache(dto.userId);
 
       // Send notification to user
       await this.notifications.enqueue({

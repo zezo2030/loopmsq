@@ -183,7 +183,7 @@ export class LoyaltyService {
 
       await queryRunner.commitTransaction();
 
-      await this.redisService.del(`user:${userId}:bookings`);
+      await this.redisService.invalidateUserBookingsListCache(userId);
 
       const branchName = branch.name_ar || branch.name_en || branch.id;
       await this.notifications.enqueue({

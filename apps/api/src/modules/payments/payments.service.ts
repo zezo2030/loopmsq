@@ -414,6 +414,7 @@ export class PaymentsService {
         userId,
         branchId: plan.branchId,
         status: SubscriptionPurchaseStatus.ACTIVE,
+        paymentStatus: SubscriptionPurchasePaymentStatus.COMPLETED,
       },
     });
     if (existingActive) {
@@ -564,9 +565,10 @@ export class PaymentsService {
 
       if (!tripRequest) throw new NotFoundException('Trip request not found');
 
+      // Remaining balance after deposit is settled at the branch, not via app payments.
       if (
         tripRequest.status !== TripRequestStatus.APPROVED &&
-        tripRequest.status !== TripRequestStatus.DEPOSIT_PAID
+        tripRequest.status !== TripRequestStatus.INVOICED
       ) {
         throw new BadRequestException('Trip request not payable');
       }
@@ -579,11 +581,9 @@ export class PaymentsService {
 
       customerUser = tripRequest.requester;
       amountToPay =
-        tripRequest.status === TripRequestStatus.DEPOSIT_PAID
-          ? Number(tripRequest.remainingAmount ?? totalAmount)
-          : tripRequest.paymentOption === 'deposit'
-            ? Number(tripRequest.depositAmount ?? 0)
-            : totalAmount;
+        tripRequest.paymentOption === 'deposit'
+          ? Number(tripRequest.depositAmount ?? 0)
+          : totalAmount;
 
       if (amountToPay <= 0) {
         throw new BadRequestException('Trip request does not require payment');

@@ -57,6 +57,54 @@ export class SubscriptionPurchasesService {
   ) {}
 
   /**
+   * Same plan + branch with an unpaid checkout: reuse payment row instead of duplicating purchases.
+   */
+  private async findResumablePendingCheckout(
+    userId: string,
+    branchId: string,
+    subscriptionPlanId: string,
+    loyaltyStatus: { isEligibleForFreePurchase: boolean },
+  ): Promise<{ purchase: SubscriptionPurchase; payment: Payment } | null> {
+    if (loyaltyStatus.isEligibleForFreePurchase) {
+      return null;
+    }
+    const legacy = await this.purchaseRepo.findOne({
+      where: {
+        userId,
+        branchId,
+        subscriptionPlanId,
+        status: SubscriptionPurchaseStatus.ACTIVE,
+        paymentStatus: SubscriptionPurchasePaymentStatus.PENDING,
+      },
+      order: { createdAt: 'DESC' },
+    });
+    const pending = await this.purchaseRepo.findOne({
+      where: {
+        userId,
+        branchId,
+        subscriptionPlanId,
+        status: SubscriptionPurchaseStatus.PENDING_PAYMENT,
+      },
+      order: { createdAt: 'DESC' },
+    });
+    const purchase = pending ?? legacy;
+    if (!purchase) {
+      return null;
+    }
+    const payment = await this.paymentRepo.findOne({
+      where: {
+        subscriptionPurchaseId: purchase.id,
+        status: PaymentStatus.PENDING,
+      },
+      order: { createdAt: 'DESC' },
+    });
+    if (!payment) {
+      return null;
+    }
+    return { purchase, payment };
+  }
+
+  /**
    * Calculate pricing for a subscription purchase before payment.
    */
   async getQuote(userId: string, dto: SubscriptionQuoteDto) {
@@ -67,12 +115,13 @@ export class SubscriptionPurchasesService {
       plan.id,
     );
 
-    // Check if user already has active subscription in this branch
+    // Paid-and-active subscription only (unpaid checkouts are not "active")
     const existingActive = await this.purchaseRepo.findOne({
       where: {
         userId,
         branchId: plan.branchId,
         status: SubscriptionPurchaseStatus.ACTIVE,
+        paymentStatus: SubscriptionPurchasePaymentStatus.COMPLETED,
       },
     });
 
@@ -124,12 +173,13 @@ export class SubscriptionPurchasesService {
       );
     }
 
-    // Check if user already has active subscription in this branch
+    // Paid-and-active subscription only
     const existingActive = await this.purchaseRepo.findOne({
       where: {
         userId,
         branchId: plan.branchId,
         status: SubscriptionPurchaseStatus.ACTIVE,
+        paymentStatus: SubscriptionPurchasePaymentStatus.COMPLETED,
       },
     });
 
@@ -147,6 +197,30 @@ export class SubscriptionPurchasesService {
     const totalPrice = loyaltyStatus.isEligibleForFreePurchase
       ? 0
       : Number(plan.price);
+
+    const resumable = await this.findResumablePendingCheckout(
+      userId,
+      plan.branchId,
+      plan.id,
+      loyaltyStatus,
+    );
+    if (resumable) {
+      const { purchase: rp, payment: pay } = resumable;
+      this.logger.log(
+        `Resuming pending subscription checkout ${rp.id} for user ${userId}`,
+      );
+      return {
+        id: rp.id,
+        paymentId: pay.id,
+        paymentUrl: `/pay/${pay.id}`,
+        totalPrice,
+        currency: plan.currency || 'SAR',
+        paymentRequired: totalPrice > 0,
+        isFreePurchase: totalPrice === 0,
+        loyalty: loyaltyStatus,
+      };
+    }
+
     const totalHours = plan.totalHours != null ? Number(plan.totalHours) : null;
     const dailyHoursLimit =
       plan.dailyHoursLimit != null ? Number(plan.dailyHoursLimit) : null;
@@ -199,7 +273,10 @@ export class SubscriptionPurchasesService {
         endsAt: provisionalEndsAt,
         qrTokenHash: provisionalQrTokenHash,
         paymentStatus: 'pending' as any,
-        status: SubscriptionPurchaseStatus.ACTIVE,
+        status:
+          totalPrice > 0
+            ? SubscriptionPurchaseStatus.PENDING_PAYMENT
+            : SubscriptionPurchaseStatus.ACTIVE,
         metadata: {
           acceptedTerms: true,
           acceptedTermsAt: new Date().toISOString(),
@@ -370,6 +447,10 @@ export class SubscriptionPurchasesService {
 
     if (status) {
       qb.andWhere('purchase.status = :status', { status });
+    } else {
+      qb.andWhere('purchase.status != :excludePendingPayment', {
+        excludePendingPayment: SubscriptionPurchaseStatus.PENDING_PAYMENT,
+      });
     }
 
     qb.orderBy('purchase.createdAt', 'DESC');
@@ -480,6 +561,12 @@ export class SubscriptionPurchasesService {
 
     await this.assertStaffSubscriptionBranch(staffId, purchase);
 
+    if (
+      purchase.paymentStatus !== SubscriptionPurchasePaymentStatus.COMPLETED
+    ) {
+      throw new BadRequestException('Subscription payment is not completed');
+    }
+
     // Lazy expiration check
     await this.checkAndUpdateExpired(purchase);
 
@@ -554,6 +641,12 @@ export class SubscriptionPurchasesService {
     }
 
     await this.assertStaffSubscriptionBranch(staffId, purchase);
+
+    if (
+      purchase.paymentStatus !== SubscriptionPurchasePaymentStatus.COMPLETED
+    ) {
+      throw new BadRequestException('Subscription payment is not completed');
+    }
 
     // Check status
     if (purchase.status !== SubscriptionPurchaseStatus.ACTIVE) {
@@ -850,7 +943,7 @@ export class SubscriptionPurchasesService {
       .createQueryBuilder('purchase')
       .select('COUNT(*)', 'total')
       .addSelect(
-        `SUM(CASE WHEN purchase.status = :activeStatus THEN 1 ELSE 0 END)`,
+        `SUM(CASE WHEN purchase.status = :activeStatus AND purchase.paymentStatus = :completedPaymentStatusForActive THEN 1 ELSE 0 END)`,
         'active',
       )
       .addSelect(
@@ -871,6 +964,8 @@ export class SubscriptionPurchasesService {
       )
       .setParameters({
         activeStatus: SubscriptionPurchaseStatus.ACTIVE,
+        completedPaymentStatusForActive:
+          SubscriptionPurchasePaymentStatus.COMPLETED,
         expiredStatus: SubscriptionPurchaseStatus.EXPIRED,
         depletedStatus: SubscriptionPurchaseStatus.DEPLETED,
         completedPaymentStatus: SubscriptionPurchasePaymentStatus.COMPLETED,
@@ -1136,6 +1231,8 @@ export class SubscriptionPurchasesService {
   private async checkAndUpdateExpired(purchase: SubscriptionPurchase) {
     if (
       purchase.status === SubscriptionPurchaseStatus.ACTIVE &&
+      purchase.paymentStatus ===
+        SubscriptionPurchasePaymentStatus.COMPLETED &&
       purchase.endsAt &&
       new Date() > purchase.endsAt
     ) {
