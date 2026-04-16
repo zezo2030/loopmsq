@@ -118,6 +118,43 @@ export class CreatePaymentIntentDto {
   @IsUUID()
   giftOrderId?: string;
 
+  @ApiPropertyOptional({
+    description:
+      'Pay-first school trip payload. When provided, the SchoolTripRequest is created AFTER successful payment.',
+    type: 'object',
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
+  tripRequestPayload?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description:
+      'Pay-first event request payload. When provided, the EventRequest record is created AFTER successful payment.',
+    type: 'object',
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
+  eventRequestPayload?: {
+    type: string;
+    branchId: string;
+    startTime: string;
+    selectedTimeSlot: string;
+    durationHours: number;
+    persons: number;
+    paymentOption: 'full' | 'deposit';
+    addOns?: Array<{
+      id: string;
+      name: string;
+      price: number;
+      quantity: number;
+      category?: string;
+    }>;
+    notes?: string;
+    acceptedTerms: boolean;
+  };
+
   @ApiProperty({ enum: PaymentMethod })
   @IsEnum(PaymentMethod)
   method: PaymentMethod;

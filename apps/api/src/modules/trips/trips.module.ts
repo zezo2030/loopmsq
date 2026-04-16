@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SchoolTripRequest } from '../../database/entities/school-trip-request.entity';
 import { Booking } from '../../database/entities/booking.entity';
@@ -26,12 +26,13 @@ import { ContentModule } from '../content/content.module';
       Payment,
     ]),
     UsersModule,
-    PaymentsModule,
+    forwardRef(() => PaymentsModule),
     BookingsModule,
     NotificationsModule,
     ContentModule,
   ],
   controllers: [TripsController, TripsPublicController],
   providers: [TripsService, RedisService, QRCodeService],
+  exports: [TripsService],
 })
 export class TripsModule {}

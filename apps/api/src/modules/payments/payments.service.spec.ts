@@ -25,6 +25,7 @@ import { OfferBookingsService } from '../offer-bookings/offer-bookings.service';
 import { ReferralsService } from '../referrals/referrals.service';
 import { SubscriptionPurchasesService } from '../subscription-purchases/subscription-purchases.service';
 import { WalletService } from '../wallet/wallet.service';
+import { TripsService } from '../trips/trips.service';
 import { PaymentsService } from './payments.service';
 
 describe('PaymentsService', () => {
@@ -100,6 +101,11 @@ describe('PaymentsService', () => {
     issueTicketsForBooking: jest.fn(async () => undefined),
   };
 
+  const tripsServiceMock = {
+    quotePayFirstSchoolTripIntent: jest.fn(),
+    insertSchoolTripFromPayFirstConfirmation: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -154,6 +160,7 @@ describe('PaymentsService', () => {
         { provide: QRCodeService, useValue: qrCodeServiceMock },
         { provide: OfferBookingsService, useValue: {} },
         { provide: SubscriptionPurchasesService, useValue: {} },
+        { provide: TripsService, useValue: tripsServiceMock },
       ],
     }).compile();
 

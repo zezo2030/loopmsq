@@ -20,6 +20,7 @@ import { QRCodeService } from '../../utils/qr-code.service';
 import { OfferBookingsModule } from '../offer-bookings/offer-bookings.module';
 import { SubscriptionPurchasesModule } from '../subscription-purchases/subscription-purchases.module';
 import { GiftOrdersModule } from '../gift-orders/gift-orders.module';
+import { TripsModule } from '../trips/trips.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { GiftOrdersModule } from '../gift-orders/gift-orders.module';
     OfferBookingsModule,
     SubscriptionPurchasesModule,
     forwardRef(() => GiftOrdersModule),
+    forwardRef(() => TripsModule),
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, RedisService, MoyasarService, QRCodeService],

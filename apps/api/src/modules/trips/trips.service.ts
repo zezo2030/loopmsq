@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import * as XLSX from 'xlsx';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Repository } from 'typeorm';
+import { Between, EntityManager, In, Repository } from 'typeorm';
 import {
   SchoolTripRequest,
   TripRequestStatus,
@@ -1121,5 +1121,244 @@ export class TripsService {
     }
 
     return [];
+  }
+
+  /**
+   * Validates a pay-first school trip payload and returns the amount to charge plus
+   * deferred context stored on the Payment row until Moyasar/wallet confirmation.
+   */
+  async quotePayFirstSchoolTripIntent(
+    userId: string,
+    raw: Record<string, any>,
+  ): Promise<{ amountToPay: number; deferredFlowContext: Record<string, any> }> {
+    const branchId = String(raw?.branchId ?? '').trim();
+    if (!branchId) {
+      throw new BadRequestException('branchId is required');
+    }
+
+    const branch = await this.contentService.findBranchById(branchId);
+    if (!branch.hasSchoolTrips) {
+      throw new BadRequestException(
+        'This branch does not accept school trip booking requests',
+      );
+    }
+
+    const studentsCount = Number(raw.studentsCount);
+    const minimumStudents = this.getMinimumStudents(branch);
+    if (!Number.isInteger(studentsCount) || studentsCount < minimumStudents) {
+      throw new BadRequestException(
+        `School trips require at least ${minimumStudents} students`,
+      );
+    }
+
+    const preferredTime =
+      raw.preferredTime != null ? String(raw.preferredTime).trim() : '';
+    this.ensureTimeSlotAllowed(preferredTime || null);
+
+    const preferredDateRaw = this.parsePreferredDateParam(
+      String(raw.preferredDate ?? ''),
+    );
+    if (!preferredDateRaw) {
+      throw new BadRequestException('Invalid preferred date');
+    }
+    const preferredDate = this.startOfDay(preferredDateRaw);
+
+    const paymentOption = this.normalizePaymentOption(
+      raw.paymentOption != null ? String(raw.paymentOption) : 'full',
+    );
+    const resolvedAddOns = await this.resolveTripAddOns(
+      branchId,
+      (raw.addOns as { id?: string; quantity?: number }[]) || [],
+    );
+
+    await this.ensureNoConflict({
+      branchId,
+      preferredDate,
+      preferredTime,
+    });
+
+    const pricing = this.buildPricing({
+      branch,
+      studentsCount,
+      preferredDate,
+      paymentOption,
+      addOns: resolvedAddOns,
+    });
+
+    const schoolName = String(raw.schoolName ?? '').trim();
+    if (schoolName.length < 2 || schoolName.length > 200) {
+      throw new BadRequestException('Invalid school name');
+    }
+
+    const accompanyingRaw = Number(raw.accompanyingAdults ?? 0);
+    const accompanyingAdults =
+      Number.isInteger(accompanyingRaw) && accompanyingRaw >= 0
+        ? accompanyingRaw
+        : 0;
+
+    return {
+      amountToPay: pricing.amountDueNow,
+      deferredFlowContext: {
+        flowType: 'trip_request_pay_first',
+        userId,
+        tripRequestPayload: {
+          branchId,
+          schoolName,
+          studentsCount,
+          accompanyingAdults,
+          preferredDate: preferredDate.toISOString().slice(0, 10),
+          preferredTime,
+          specialRequirements:
+            raw.specialRequirements != null
+              ? String(raw.specialRequirements).slice(0, 1000)
+              : null,
+          paymentOption,
+          addOns: resolvedAddOns,
+        },
+        totalAmount: pricing.totalAmount,
+        depositAmount: pricing.depositAmount,
+        ticketsSubtotal: pricing.ticketsSubtotal,
+        addonsSubtotal: pricing.addonsSubtotal,
+        ticketPricePerStudent: pricing.ticketPricePerStudent,
+        pricingMonth: pricing.pricingMonth,
+        pricingSnapshot: pricing.pricingSnapshot,
+      },
+    };
+  }
+
+  /**
+   * Persists SchoolTripRequest after a successful pay-first gateway payment.
+   * Re-validates slot, catalog add-ons, and amount vs the intent quote.
+   */
+  async insertSchoolTripFromPayFirstConfirmation(
+    manager: EntityManager,
+    userId: string,
+    pendingFlowContext: Record<string, any>,
+    payment: Pick<Payment, 'amount' | 'method'>,
+  ): Promise<SchoolTripRequest> {
+    const tp = pendingFlowContext?.tripRequestPayload as Record<
+      string,
+      any
+    > | null;
+    if (!tp || typeof tp !== 'object') {
+      throw new BadRequestException('Missing trip request payload');
+    }
+
+    const branchId = String(tp.branchId ?? '').trim();
+    const branch = await this.contentService.findBranchById(branchId);
+    if (!branch.hasSchoolTrips) {
+      throw new BadRequestException(
+        'This branch does not accept school trip booking requests',
+      );
+    }
+
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const studentsCount = Number(tp.studentsCount);
+    const minimumStudents = this.getMinimumStudents(branch);
+    if (!Number.isInteger(studentsCount) || studentsCount < minimumStudents) {
+      throw new BadRequestException(
+        `School trips require at least ${minimumStudents} students`,
+      );
+    }
+
+    const preferredTime =
+      tp.preferredTime != null ? String(tp.preferredTime).trim() : '';
+    this.ensureTimeSlotAllowed(preferredTime || null);
+
+    const preferredDateRaw = this.parsePreferredDateParam(
+      String(tp.preferredDate ?? ''),
+    );
+    if (!preferredDateRaw) {
+      throw new BadRequestException('Invalid preferred date');
+    }
+    const preferredDate = this.startOfDay(preferredDateRaw);
+
+    const paymentOption = this.normalizePaymentOption(
+      tp.paymentOption != null ? String(tp.paymentOption) : 'full',
+    );
+    const resolvedAddOns = await this.resolveTripAddOns(
+      branchId,
+      (tp.addOns as { id?: string; quantity?: number }[]) || [],
+    );
+
+    await this.ensureNoConflict({
+      branchId,
+      preferredDate,
+      preferredTime,
+    });
+
+    const pricing = this.buildPricing({
+      branch,
+      studentsCount,
+      preferredDate,
+      paymentOption,
+      addOns: resolvedAddOns,
+    });
+
+    const expectedDue = pricing.amountDueNow;
+    if (
+      Math.round(Number(payment.amount) * 100) !==
+      Math.round(Number(expectedDue) * 100)
+    ) {
+      throw new BadRequestException('Payment amount mismatch');
+    }
+
+    const schoolName = String(tp.schoolName ?? '').trim();
+    if (schoolName.length < 2 || schoolName.length > 200) {
+      throw new BadRequestException('Invalid school name');
+    }
+
+    const accompanyingRaw = Number(tp.accompanyingAdults ?? 0);
+    const accompanyingAdults =
+      Number.isInteger(accompanyingRaw) && accompanyingRaw >= 0
+        ? accompanyingRaw
+        : 0;
+
+    const paidAmount = Number(payment.amount);
+    const totalAmount = pricing.totalAmount;
+    const remainingAmount = Math.max(
+      0,
+      Math.round((totalAmount - paidAmount) * 100) / 100,
+    );
+
+    const tripRepo = manager.getRepository(SchoolTripRequest);
+    const row = tripRepo.create({
+      requesterId: userId,
+      branchId,
+      schoolName,
+      contactPersonName: user.name,
+      contactPhone: user.phone || '',
+      contactEmail: user.email,
+      studentsCount,
+      accompanyingAdults,
+      preferredDate,
+      preferredTime,
+      selectedTimeSlot: preferredTime,
+      durationHours: this.resolveDurationHours(preferredTime),
+      specialRequirements: tp.specialRequirements ?? undefined,
+      addOns: resolvedAddOns as any,
+      status:
+        remainingAmount > 0
+          ? TripRequestStatus.DEPOSIT_PAID
+          : TripRequestStatus.PAID,
+      quotedPrice: totalAmount,
+      ticketPricePerStudent: pricing.ticketPricePerStudent,
+      ticketsSubtotal: pricing.ticketsSubtotal,
+      addonsSubtotal: pricing.addonsSubtotal,
+      totalAmount,
+      paymentOption,
+      depositAmount: pricing.depositAmount,
+      amountPaid: paidAmount as any,
+      remainingAmount: remainingAmount as any,
+      pricingMonth: pricing.pricingMonth,
+      pricingSnapshot: pricing.pricingSnapshot as any,
+      paymentMethod: payment.method as any,
+    });
+
+    return tripRepo.save(row);
   }
 }
