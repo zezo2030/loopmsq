@@ -9,12 +9,21 @@ type Overview = {
   revenueByMethod: Record<string, number>
 }
 
+type Branch = {
+  id: string
+  name_ar?: string
+  name_en?: string
+  location?: string
+}
+
 export default function ReportsOverview() {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
+  const [branchesLoading, setBranchesLoading] = useState(false)
   const [from, setFrom] = useState<string | undefined>()
   const [to, setTo] = useState<string | undefined>()
   const [branchId, setBranchId] = useState<string | undefined>()
+  const [branchOptions, setBranchOptions] = useState<Array<{ label: string; value: string }>>([])
   const [data, setData] = useState<Overview | null>(null)
 
   async function load() {
@@ -33,13 +42,43 @@ export default function ReportsOverview() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  async function loadBranches() {
+    setBranchesLoading(true)
+    try {
+      const res = await apiGet<any>('/content/branches?includeInactive=true')
+      const list: Branch[] = Array.isArray(res) ? res : (res?.items || res?.branches || [])
+      setBranchOptions(
+        (list || []).map((b) => ({
+          value: b.id,
+          label: `${b.name_ar || b.name_en || 'Branch'}${b.location ? ` - ${b.location}` : ''}`,
+        })),
+      )
+    } catch {
+      setBranchOptions([])
+    } finally {
+      setBranchesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    loadBranches()
+  }, [])
 
   return (
     <Card title={t('reports.overview') || 'Reports Overview'} loading={loading} extra={<Space>
       <DatePicker placeholder={t('common.from') || 'From'} onChange={(v) => setFrom(v ? v.toISOString() : undefined)} />
       <DatePicker placeholder={t('common.to') || 'To'} onChange={(v) => setTo(v ? v.toISOString() : undefined)} />
-      <Select placeholder={t('reports.branch') || 'Branch'} style={{ width: 200 }} allowClear onChange={(v) => setBranchId(v)} />
+      <Select
+        placeholder={t('reports.branch') || 'Branch'}
+        style={{ width: 260 }}
+        allowClear
+        showSearch
+        loading={branchesLoading}
+        options={branchOptions}
+        onChange={(v) => setBranchId(v)}
+        filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
+      />
       <Button onClick={load}>{t('common.apply') || 'Apply'}</Button>
       <Button onClick={async () => {
         try {

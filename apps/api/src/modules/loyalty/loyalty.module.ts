@@ -5,6 +5,7 @@ import { LoyaltyController } from './loyalty.controller';
 import { LoyaltyRule } from '../../database/entities/loyalty-rule.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { LoyaltyTransaction } from '../../database/entities/loyalty-transaction.entity';
+import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
 import { Branch } from '../../database/entities/branch.entity';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -13,7 +14,13 @@ import { RedisService } from '../../utils/redis.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([LoyaltyRule, Wallet, LoyaltyTransaction, Branch]),
+    TypeOrmModule.forFeature([
+      LoyaltyRule,
+      Wallet,
+      LoyaltyTransaction,
+      WalletTransaction,
+      Branch,
+    ]),
     UsersModule,
     NotificationsModule,
   ],

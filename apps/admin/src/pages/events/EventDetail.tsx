@@ -55,7 +55,6 @@ type EventRequest = {
     name_ar?: string
     nameAr?: string
     location?: string
-    capacity?: number
     amenities?: string[]
   }
   hallId?: string
@@ -488,14 +487,6 @@ export default function EventDetail() {
                   <Descriptions.Item label="العنوان">
                     {event.branch?.location || 'غير محدد'}
                   </Descriptions.Item>
-                  {event.branch?.capacity && (
-                    <Descriptions.Item label="السعة">
-                      <Space>
-                        <UserOutlined />
-                        {event.branch.capacity} شخص
-                      </Space>
-                    </Descriptions.Item>
-                  )}
                 </Descriptions>
                 
                 {event.branch?.amenities && event.branch.amenities.length > 0 && (

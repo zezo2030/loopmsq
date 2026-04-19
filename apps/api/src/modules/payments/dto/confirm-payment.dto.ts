@@ -36,6 +36,14 @@ export class ConfirmPaymentDto {
   @IsUUID()
   subscriptionPurchaseId?: string;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Gift order ID for gift purchase flow',
+  })
+  @IsOptional()
+  @IsUUID()
+  giftOrderId?: string;
+
   @ApiProperty({
     description: 'Internal payment id or external gateway payment id',
   })

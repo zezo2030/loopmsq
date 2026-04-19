@@ -5,6 +5,7 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 import { AdminConfigService } from './admin-config.service';
 import { UpdateSmsConfigDto } from './dto/update-sms-config.dto';
 import { UpdateOtpConfigDto } from './dto/update-otp-config.dto';
+import { UpdatePrivateEventTermsDto } from './dto/update-private-event-terms.dto';
 
 @ApiTags('admin-config')
 @ApiBearerAuth()
@@ -59,5 +60,17 @@ export class AdminConfigController {
   @ApiOperation({ summary: 'Update OTP configuration' })
   async updateOtp(@Body() dto: UpdateOtpConfigDto) {
     return this.service.updateOtpConfig(dto);
+  }
+
+  @Get('private-event-terms')
+  @ApiOperation({ summary: 'Get private event terms configuration' })
+  async getPrivateEventTerms() {
+    return this.service.getPrivateEventTermsConfig();
+  }
+
+  @Put('private-event-terms')
+  @ApiOperation({ summary: 'Update private event terms configuration' })
+  async updatePrivateEventTerms(@Body() dto: UpdatePrivateEventTermsDto) {
+    return this.service.updatePrivateEventTermsConfig(dto);
   }
 }

@@ -33,7 +33,6 @@ export default function BranchInfo() {
         nameAr: data.nameAr,
         nameEn: data.nameEn,
         location: data.location,
-        capacity: data.capacity,
         status: data.status,
         contactPhone: data.contactPhone,
         amenities: data.amenities,
@@ -146,22 +145,13 @@ export default function BranchInfo() {
                   </Row>
 
                   <Row gutter={[16, 16]}>
-                    <Col xs={24} sm={12}>
+                    <Col xs={24}>
                       <Form.Item
                         label={t('branch.location') || 'Location'}
                         name="location"
                         rules={[{ required: true, message: t('branch.location_required') || 'Please enter location' }]}
                       >
                         <Input placeholder={t('branch.location_ph') || 'Enter branch location'} />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item
-                        label={t('branch.capacity') || 'Capacity'}
-                        name="capacity"
-                        rules={[{ required: true, message: t('branch.capacity_required') || 'Please enter capacity' }]}
-                      >
-                        <Input type="number" placeholder={t('branch.capacity_ph') || 'Enter capacity'} />
                       </Form.Item>
                     </Col>
                   </Row>

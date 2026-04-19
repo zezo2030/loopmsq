@@ -7,6 +7,7 @@ import { User } from '../../database/entities/user.entity';
 import { DeviceToken } from '../../database/entities/device-token.entity';
 import { Notification } from '../../database/entities/notification.entity';
 import { EncryptionService } from '../../utils/encryption.util';
+import { normalizePhone } from '../../utils/phone.util';
 import { EmailProvider } from './providers/email.provider';
 import { WhatsAppProvider } from './providers/whatsapp.provider';
 
@@ -30,6 +31,7 @@ export interface EnqueueNotification {
     | 'LOYALTY_TICKET_REDEEMED'
     | 'RATING_REQUEST'
     | 'WALLET_RECHARGED'
+    | 'WALLET_REWARD_CREDITED'
     | 'OFFER_PURCHASE_SUCCESS'
     | 'SUBSCRIPTION_PURCHASE_SUCCESS'
     | 'GIFT_INVITE'
@@ -64,15 +66,16 @@ export class NotificationsService {
 
   async enqueue(n: EnqueueNotification): Promise<void> {
     const resolved = await this.resolveRecipient(n.to);
+    const targetUserId = resolved.userId || n.to.userId;
     const lang = n.lang || resolved.lang || 'ar';
     const jobs: Promise<any>[] = [];
 
     // Save to database if userId is provided
-    if (n.to.userId) {
+    if (targetUserId) {
       const title = this.renderSubject(n, lang);
       const body = this.renderTemplate(n, 'email', lang); // full body
       const notification = this.notificationRepo.create({
-        userId: n.to.userId,
+        userId: targetUserId,
         title,
         body,
         type: n.type,
@@ -169,8 +172,8 @@ export class NotificationsService {
 
     if (n.channels.includes('push')) {
       // إذا لم يتم تحديد مستخدم، أرسل لجميع الأجهزة
-      const tokens = n.to.userId
-        ? await this.getUserTokens(n.to.userId, resolved.phone)
+      const tokens = targetUserId
+        ? await this.getUserTokens(targetUserId, resolved.phone)
         : await this.getAllDeviceTokens();
       if (tokens.length) {
         const title = this.renderSubject(n, lang);
@@ -266,7 +269,12 @@ export class NotificationsService {
     phone?: string;
     email?: string;
     userId?: string;
-  }): Promise<{ phone?: string; email?: string; lang?: 'ar' | 'en' }> {
+  }): Promise<{
+    phone?: string;
+    email?: string;
+    lang?: 'ar' | 'en';
+    userId?: string;
+  }> {
     if (to.userId) {
       const user = await this.userRepo.findOne({ where: { id: to.userId } });
       if (user) {
@@ -277,13 +285,54 @@ export class NotificationsService {
           phone = undefined;
         }
         return {
+          userId: user.id,
           phone,
           email: user.email || undefined,
           lang: (user.language as any) || undefined,
         };
       }
     }
+
+    if (to.phone) {
+      const matchedUser = await this.findUserByPhone(to.phone);
+      if (matchedUser) {
+        return {
+          userId: matchedUser.id,
+          phone: to.phone,
+          email: matchedUser.email || to.email,
+          lang: (matchedUser.language as any) || undefined,
+        };
+      }
+    }
+
     return { phone: to.phone, email: to.email };
+  }
+
+  private async findUserByPhone(phone: string): Promise<User | null> {
+    let normalized: string;
+    try {
+      normalized = normalizePhone(phone);
+    } catch {
+      return null;
+    }
+
+    const users = await this.userRepo
+      .createQueryBuilder('user')
+      .where('user.phone IS NOT NULL')
+      .getMany();
+
+    for (const user of users) {
+      try {
+        const decrypted = user.phone ? this.encryption.decrypt(user.phone) : '';
+        if (decrypted && normalizePhone(decrypted) === normalized) {
+          return user;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
   }
 
   private async getUserTokens(
@@ -311,6 +360,9 @@ export class NotificationsService {
 
   private renderSubject(n: EnqueueNotification, lang: 'ar' | 'en'): string {
     const d = n.data as any;
+    if (false && n.type === 'GIFT_INVITE') {
+      return lang === 'ar' ? 'وصلتك هدية جديدة!' : 'You received a gift!';
+    }
     switch (n.type) {
       case 'OTP':
         return lang === 'ar' ? 'رمز التحقق' : 'Your OTP Code';
@@ -332,6 +384,8 @@ export class NotificationsService {
         return lang === 'ar' ? 'تم الدفع بنجاح' : 'Payment Successful';
       case 'WALLET_RECHARGED':
         return lang === 'ar' ? 'شحن المحفظة' : 'Wallet Recharged';
+      case 'WALLET_REWARD_CREDITED':
+        return lang === 'ar' ? 'رصيد مكافأة' : 'Reward balance';
       case 'TICKETS_ISSUED':
         return lang === 'ar' ? 'إصدار التذاكر' : 'Tickets Issued';
       case 'TRIP_STATUS':
@@ -364,6 +418,23 @@ export class NotificationsService {
   ): string {
     if (n.template) return n.template;
     const d = n.data as any;
+    if (false && n.type === 'GIFT_INVITE') {
+      return lang === 'ar'
+          ? [
+              `أرسل ${d.senderName || 'شخص'} لك هدية: ${d.productTitle} من ${d.branchName}.`,
+              d.giftMessage ? `الرسالة: ${d.giftMessage}` : null,
+              'افتح تفاصيل الهدية الآن.',
+            ]
+              .filter(Boolean)
+              .join(' ')
+          : [
+              `${d.senderName || 'Someone'} sent you a gift: ${d.productTitle} from ${d.branchName}.`,
+              d.giftMessage ? `Message: ${d.giftMessage}` : null,
+              'Open gift details now.',
+            ]
+              .filter(Boolean)
+              .join(' ');
+    }
     switch (n.type) {
       case 'OTP':
         return lang === 'ar'
@@ -431,6 +502,10 @@ export class NotificationsService {
         return lang === 'ar'
           ? `تم شحن محفظتك بمبلغ ${d.amount} ${d.currency || 'SAR'}. الرصيد الحالي: ${d.balance || 0} ${d.currency || 'SAR'}.`
           : `Your wallet has been recharged with ${d.amount} ${d.currency || 'SAR'}. Current balance: ${d.balance || 0} ${d.currency || 'SAR'}.`;
+      case 'WALLET_REWARD_CREDITED':
+        return lang === 'ar'
+          ? `تم تعبئة رصيد المكافأة بقيمة ${d.amount} ${d.currency || 'SAR'}. رصيد محفظتك الحالي: ${d.balance ?? 0} ${d.currency || 'SAR'}.`
+          : `Your reward balance was topped up with ${d.amount} ${d.currency || 'SAR'}. Current wallet balance: ${d.balance ?? 0} ${d.currency || 'SAR'}.`;
       case 'OFFER_PURCHASE_SUCCESS':
         return lang === 'ar'
           ? `تم شراء العرض "${d.offerTitle}" بنجاح! تم إصدار ${d.ticketCount} تذكرة.`

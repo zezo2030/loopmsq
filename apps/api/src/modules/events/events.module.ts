@@ -13,6 +13,7 @@ import { BookingsModule } from '../bookings/bookings.module';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ContentModule } from '../content/content.module';
+import { AdminConfigModule } from '../admin-config/admin-config.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ContentModule } from '../content/content.module';
     UsersModule,
     NotificationsModule,
     ContentModule,
+    AdminConfigModule,
   ],
   controllers: [EventsController],
   providers: [EventsService],

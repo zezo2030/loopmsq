@@ -4,10 +4,16 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { LoyaltyRule } from '../../database/entities/loyalty-rule.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
+import {
+  WalletTransaction,
+  WalletTransactionStatus,
+  WalletTransactionType,
+} from '../../database/entities/wallet-transaction.entity';
 import {
   LoyaltyTransaction,
   TransactionType,
@@ -318,38 +324,115 @@ export class LoyaltyService {
     if (!input || (input.balanceDelta == null && input.pointsDelta == null)) {
       throw new BadRequestException('No changes provided');
     }
-    const wallet = await this.walletRepo.findOne({ where: { userId } });
-    if (!wallet) throw new NotFoundException('Wallet not found');
 
-    if (input.balanceDelta) {
-      wallet.balance = Number(wallet.balance) + Number(input.balanceDelta);
-    }
-    if (input.pointsDelta) {
-      wallet.loyaltyPoints =
-        Number(wallet.loyaltyPoints) + Number(input.pointsDelta);
-    }
-    wallet.lastTransactionAt = new Date();
-    await this.walletRepo.save(wallet);
+    const balanceDelta =
+      input.balanceDelta != null && Number(input.balanceDelta) !== 0
+        ? Number(input.balanceDelta)
+        : 0;
+    const pointsDelta =
+      input.pointsDelta != null && Number(input.pointsDelta) !== 0
+        ? Number(input.pointsDelta)
+        : 0;
 
-    if (input.pointsDelta && input.pointsDelta !== 0) {
-      const tx = this.txRepo.create({
-        userId,
-        walletId: wallet.id,
-        pointsChange: Number(input.pointsDelta),
-        amountChange: null,
-        type:
-          input.pointsDelta > 0
-            ? TransactionType.BONUS
-            : TransactionType.PENALTY,
-        reason: input.reason || 'Admin adjustment',
-      } as any);
-      await this.txRepo.save(tx);
+    if (balanceDelta === 0 && pointsDelta === 0) {
+      throw new BadRequestException('No changes provided');
     }
 
-    return {
-      success: true,
-      balance: wallet.balance,
-      points: wallet.loyaltyPoints,
-    };
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const wallet = await queryRunner.manager.findOne(Wallet, {
+        where: { userId },
+      });
+      if (!wallet) throw new NotFoundException('Wallet not found');
+
+      const currentBalance = Number(wallet.balance);
+      const newBalance = currentBalance + balanceDelta;
+      if (newBalance < 0) {
+        throw new BadRequestException('Insufficient wallet balance');
+      }
+
+      if (balanceDelta !== 0) {
+        wallet.balance = newBalance;
+        if (balanceDelta > 0) {
+          wallet.totalEarned = Number(wallet.totalEarned) + balanceDelta;
+        } else {
+          wallet.totalSpent =
+            Number(wallet.totalSpent) + Math.abs(balanceDelta);
+        }
+      }
+
+      if (pointsDelta !== 0) {
+        wallet.loyaltyPoints = Number(wallet.loyaltyPoints) + pointsDelta;
+      }
+
+      if (balanceDelta !== 0 || pointsDelta !== 0) {
+        wallet.lastTransactionAt = new Date();
+      }
+
+      await queryRunner.manager.save(wallet);
+
+      if (balanceDelta !== 0) {
+        const walletTx = queryRunner.manager.create(WalletTransaction, {
+          walletId: wallet.id,
+          userId,
+          type:
+            balanceDelta > 0
+              ? WalletTransactionType.DEPOSIT
+              : WalletTransactionType.WITHDRAWAL,
+          amount: Math.abs(balanceDelta),
+          status: WalletTransactionStatus.SUCCESS,
+          method: balanceDelta > 0 ? 'reward' : 'admin_adjustment',
+          reference: `admin_adjust:${randomUUID()}`,
+          metadata: {
+            source: 'admin_adjust',
+            reason: input.reason ?? null,
+          },
+        });
+        await queryRunner.manager.save(walletTx);
+      }
+
+      if (pointsDelta !== 0) {
+        const loyaltyTx = queryRunner.manager.create(LoyaltyTransaction, {
+          userId,
+          walletId: wallet.id,
+          pointsChange: pointsDelta,
+          amountChange: null,
+          type:
+            pointsDelta > 0 ? TransactionType.BONUS : TransactionType.PENALTY,
+          reason: input.reason || 'Admin adjustment',
+        } as any);
+        await queryRunner.manager.save(loyaltyTx);
+      }
+
+      await queryRunner.commitTransaction();
+
+      if (balanceDelta > 0) {
+        await this.notifications.enqueue({
+          type: 'WALLET_REWARD_CREDITED',
+          to: { userId },
+          data: {
+            amount: balanceDelta,
+            currency: 'SAR',
+            balance: Number(wallet.balance),
+            reason: input.reason,
+          },
+          channels: ['sms', 'push'],
+        });
+      }
+
+      return {
+        success: true,
+        balance: wallet.balance,
+        points: wallet.loyaltyPoints,
+      };
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw e;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

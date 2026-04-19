@@ -130,7 +130,6 @@ export class ContentService {
     const {
       hallName_ar,
       hallName_en,
-      hallCapacity,
       hallIsDecorated,
       hallDescription_ar,
       hallDescription_en,
@@ -292,7 +291,6 @@ export class ContentService {
     const {
       hallName_ar,
       hallName_en,
-      hallCapacity,
       hallIsDecorated,
       hallDescription_ar,
       hallDescription_en,
@@ -455,6 +453,8 @@ export class ContentService {
     persons?: number,
   ): Promise<boolean> {
     try {
+      void persons;
+
       this.logger.log(
         `Checking availability for branch: ${branchId}, startTime: ${startTime}, duration: ${durationHours} hours`,
       );
@@ -552,9 +552,8 @@ export class ContentService {
         ],
       });
 
-      let hasOverlap = false;
-      let totalOverlappingPersons = 0;
-      existingBookings.forEach((booking) => {
+      let exclusiveEventBookingOverlap = false;
+      for (const booking of existingBookings) {
         const bookingEnd = this.calculateBookingEnd(
           booking.startTime,
           booking.durationHours,
@@ -566,16 +565,13 @@ export class ContentService {
           this.logger.log(
             `Overlap detected with booking ${booking.id}: ${booking.startTime.toISOString()} - ${bookingEnd.toISOString()}`,
           );
-          hasOverlap = true;
-          // If this booking was created from a private event, treat as exclusive block
           const metadata = booking.metadata;
           if (metadata?.eventRequestId) {
-            totalOverlappingPersons = Infinity;
-            return;
+            exclusiveEventBookingOverlap = true;
+            break;
           }
-          totalOverlappingPersons += (booking as any).persons ?? 0;
         }
-      });
+      }
 
       // Check for active event requests that exclusively block the slot
       const eventBlocks = await this.getActiveEventBlocks(
@@ -593,13 +589,11 @@ export class ContentService {
         return false;
       }
 
-      // Capacity-aware: only block if capacity would be exceeded
-      if (hasOverlap) {
-        const reqPersons = Math.max(1, persons ?? 1);
-        const remaining = (branch.capacity ?? 0) - totalOverlappingPersons;
-        if (remaining < reqPersons) {
-          return false;
-        }
+      if (exclusiveEventBookingOverlap) {
+        this.logger.log(
+          `Time slot blocked by an exclusive private-event booking for branch ${branchId}`,
+        );
+        return false;
       }
 
       this.logger.log(
@@ -769,7 +763,7 @@ export class ContentService {
         searchEnd,
       );
 
-      const reqPersons = Math.max(1, persons ?? 1);
+      void persons;
 
       const canFitAt = (slotStart: Date, slotEnd: Date): boolean => {
         // Exclusive block: any active private event overlapping this slot
@@ -787,17 +781,8 @@ export class ContentService {
         );
         if (blockedByEventBooking) return false;
 
-        // Existing capacity-based check for regular bookings
-        const overlappingPersons = normalizedBookings
-          .filter(
-            (b) =>
-              b.start < slotEnd &&
-              b.end > slotStart &&
-              !b.metadata?.eventRequestId,
-          )
-          .reduce((sum, b) => sum + (b.persons || 0), 0);
-        const remaining = (branch.capacity ?? 0) - overlappingPersons;
-        return remaining >= reqPersons;
+        // Regular overlapping bookings are not limited by branch capacity.
+        return true;
       };
 
       const slots: {

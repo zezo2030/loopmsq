@@ -12,5 +12,6 @@ import { DeviceToken } from '../../database/entities/device-token.entity';
   imports: [NotificationsModule, TypeOrmModule.forFeature([User, DeviceToken])],
   controllers: [AdminConfigController],
   providers: [AdminConfigService, EncryptionService, RedisService],
+  exports: [AdminConfigService],
 })
 export class AdminConfigModule {}

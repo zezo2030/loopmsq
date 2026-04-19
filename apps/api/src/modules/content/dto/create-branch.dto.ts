@@ -35,13 +35,6 @@ export class CreateBranchDto {
   location: string;
 
   @ApiProperty({
-    description: 'Total branch capacity',
-    example: 500,
-  })
-  @IsInt()
-  capacity: number;
-
-  @ApiProperty({
     description: 'Branch description in Arabic',
     example: 'فرع حديث ومجهز بأحدث التقنيات',
     required: false,
@@ -154,15 +147,6 @@ export class CreateBranchDto {
   @IsOptional()
   @IsString()
   hallName_en?: string;
-
-  @ApiProperty({
-    description: 'Hall capacity (number of people)',
-    example: 100,
-    required: false,
-  })
-  @IsOptional()
-  @IsInt()
-  hallCapacity?: number;
 
   @ApiProperty({
     description: 'Whether the hall comes with decoration',

@@ -16,7 +16,6 @@ type Branch = {
   name_ar: string
   name_en: string
   location: string
-  capacity: number
   description_ar?: string | null
   description_en?: string | null
   contactPhone?: string | null
@@ -42,7 +41,6 @@ const buildBranchFormValues = (branch: Branch) => ({
   name_ar: branch.name_ar,
   name_en: branch.name_en,
   location: branch.location,
-  capacity: branch.capacity,
   description_ar: branch.description_ar,
   description_en: branch.description_en,
   contactPhone: branch.contactPhone,
@@ -183,7 +181,6 @@ export default function Branches() {
     { title: t('branches.name_ar') || 'الاسم (AR)', dataIndex: 'name_ar', key: 'name_ar' },
     { title: t('branches.name_en') || 'الاسم (EN)', dataIndex: 'name_en', key: 'name_en' },
     { title: t('branches.location') || 'الموقع', dataIndex: 'location', key: 'location' },
-    { title: t('branches.capacity') || 'السعة', dataIndex: 'capacity', key: 'capacity' },
     { title: t('branches.status') || 'الحالة', dataIndex: 'status', key: 'status' },
     {
       title: t('common.actions') || 'إجراءات',
@@ -240,7 +237,6 @@ export default function Branches() {
                     <p><strong>{t('branches.name_ar') || 'الاسم (AR)'}:</strong> {selectedBranch.name_ar}</p>
                     <p><strong>{t('branches.name_en') || 'الاسم (EN)'}:</strong> {selectedBranch.name_en}</p>
                     <p><strong>{t('branches.location') || 'الموقع'}:</strong> {selectedBranch.location}</p>
-                    <p><strong>{t('branches.capacity') || 'السعة'}:</strong> {selectedBranch.capacity}</p>
                     <p><strong>{t('branches.status') || 'الحالة'}:</strong> {selectedBranch.status}</p>
                     <p>
                       <strong>{t('branches.allow_special_event_bookings') || 'Special events'}:</strong>{' '}
@@ -321,7 +317,6 @@ export default function Branches() {
               name_ar: values.name_ar,
               name_en: values.name_en,
               location: values.location,
-              capacity: Number(values.capacity || 0),
               description_ar: values.description_ar || null,
               description_en: values.description_en || null,
               contactPhone: values.contactPhone || null,
@@ -423,9 +418,6 @@ export default function Branches() {
             </Col>
           </Row>
           
-          <Form.Item name="capacity" label={t('branches.capacity') || 'السعة'} rules={[{ required: true }]}>
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
           <Form.Item name="contactPhone" label={t('branches.contact_phone') || 'هاتف التواصل'}>
             <Input />
           </Form.Item>

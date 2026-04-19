@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Form, Input, InputNumber, Select, Button, message, Row, Col, Space, Card, Spin } from 'antd'
+import { Form, Input, Select, Button, message, Row, Col, Space, Card, Spin } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import { apiGet, apiPatch } from '../shared/api'
 import { useTranslation } from 'react-i18next'
@@ -44,7 +44,6 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
       form.setFieldsValue({
         name_ar: branch.nameAr || branch.name_ar,
         name_en: branch.nameEn || branch.name_en,
-        capacity: branch.capacity,
         isDecorated: branch.isDecorated,
         description_ar: branch.descriptionAr || branch.description_ar,
         description_en: branch.descriptionEn || branch.description_en,
@@ -60,7 +59,6 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
     const body = {
       nameAr: values.name_ar,
       nameEn: values.name_en,
-      capacity: Number(values.capacity || 0),
       isDecorated: !!values.isDecorated,
       descriptionAr: values.description_ar || null,
       descriptionEn: values.description_en || null,
@@ -105,11 +103,6 @@ export default function BranchHallTab({ branchId }: BranchHallTabProps) {
         </Row>
 
         <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item name="capacity" label={t('branches.capacity') || 'السعة'} rules={[{ required: true }]}>
-              <InputNumber min={0} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
           <Col span={12}>
             <Form.Item name="isDecorated" label={t('branches.decorated') || 'مزينة'}>
               <Select

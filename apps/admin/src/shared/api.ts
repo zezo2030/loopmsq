@@ -86,6 +86,10 @@ export type OtpConfig = {
   rateMaxAttempts: number
 }
 
+export type PrivateEventTermsConfig = {
+  terms: string[]
+}
+
 export async function getWhatsAppConfig(): Promise<WhatsAppConfigMasked> {
   return apiGet('/admin/config/whatsapp')
 }
@@ -104,6 +108,14 @@ export async function getOtpConfig(): Promise<OtpConfig> {
 
 export async function updateOtpConfig(body: Partial<OtpConfig>): Promise<OtpConfig> {
   return apiPut('/admin/config/otp', body)
+}
+
+export async function getPrivateEventTermsConfig(): Promise<PrivateEventTermsConfig> {
+  return apiGet('/admin/config/private-event-terms')
+}
+
+export async function updatePrivateEventTermsConfig(body: PrivateEventTermsConfig): Promise<PrivateEventTermsConfig> {
+  return apiPut('/admin/config/private-event-terms', body)
 }
 
 

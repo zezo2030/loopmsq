@@ -33,4 +33,10 @@ describe('AdminConfig (e2e)', () => {
       .get('/api/v1/admin/config/sms')
       .expect(401);
   });
+
+  it('GET /admin/config/private-event-terms should be unauthorized without token', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/config/private-event-terms')
+      .expect(401);
+  });
 });

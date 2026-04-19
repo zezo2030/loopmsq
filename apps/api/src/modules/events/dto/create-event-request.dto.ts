@@ -89,7 +89,7 @@ export class CreateEventRequestDto {
   @ApiProperty()
   @IsInt()
   @Min(1)
-  @Max(15)
+  @Max(7)
   persons: number;
 
   @ApiPropertyOptional({ type: [AddOnDto] })

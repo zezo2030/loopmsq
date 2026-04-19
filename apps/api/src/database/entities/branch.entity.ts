@@ -22,9 +22,6 @@ export class Branch {
   @Column({ type: 'text' })
   location: string;
 
-  @Column({ type: 'int' })
-  capacity: number;
-
   @Column({
     type: 'enum',
     enum: ['active', 'inactive', 'maintenance'],

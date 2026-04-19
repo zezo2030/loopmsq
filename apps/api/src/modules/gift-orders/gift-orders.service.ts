@@ -751,6 +751,8 @@ export class GiftOrdersService {
           senderName: gift.senderDisplayNameSnapshot || 'مستخدم',
           productTitle: gift.sourceProductSnapshot?.title ?? '',
           branchName: gift.sourceProductSnapshot?.branchName ?? '',
+          giftMessage: gift.giftMessage || '',
+          giftOrderId: gift.id,
           deepLinkUrl: `${this.configService.get<string>('APP_DEEP_LINK_BASE_URL') || 'loop://gift/claim'}?token=`,
         },
         channels: ['whatsapp'],

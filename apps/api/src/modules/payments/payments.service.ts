@@ -895,7 +895,7 @@ export class PaymentsService {
       // Compute pricing (mirrors EventsService constants)
       const BASE_HALL_PRICE = 200;
       const DEPOSIT_PCT = 20;
-      const MAX_PERSONS = 15;
+      const MAX_PERSONS = 7;
       const FIXED_DURATION = 2;
       const VALID_SLOTS = ['16:00-18:00', '19:00-21:00', '22:00-00:00'];
 
@@ -1233,7 +1233,8 @@ export class PaymentsService {
         dto.eventRequestId ||
         dto.tripRequestId ||
         dto.offerBookingId ||
-        dto.subscriptionPurchaseId)
+        dto.subscriptionPurchaseId ||
+        dto.giftOrderId)
     ) {
       externalGatewayPaymentId = dto.paymentId;
 
@@ -1263,6 +1264,15 @@ export class PaymentsService {
         }
       }
 
+      if (dto.giftOrderId) {
+        giftOrder = await this.dataSource.getRepository(GiftOrder).findOne({
+          where: { id: dto.giftOrderId, senderUserId: userId },
+        });
+        if (!giftOrder) {
+          throw new NotFoundException('Gift order not found or access denied');
+        }
+      }
+
       payment = await this.paymentRepository.findOne({
         where: {
           ...(dto.bookingId ? { bookingId: dto.bookingId } : {}),
@@ -1272,6 +1282,7 @@ export class PaymentsService {
           ...(dto.subscriptionPurchaseId
             ? { subscriptionPurchaseId: dto.subscriptionPurchaseId }
             : {}),
+          ...(dto.giftOrderId ? { giftOrderId: dto.giftOrderId } : {}),
           status: PaymentStatus.PROCESSING,
         },
         order: { createdAt: 'DESC' },
@@ -1297,6 +1308,7 @@ export class PaymentsService {
         tripRequestId: payment.tripRequestId ?? undefined,
         offerBookingId: payment.offerBookingId ?? undefined,
         subscriptionPurchaseId: payment.subscriptionPurchaseId ?? undefined,
+        giftOrderId: payment.giftOrderId ?? undefined,
       };
     }
     const pendingFlowContext = this.getPendingFlowContext(payment);
@@ -1915,11 +1927,13 @@ export class PaymentsService {
         booking?.id ??
         eventRequest?.id ??
         tripRequest?.id ??
+        giftOrder?.id ??
         payment.bookingId ??
         payment.eventRequestId ??
         payment.tripRequestId ??
         payment.offerBookingId ??
-        payment.subscriptionPurchaseId;
+        payment.subscriptionPurchaseId ??
+        payment.giftOrderId;
       if (!targetId) {
         throw new BadRequestException('Payment target id is missing');
       }
@@ -1988,11 +2002,13 @@ export class PaymentsService {
               type: 'GIFT_INVITE' as any,
               to: { phone: giftOrder.normalizedRecipientPhone },
               data: {
-                branchName: giftOrder.sourceProductSnapshot?.title || '',
+                branchName:
+                  giftOrder.sourceProductSnapshot?.branchName || '',
                 productTitle: giftOrder.sourceProductSnapshot?.title || '',
                 senderName: giftOrder.showSenderInfo
                   ? giftOrder.senderDisplayNameSnapshot
                   : '',
+                giftMessage: giftOrder.giftMessage || '',
                 deepLinkUrl,
                 giftOrderId: giftOrder.id,
               },
@@ -2041,6 +2057,7 @@ export class PaymentsService {
         paymentId: payment.id,
         eventRequestId: payment.eventRequestId ?? undefined,
         tripRequestId: payment.tripRequestId ?? undefined,
+        giftOrderId: payment.giftOrderId ?? undefined,
       };
 
     } catch (e) {

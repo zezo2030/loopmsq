@@ -18,6 +18,7 @@ import { CreateEventRequestDto } from './dto/create-event-request.dto';
 import { QuoteEventRequestDto } from './dto/quote-event-request.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ContentService } from '../content/content.service';
+import { AdminConfigService } from '../admin-config/admin-config.service';
 import { resolveEventTicketWindow } from '../../utils/event-ticket-window.util';
 import * as crypto from 'crypto';
 
@@ -39,7 +40,7 @@ export class EventsService {
 
   private static readonly BASE_HALL_RENTAL_PRICE = 200;
   private static readonly DEPOSIT_PERCENTAGE = 20;
-  private static readonly MAX_PERSONS = 15;
+  private static readonly MAX_PERSONS = 7;
   private static readonly FIXED_DURATION_HOURS = 2;
   private static readonly TIME_SLOTS = [
     '16:00-18:00',
@@ -66,10 +67,13 @@ export class EventsService {
     private readonly dataSource: DataSource,
     private readonly notifications: NotificationsService,
     private readonly contentService: ContentService,
+    private readonly adminConfigService: AdminConfigService,
   ) {}
 
   async getPublicConfig(branchId?: string, date?: string) {
     const addOns = await this.getEventAddOnCatalog(branchId);
+    const privateEventTerms =
+      await this.adminConfigService.getPrivateEventTermsConfig();
     let timeSlots: string[] = [...EventsService.TIME_SLOTS];
     let bookedTimeSlots: string[] = [];
 
@@ -86,14 +90,7 @@ export class EventsService {
       durationHours: EventsService.FIXED_DURATION_HOURS,
       timeSlots,
       bookedTimeSlots,
-      terms: [
-        'عدد الأفراد لا يزيد عن 15 شخصاً.',
-        'الإيجار الأساسي للصالة 200 ريال.',
-        'البيتزا تكفي 3 أشخاص في المناسبات الخاصة.',
-        'لا توجد وجبة برجر ضمن إضافات المناسبات الخاصة.',
-        'لا يمكن تأكيد الحجز إذا كان الموعد محجوزاً مسبقاً.',
-        'بعد إتمام الدفع يُؤكَّد الحجز فوراً دون انتظار موافقة إدارية.',
-      ],
+      terms: privateEventTerms.terms,
       addOns,
     };
   }

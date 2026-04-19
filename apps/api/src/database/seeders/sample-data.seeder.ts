@@ -48,7 +48,6 @@ export class SampleDataSeeder implements OnModuleInit {
         name_ar: 'الفرع الرئيسي',
         name_en: 'Main Branch',
         location: 'الرياض، المملكة العربية السعودية',
-        capacity: 1000,
         status: 'active',
         description_ar: 'الفرع الرئيسي للمنشأة في قلب الرياض',
         description_en: 'Main branch of the facility in the heart of Riyadh',
