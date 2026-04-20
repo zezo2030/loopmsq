@@ -64,6 +64,87 @@ export class GiftOrdersService {
     private readonly paymentsService: PaymentsService,
   ) {}
 
+  private getGiftAppBaseUrl(): string {
+    return (
+      this.configService.get<string>('GIFT_APP_BASE_URL') ||
+      this.configService.get<string>('APP_BASE_URL') ||
+      'https://kinetic-app-sa.org'
+    ).replace(/\/+$/, '');
+  }
+
+  private getGiftCustomSchemeBaseUrl(): string {
+    return (
+      this.configService.get<string>('GIFT_CUSTOM_SCHEME_BASE_URL') ||
+      'loopmsq://gift/claim'
+    ).replace(/\/+$/, '');
+  }
+
+  private buildClaimUrl(token: string): string {
+    return `${this.getGiftAppBaseUrl()}/gift/claim?token=${encodeURIComponent(token)}`;
+  }
+
+  private generateClaimToken(): {
+    token: string;
+    claimTokenHash: string;
+    claimTokenExpiresAt: Date;
+  } {
+    const token = crypto.randomBytes(32).toString('hex');
+    const claimTokenHash = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+    const expiryDays = Number(
+      this.configService.get<string>('GIFT_CLAIM_EXPIRY_DAYS') || 30,
+    );
+    const claimTokenExpiresAt = new Date();
+    claimTokenExpiresAt.setDate(claimTokenExpiresAt.getDate() + expiryDays);
+    return { token, claimTokenHash, claimTokenExpiresAt };
+  }
+
+  private ensureClaimLink(gift: GiftOrder): {
+    token: string;
+    claimUrl: string;
+  } {
+    const existingToken = gift.metadata?.claimToken?.toString().trim();
+    const existingClaimUrl = gift.metadata?.claimUrl?.toString().trim();
+
+    if (existingToken && existingClaimUrl) {
+      return { token: existingToken, claimUrl: existingClaimUrl };
+    }
+
+    const generated = this.generateClaimToken();
+    gift.claimTokenHash = generated.claimTokenHash;
+    gift.claimTokenExpiresAt = generated.claimTokenExpiresAt;
+    gift.metadata = {
+      ...(gift.metadata || {}),
+      claimToken: generated.token,
+      claimUrl: this.buildClaimUrl(generated.token),
+      claimStatus: gift.giftStatus,
+    };
+
+    return {
+      token: generated.token,
+      claimUrl: gift.metadata.claimUrl,
+    };
+  }
+
+  private buildWhatsappText(gift: GiftOrder, claimUrl: string): string {
+    const senderPrefix =
+      gift.showSenderInfo && gift.senderDisplayNameSnapshot
+        ? `${gift.senderDisplayNameSnapshot} `
+        : '';
+    const messageLine = gift.giftMessage?.trim()
+      ? `\nرسالة الهدية: ${gift.giftMessage.trim()}`
+      : '';
+
+    return [
+      `لديك هدية ${senderPrefix}من ${gift.sourceProductSnapshot?.title ?? 'أحد الفروع'}.`,
+      'اضغط على الرابط لاستلامها داخل التطبيق:',
+      claimUrl,
+      messageLine,
+    ].join('\n');
+  }
+
   async getQuote(userId: string, dto: GiftQuoteDto) {
     const normalizedRecipientPhone = normalizePhone(dto.recipientPhone);
 
@@ -222,6 +303,7 @@ export class GiftOrdersService {
       productSnapshot = {
         id: product.id,
         title: product.title,
+        branchName: branch.name_ar,
         description: product.description,
         price: Number(product.price),
         currency: product.currency,
@@ -251,6 +333,7 @@ export class GiftOrdersService {
       productSnapshot = {
         id: plan.id,
         title: plan.title,
+        branchName: branch.name_ar,
         description: plan.description,
         price: Number(plan.price),
         currency: plan.currency,
@@ -290,6 +373,7 @@ export class GiftOrdersService {
     giftOrder.giftStatus = GiftStatus.PENDING_CLAIM;
     giftOrder.whatsappMessageStatus = WhatsAppStatus.PENDING;
     giftOrder.metadata = dto.addOns ? { addOns: dto.addOns } : {};
+    const claimLink = this.ensureClaimLink(giftOrder);
 
     const saved = await this.giftOrderRepo.save(giftOrder);
 
@@ -307,6 +391,8 @@ export class GiftOrdersService {
       total: saved.total,
       currency: saved.currency,
       claimExpiresAt: saved.claimTokenExpiresAt,
+      claimToken: claimLink.token,
+      claimUrl: claimLink.claimUrl,
     };
   }
 
@@ -332,6 +418,7 @@ export class GiftOrdersService {
     const qb = this.giftOrderRepo
       .createQueryBuilder('go')
       .leftJoinAndSelect('go.branch', 'branch')
+      .leftJoinAndSelect('go.claimedByUser', 'claimedByUser')
       .where('go.senderUserId = :userId', { userId })
       .orderBy('go.createdAt', 'DESC')
       .skip((page - 1) * limit)
@@ -353,7 +440,10 @@ export class GiftOrdersService {
         currency: go.currency,
         paymentStatus: go.paymentStatus,
         giftStatus: go.giftStatus,
+        claimStatus: go.metadata?.claimStatus?.toString() ?? go.giftStatus,
         whatsappMessageStatus: go.whatsappMessageStatus,
+        claimUrl: go.metadata?.claimUrl?.toString() ?? null,
+        claimedByDisplayName: (go as any).claimedByUser?.name ?? null,
         claimExpiresAt: go.claimTokenExpiresAt,
         claimedAt: go.claimedAt,
         createdAt: go.createdAt,
@@ -365,36 +455,12 @@ export class GiftOrdersService {
   }
 
   async getReceivedGifts(userId: string, query: ListGiftOrdersDto) {
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user || !user.phone) {
-      return {
-        items: [],
-        total: 0,
-        page: query.page ?? 1,
-        limit: query.limit ?? 20,
-      };
-    }
-
-    let normalizedUserPhone: string;
-    try {
-      normalizedUserPhone = normalizePhone(this.encryption.decrypt(user.phone));
-    } catch {
-      return {
-        items: [],
-        total: 0,
-        page: query.page ?? 1,
-        limit: query.limit ?? 20,
-      };
-    }
-
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const qb = this.giftOrderRepo
       .createQueryBuilder('go')
       .leftJoinAndSelect('go.branch', 'branch')
-      .where('go.normalizedRecipientPhone = :phone', {
-        phone: normalizedUserPhone,
-      })
+      .where('go.claimedByUserId = :userId', { userId })
       .orderBy('go.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -418,9 +484,7 @@ export class GiftOrdersService {
         currency: go.currency,
         giftStatus: go.giftStatus,
         claimExpiresAt: go.claimTokenExpiresAt,
-        claimable:
-          go.giftStatus === GiftStatus.PENDING_CLAIM &&
-          go.paymentStatus === GiftPaymentStatus.PAID,
+        claimable: false,
         claimedAt: go.claimedAt,
         finalAssetType: go.finalAssetType,
         finalAssetId: go.finalAssetId,
@@ -447,14 +511,7 @@ export class GiftOrdersService {
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
     const isSender = gift.senderUserId === userId;
-    let isRecipient = false;
-
-    if (user?.phone) {
-      try {
-        const userPhone = normalizePhone(this.encryption.decrypt(user.phone));
-        isRecipient = phonesMatch(userPhone, gift.normalizedRecipientPhone);
-      } catch {}
-    }
+    const isRecipient = gift.claimedByUserId === user?.id;
 
     if (!isSender && !isRecipient) {
       throw new ForbiddenException({
@@ -477,8 +534,11 @@ export class GiftOrdersService {
       currency: gift.currency,
       paymentStatus: gift.paymentStatus,
       giftStatus: gift.giftStatus,
+      claimStatus: gift.metadata?.claimStatus?.toString() ?? gift.giftStatus,
       claimExpiresAt: gift.claimTokenExpiresAt,
       whatsappMessageStatus: gift.whatsappMessageStatus,
+      claimUrl: isSender ? gift.metadata?.claimUrl?.toString() ?? null : null,
+      claimedByDisplayName: gift.claimedByUserId === userId ? user?.name : null,
       claimedAt: gift.claimedAt,
       finalAssetType: gift.finalAssetType,
       finalAssetId: gift.finalAssetId,
@@ -527,10 +587,17 @@ export class GiftOrdersService {
       });
     }
 
-    if (dto.claimToken && gift.claimTokenHash) {
+    if (gift.claimTokenHash) {
+      if (!dto.claimToken?.trim()) {
+        throw new BadRequestException({
+          code: 'CLAIM_TOKEN_REQUIRED',
+          message: 'Claim token is required',
+        });
+      }
+
       const tokenHash = crypto
         .createHash('sha256')
-        .update(dto.claimToken)
+        .update(dto.claimToken.trim())
         .digest('hex');
       if (tokenHash !== gift.claimTokenHash) {
         throw new BadRequestException({
@@ -541,27 +608,10 @@ export class GiftOrdersService {
     }
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user?.phone) {
-      throw new BadRequestException({
-        code: 'PHONE_MISMATCH',
-        message: 'User phone not available',
-      });
-    }
-
-    let normalizedUserPhone: string;
-    try {
-      normalizedUserPhone = normalizePhone(this.encryption.decrypt(user.phone));
-    } catch {
-      throw new BadRequestException({
-        code: 'PHONE_MISMATCH',
-        message: 'Could not verify phone',
-      });
-    }
-
-    if (!phonesMatch(normalizedUserPhone, gift.normalizedRecipientPhone)) {
-      throw new BadRequestException({
-        code: 'PHONE_MISMATCH',
-        message: 'Your phone number does not match the gift recipient',
+    if (!user) {
+      throw new NotFoundException({
+        code: 'USER_NOT_FOUND',
+        message: 'User not found',
       });
     }
 
@@ -612,6 +662,11 @@ export class GiftOrdersService {
     gift.claimedAt = new Date();
     gift.finalAssetType = finalAssetType;
     gift.finalAssetId = finalAssetId;
+    gift.metadata = {
+      ...(gift.metadata || {}),
+      claimStatus: GiftStatus.CLAIMED,
+      openedAt: gift.metadata?.openedAt ?? new Date().toISOString(),
+    };
     await this.giftOrderRepo.save(gift);
 
     await this.logEvent(gift.id, 'gift_claimed', 'recipient', userId, {
@@ -647,7 +702,7 @@ export class GiftOrdersService {
     };
   }
 
-  async resolveClaimToken(userId: string, token: string) {
+  async resolveClaimToken(token: string) {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
     const gift = await this.giftOrderRepo
@@ -663,43 +718,36 @@ export class GiftOrdersService {
       });
     }
 
-    if (gift.claimTokenExpiresAt && new Date() > gift.claimTokenExpiresAt) {
-      throw new BadRequestException({
-        code: 'TOKEN_EXPIRED',
-        message: 'Claim token has expired',
-      });
-    }
+    const isExpired =
+      gift.claimTokenExpiresAt != null && new Date() > gift.claimTokenExpiresAt;
 
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (user?.phone) {
-      try {
-        const userPhone = normalizePhone(this.encryption.decrypt(user.phone));
-        if (!phonesMatch(userPhone, gift.normalizedRecipientPhone)) {
-          throw new ForbiddenException({
-            code: 'PHONE_MISMATCH',
-            message: 'Your phone does not match the gift recipient',
-          });
-        }
-      } catch (e) {
-        if (e instanceof ForbiddenException) throw e;
-      }
-    }
+    gift.metadata = {
+      ...(gift.metadata || {}),
+      openedAt: gift.metadata?.openedAt ?? new Date().toISOString(),
+      claimStatus: gift.metadata?.claimStatus?.toString() ?? gift.giftStatus,
+    };
+    await this.giftOrderRepo.save(gift);
 
     const branchName = (gift as any).branch?.name_ar ?? '';
     return {
-      id: gift.id,
+      giftOrderId: gift.id,
       giftType: gift.giftType,
+      branchId: gift.branchId,
       sourceProductTitle: gift.sourceProductSnapshot?.title ?? '',
       branchName,
       senderDisplayName: gift.showSenderInfo
         ? gift.senderDisplayNameSnapshot
         : null,
       giftMessage: gift.giftMessage || null,
-      giftStatus: gift.giftStatus,
+      status: isExpired ? GiftStatus.EXPIRED : gift.giftStatus,
+      paymentStatus: gift.paymentStatus,
       claimExpiresAt: gift.claimTokenExpiresAt,
       claimable:
+        !isExpired &&
         gift.giftStatus === GiftStatus.PENDING_CLAIM &&
         gift.paymentStatus === GiftPaymentStatus.PAID,
+      finalAssetType: gift.finalAssetType,
+      finalAssetId: gift.finalAssetId,
     };
   }
 
@@ -740,27 +788,15 @@ export class GiftOrdersService {
       });
     }
 
-    gift.whatsappMessageStatus = WhatsAppStatus.PENDING;
-    await this.giftOrderRepo.save(gift);
+    const claimLink = this.ensureClaimLink(gift);
 
-    await this.notificationsService
-      .enqueue({
-        type: 'GIFT_INVITE',
-        to: { phone: gift.recipientPhone },
-        data: {
-          senderName: gift.senderDisplayNameSnapshot || 'مستخدم',
-          productTitle: gift.sourceProductSnapshot?.title ?? '',
-          branchName: gift.sourceProductSnapshot?.branchName ?? '',
-          giftMessage: gift.giftMessage || '',
-          giftOrderId: gift.id,
-          deepLinkUrl: `${this.configService.get<string>('APP_DEEP_LINK_BASE_URL') || 'loop://gift/claim'}?token=`,
-        },
-        channels: ['whatsapp'],
-        lang: 'ar',
-      })
-      .catch((err) =>
-        this.logger.warn(`Failed to resend WhatsApp invite: ${err.message}`),
-      );
+    gift.whatsappMessageStatus = WhatsAppStatus.SENT;
+    gift.whatsappSentAt = new Date();
+    gift.metadata = {
+      ...(gift.metadata || {}),
+      claimStatus: gift.metadata?.claimStatus?.toString() ?? gift.giftStatus,
+    };
+    await this.giftOrderRepo.save(gift);
 
     await this.logEvent(gift.id, 'invite_resent', 'sender', userId, {
       recipientPhone: gift.normalizedRecipientPhone,
@@ -769,6 +805,12 @@ export class GiftOrdersService {
     return {
       id: gift.id,
       whatsappMessageStatus: gift.whatsappMessageStatus,
+      recipientPhone: gift.recipientPhone,
+      claimUrl: claimLink.claimUrl,
+      claimToken: claimLink.token,
+      whatsappText: this.buildWhatsappText(gift, claimLink.claimUrl),
+      schemeUrl:
+        `${this.getGiftCustomSchemeBaseUrl()}?token=${encodeURIComponent(claimLink.token)}`,
     };
   }
 

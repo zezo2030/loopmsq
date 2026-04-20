@@ -53,6 +53,17 @@ services:
       ENCRYPTION_KEY: your-32-character-encryption-key-dev
       PORT: 3000
       API_PREFIX: api/v1
+      # Gift links / App links
+      APP_BASE_URL: ${APP_BASE_URL:-https://kinetic-app-sa.org}
+      GIFT_APP_BASE_URL: ${GIFT_APP_BASE_URL:-https://kinetic-app-sa.org}
+      GIFT_CUSTOM_SCHEME_BASE_URL: ${GIFT_CUSTOM_SCHEME_BASE_URL:-loopmsq://gift/claim}
+      ANDROID_APP_PACKAGE: ${ANDROID_APP_PACKAGE:-com.company.kinetic}
+      ANDROID_SHA256_FINGERPRINTS: ${ANDROID_SHA256_FINGERPRINTS:-}
+      IOS_TEAM_ID: ${IOS_TEAM_ID:-}
+      IOS_APP_BUNDLE_ID: ${IOS_APP_BUNDLE_ID:-com.example.userApp}
+      ANDROID_STORE_URL: ${ANDROID_STORE_URL:-https://play.google.com/store/apps/details?id=com.company.kinetic}
+      IOS_STORE_URL: ${IOS_STORE_URL:-https://apps.apple.com/}
+      GIFT_CLAIM_EXPIRY_DAYS: ${GIFT_CLAIM_EXPIRY_DAYS:-30}
       # Admin bootstrap
       ADMIN_EMAIL: admin@example.com
       ADMIN_PASSWORD: StrongPass#2025

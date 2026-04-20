@@ -1721,30 +1721,9 @@ export class PaymentsService {
           where: { id: pendingFlowContext.giftOrderId },
         });
         if (giftOrder) {
-          const claimToken = crypto.randomBytes(32).toString('hex');
-          const claimTokenHash = crypto
-            .createHash('sha256')
-            .update(claimToken)
-            .digest('hex');
-          const expiryDays = Number(
-            this.configService.get<string>('GIFT_CLAIM_EXPIRY_DAYS') || 30,
-          );
-          const claimTokenExpiresAt = new Date();
-          claimTokenExpiresAt.setDate(
-            claimTokenExpiresAt.getDate() + expiryDays,
-          );
-
           giftOrder.paymentStatus = GiftPaymentStatus.PAID;
-          giftOrder.claimTokenHash = claimTokenHash;
-          giftOrder.claimTokenExpiresAt = claimTokenExpiresAt;
           giftOrder.whatsappMessageStatus = 'pending' as any;
           await giftOrderRepo.save(giftOrder);
-
-          payment.webhookData = this.serializePaymentJson({
-            ...pendingFlowContext,
-            claimToken,
-          });
-          await queryRunner.manager.save(payment);
         }
       } else if (booking) {
         booking.status = BookingStatus.CONFIRMED;
@@ -1977,46 +1956,6 @@ export class PaymentsService {
           this.logger.error(
             `Failed to confirm subscription purchase payment: ${e?.message || e}`,
           );
-        }
-      }
-
-      // Handle gift order post-confirmation: WhatsApp invite + push notification
-      if (
-        pendingFlowContext?.flowType === 'gift_order' &&
-        pendingFlowContext.giftOrderId
-      ) {
-        try {
-          const giftOrderRepo = this.dataSource.getRepository(GiftOrder);
-          const giftOrder = await giftOrderRepo.findOne({
-            where: { id: pendingFlowContext.giftOrderId },
-          });
-          if (giftOrder) {
-            const claimToken = this.normalizePaymentJson(
-              payment.webhookData,
-            )?.claimToken;
-            const deepLinkUrl = claimToken
-              ? `https://app.loop.com/gifts/claim?token=${claimToken}`
-              : '';
-
-            await this.notifications.enqueue({
-              type: 'GIFT_INVITE' as any,
-              to: { phone: giftOrder.normalizedRecipientPhone },
-              data: {
-                branchName:
-                  giftOrder.sourceProductSnapshot?.branchName || '',
-                productTitle: giftOrder.sourceProductSnapshot?.title || '',
-                senderName: giftOrder.showSenderInfo
-                  ? giftOrder.senderDisplayNameSnapshot
-                  : '',
-                giftMessage: giftOrder.giftMessage || '',
-                deepLinkUrl,
-                giftOrderId: giftOrder.id,
-              },
-              channels: ['whatsapp', 'push'],
-            });
-          }
-        } catch (e) {
-          this.logger.error(`Failed to send gift invite: ${e?.message || e}`);
         }
       }
 
