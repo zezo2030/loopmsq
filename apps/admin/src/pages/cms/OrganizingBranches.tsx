@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, Form, Input, Modal, Switch, Table, message, Upload, Image, Space, Radio, Divider } from 'antd'
 import { UploadOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { resolveFileUrlWithBust } from '../../shared/url'
-import { useState } from 'react'
-import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
+import { useEffect, useState } from 'react'
+import { apiDelete, apiGet, apiPatch, apiPost, getWhatsAppConfig, updateWhatsAppConfig } from '../../api'
 import { useTranslation } from 'react-i18next'
 
 type OrganizingBranch = {
@@ -26,8 +26,21 @@ export default function OrganizingBranches() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<OrganizingBranch | null>(null)
   const [form] = Form.useForm()
+  const [whatsappForm] = Form.useForm()
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image')
   const [coverUrl, setCoverUrl] = useState<string | null>(null)
+  const [savingWhatsapp, setSavingWhatsapp] = useState(false)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const whatsapp = await getWhatsAppConfig()
+        whatsappForm.setFieldsValue({
+          publicContactWhatsappPhone: (whatsapp as any).publicContactWhatsappPhone || '',
+        })
+      } catch {}
+    })()
+  }, [whatsappForm])
 
   const createMutation = useMutation({
     mutationFn: (body: Partial<OrganizingBranch>) => apiPost<OrganizingBranch>('/admin/organizing-branches', body),
@@ -165,6 +178,61 @@ export default function OrganizingBranches() {
 
   return (
     <div>
+      <div
+        style={{
+          marginBottom: 16,
+          padding: 16,
+          border: '1px solid #f0f0f0',
+          borderRadius: 12,
+          background: '#fff',
+        }}
+      >
+        <Form
+          form={whatsappForm}
+          layout="vertical"
+          onFinish={async (values) => {
+            setSavingWhatsapp(true)
+            try {
+              await updateWhatsAppConfig({
+                provider: 'whatsapp',
+                publicContactWhatsappPhone:
+                  values.publicContactWhatsappPhone?.trim() || '',
+              })
+              message.success(t('organizing_branches.whatsapp_saved'))
+            } catch (e: any) {
+              message.error(e?.message || t('organizing_branches.upload_failed'))
+            } finally {
+              setSavingWhatsapp(false)
+            }
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 12 }}>
+            {t('organizing_branches.whatsapp_section_title')}
+          </div>
+          <div style={{ color: '#8c8c8c', marginBottom: 16 }}>
+            {t('organizing_branches.whatsapp_section_hint')}
+          </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <Form.Item
+              name="publicContactWhatsappPhone"
+              label={t('organizing_branches.whatsapp_phone')}
+              style={{ flex: '1 1 320px', marginBottom: 0 }}
+              rules={[
+                {
+                  pattern: /^[\d+\s()-]*$/,
+                  message: t('organizing_branches.whatsapp_phone_invalid'),
+                },
+              ]}
+            >
+              <Input placeholder={t('organizing_branches.whatsapp_phone_placeholder')} />
+            </Form.Item>
+            <Button type="primary" htmlType="submit" loading={savingWhatsapp} style={{ marginTop: 30 }}>
+              {t('common.save') || 'Save'}
+            </Button>
+          </div>
+        </Form>
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <Button 
           type="primary" 

@@ -10,6 +10,7 @@ type SmsConfig = {
   provider: 'whatsapp';
   whatsappAccessToken?: string;
   whatsappPhoneNumberId?: string;
+  publicContactWhatsappPhone?: string;
 };
 
 type OtpConfig = {
@@ -71,12 +72,16 @@ export class AdminConfigService {
       provider: 'whatsapp',
       whatsappAccessToken: current.whatsappAccessToken,
       whatsappPhoneNumberId: current.whatsappPhoneNumberId,
+      publicContactWhatsappPhone: current.publicContactWhatsappPhone,
     };
 
     if (dto.enabled !== undefined) next.enabled = dto.enabled;
     if (dto.provider) next.provider = dto.provider;
     if (dto.whatsappPhoneNumberId !== undefined) {
       next.whatsappPhoneNumberId = dto.whatsappPhoneNumberId;
+    }
+    if (dto.publicContactWhatsappPhone !== undefined) {
+      next.publicContactWhatsappPhone = dto.publicContactWhatsappPhone;
     }
     if (dto.whatsappAccessToken) {
       next.whatsappAccessToken = this.encryption.encrypt(

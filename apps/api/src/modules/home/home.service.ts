@@ -8,6 +8,7 @@ import { Activity } from '../../database/entities/activity.entity';
 import { OrganizingBranch } from '../../database/entities/organizing-branch.entity';
 import { IntroVideo } from '../../database/entities/intro-video.entity';
 import { RedisService } from '../../utils/redis.service';
+import { AdminConfigService } from '../admin-config/admin-config.service';
 
 @Injectable()
 export class HomeService {
@@ -22,6 +23,7 @@ export class HomeService {
     @InjectRepository(IntroVideo)
     private readonly introVideoRepo: Repository<IntroVideo>,
     private readonly redis: RedisService,
+    private readonly adminConfigService: AdminConfigService,
   ) {}
 
   async getHome(branchId?: string) {
@@ -87,6 +89,7 @@ export class HomeService {
       where: { isActive: true } as any,
       order: { createdAt: 'DESC' } as any,
     });
+    const whatsappConfig = await this.adminConfigService.getSmsConfig(true);
 
     const featuredBranches = await this.branchRepo.find({
       order: { createdAt: 'DESC' },
@@ -98,6 +101,8 @@ export class HomeService {
       featuredBranches,
       activities,
       organizingBranches,
+      organizingBranchesWhatsappPhone:
+        whatsappConfig.publicContactWhatsappPhone || null,
       introVideo,
     };
     await this.redis.set(cacheKey, payload, 120);

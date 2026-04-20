@@ -43,4 +43,14 @@ export class UpdateSmsConfigDto {
   @IsString()
   @MinLength(5)
   whatsappPhoneNumberId?: string;
+
+  @ApiProperty({
+    description: 'Public WhatsApp number shown in the app for organizer section',
+    required: false,
+    example: '966500000000',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  publicContactWhatsappPhone?: string;
 }

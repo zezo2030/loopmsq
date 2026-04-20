@@ -76,6 +76,7 @@ export type WhatsAppConfigMasked = {
   provider: 'whatsapp'
   whatsappAccessToken?: string
   whatsappPhoneNumberId?: string
+  publicContactWhatsappPhone?: string
 }
 
 export type OtpConfig = {
@@ -94,7 +95,7 @@ export async function getWhatsAppConfig(): Promise<WhatsAppConfigMasked> {
   return apiGet('/admin/config/whatsapp')
 }
 
-export async function updateWhatsAppConfig(body: Partial<{ enabled: boolean; provider: 'whatsapp'; whatsappAccessToken: string; whatsappPhoneNumberId: string }>): Promise<WhatsAppConfigMasked> {
+export async function updateWhatsAppConfig(body: Partial<{ enabled: boolean; provider: 'whatsapp'; whatsappAccessToken: string; whatsappPhoneNumberId: string; publicContactWhatsappPhone: string }>): Promise<WhatsAppConfigMasked> {
   return apiPut('/admin/config/whatsapp', body)
 }
 

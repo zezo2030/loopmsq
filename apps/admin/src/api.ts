@@ -78,4 +78,53 @@ async function safeText(resp: Response): Promise<string | null> {
   try { return await resp.text() } catch { return null }
 }
 
+// Admin Config APIs
+export type WhatsAppConfigMasked = {
+  enabled: boolean
+  provider: 'whatsapp'
+  whatsappAccessToken?: string
+  whatsappPhoneNumberId?: string
+  publicContactWhatsappPhone?: string
+}
+
+export type OtpConfig = {
+  enabled: boolean
+  length: number
+  expirySeconds: number
+  rateTtlSeconds: number
+  rateMaxAttempts: number
+}
+
+export type PrivateEventTermsConfig = {
+  terms: string[]
+}
+
+export async function getWhatsAppConfig(): Promise<WhatsAppConfigMasked> {
+  return apiGet('/admin/config/whatsapp')
+}
+
+export async function updateWhatsAppConfig(body: Partial<{ enabled: boolean; provider: 'whatsapp'; whatsappAccessToken: string; whatsappPhoneNumberId: string; publicContactWhatsappPhone: string }>): Promise<WhatsAppConfigMasked> {
+  return apiPut('/admin/config/whatsapp', body)
+}
+
+export async function testWhatsApp(to: string, message: string): Promise<{ success: boolean }> {
+  return apiPost('/admin/config/whatsapp/test', { to, message })
+}
+
+export async function getOtpConfig(): Promise<OtpConfig> {
+  return apiGet('/admin/config/otp')
+}
+
+export async function updateOtpConfig(body: Partial<OtpConfig>): Promise<OtpConfig> {
+  return apiPut('/admin/config/otp', body)
+}
+
+export async function getPrivateEventTermsConfig(): Promise<PrivateEventTermsConfig> {
+  return apiGet('/admin/config/private-event-terms')
+}
+
+export async function updatePrivateEventTermsConfig(body: PrivateEventTermsConfig): Promise<PrivateEventTermsConfig> {
+  return apiPut('/admin/config/private-event-terms', body)
+}
+
 

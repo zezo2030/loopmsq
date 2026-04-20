@@ -9,9 +9,11 @@ import { Activity } from '../../database/entities/activity.entity';
 import { OrganizingBranch } from '../../database/entities/organizing-branch.entity';
 import { IntroVideo } from '../../database/entities/intro-video.entity';
 import { RedisService } from '../../utils/redis.service';
+import { AdminConfigModule } from '../admin-config/admin-config.module';
 
 @Module({
   imports: [
+    AdminConfigModule,
     TypeOrmModule.forFeature([
       Banner,
       Offer,
