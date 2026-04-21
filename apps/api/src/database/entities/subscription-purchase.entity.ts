@@ -83,6 +83,9 @@ export class SubscriptionPurchase {
   @Column({ type: 'varchar', length: 255, unique: true })
   qrTokenHash: string;
 
+  @Column({ type: 'text', nullable: true })
+  holderImageUrl: string | null;
+
   @Column({ type: 'jsonb', nullable: true })
   metadata: any;
 

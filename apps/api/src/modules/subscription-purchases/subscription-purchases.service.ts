@@ -23,9 +23,13 @@ import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubscriptionQuoteDto } from './dto/subscription-quote.dto';
-import { CreateSubscriptionPurchaseDto } from './dto/create-subscription-purchase.dto';
+import {
+  CreateSubscriptionPurchaseOptions,
+  CreateSubscriptionPurchasePayload,
+} from './dto/create-subscription-purchase.dto';
 import { DeductHoursDto } from './dto/deduct-hours.dto';
 import { User } from '../../database/entities/user.entity';
+import { CloudinaryService } from '../../utils/cloudinary.service';
 
 type PurchaseListFilters = {
   status?: SubscriptionPurchaseStatus;
@@ -53,8 +57,22 @@ export class SubscriptionPurchasesService {
     private readonly userRepo: Repository<User>,
     private readonly qrCodeService: QRCodeService,
     private readonly notificationsService: NotificationsService,
+    private readonly cloudinaryService: CloudinaryService,
     private readonly dataSource: DataSource,
   ) {}
+
+  async uploadHolderPhoto(file: Express.Multer.File) {
+    if (!file.mimetype?.startsWith('image/')) {
+      throw new BadRequestException('Subscription holder photo must be an image');
+    }
+
+    const imageUrl = await this.cloudinaryService.uploadImage(
+      file,
+      'subscription-holders',
+    );
+
+    return { imageUrl };
+  }
 
   /**
    * Same plan + branch with an unpaid checkout: reuse payment row instead of duplicating purchases.
@@ -245,13 +263,23 @@ export class SubscriptionPurchasesService {
   /**
    * Create a subscription purchase and initiate payment.
    */
-  async createPurchase(userId: string, dto: CreateSubscriptionPurchaseDto) {
+  async createPurchase(
+    userId: string,
+    dto: CreateSubscriptionPurchasePayload,
+    options?: CreateSubscriptionPurchaseOptions,
+  ) {
+    const allowMissingHolderImage = options?.allowMissingHolderImage === true;
     const plan = await this.findActivePlan(dto.subscriptionPlanId);
     if (!dto.acceptedTerms) {
       throw new BadRequestException(
         'Subscription terms and conditions must be accepted',
       );
     }
+    if (!allowMissingHolderImage && !dto.holderImageUrl?.trim()) {
+      throw new BadRequestException('Subscription holder photo is required');
+    }
+
+    const trimmedHolder = dto.holderImageUrl?.trim();
 
     // Paid-and-active subscription only
     const existingActive = await this.purchaseRepo.findOne({
@@ -286,6 +314,18 @@ export class SubscriptionPurchasesService {
     );
     if (resumable) {
       const { purchase: rp, payment: pay } = resumable;
+      if (!allowMissingHolderImage) {
+        const nextHolderImageUrl = trimmedHolder!;
+        if (rp.holderImageUrl !== nextHolderImageUrl) {
+          rp.holderImageUrl = nextHolderImageUrl;
+          await this.purchaseRepo.save(rp);
+        }
+      } else if (trimmedHolder) {
+        if (rp.holderImageUrl !== trimmedHolder) {
+          rp.holderImageUrl = trimmedHolder;
+          await this.purchaseRepo.save(rp);
+        }
+      }
       this.logger.log(
         `Resuming pending subscription checkout ${rp.id} for user ${userId}`,
       );
@@ -352,6 +392,9 @@ export class SubscriptionPurchasesService {
         startedAt: provisionalStartedAt,
         endsAt: provisionalEndsAt,
         qrTokenHash: provisionalQrTokenHash,
+        holderImageUrl: allowMissingHolderImage
+          ? trimmedHolder || null
+          : trimmedHolder!,
         paymentStatus: 'pending' as any,
         status:
           totalPrice > 0
@@ -682,6 +725,7 @@ export class SubscriptionPurchasesService {
         : null;
 
     return {
+      holderImageUrl: purchase.holderImageUrl,
       subscription: {
         id: purchase.id,
         status: purchase.status,
@@ -707,6 +751,7 @@ export class SubscriptionPurchasesService {
         id: purchase.userId,
         name: purchase.user?.name || 'User',
         phone: purchase.user?.phone || '',
+        imageUrl: purchase.holderImageUrl,
       },
       branch: {
         id: purchase.branchId,
@@ -1173,6 +1218,7 @@ export class SubscriptionPurchasesService {
         id: purchase.id,
         status: purchase.status,
         paymentStatus: purchase.paymentStatus,
+        holderImageUrl: purchase.holderImageUrl,
         totalHours:
           purchase.totalHours != null ? Number(purchase.totalHours) : null,
         remainingHours:
@@ -1192,6 +1238,7 @@ export class SubscriptionPurchasesService {
           name: purchase.user?.name || 'User',
           phone: purchase.user?.phone || '',
           email: purchase.user?.email || '',
+          imageUrl: purchase.holderImageUrl,
         },
         branch: {
           id: purchase.branchId,
@@ -1259,6 +1306,7 @@ export class SubscriptionPurchasesService {
       id: purchase.id,
       status: purchase.status,
       paymentStatus: purchase.paymentStatus,
+      holderImageUrl: purchase.holderImageUrl,
       totalHours:
         purchase.totalHours != null ? Number(purchase.totalHours) : null,
       remainingHours:
@@ -1278,6 +1326,7 @@ export class SubscriptionPurchasesService {
         name: purchase.user?.name || 'User',
         phone: purchase.user?.phone || '',
         email: purchase.user?.email || '',
+        imageUrl: purchase.holderImageUrl,
       },
       branch: {
         id: purchase.branchId,

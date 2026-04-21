@@ -653,10 +653,14 @@ export class GiftOrdersService {
     } else {
       try {
         const purchaseResult =
-          await this.subscriptionPurchasesService.createPurchase(userId, {
-            subscriptionPlanId: gift.sourceProductId,
-            acceptedTerms: true,
-          });
+          await this.subscriptionPurchasesService.createPurchase(
+            userId,
+            {
+              subscriptionPlanId: gift.sourceProductId,
+              acceptedTerms: true,
+            },
+            { allowMissingHolderImage: true },
+          );
         if (purchaseResult.paymentRequired) {
           await this.subscriptionPurchasesService.confirmPayment(
             purchaseResult.id,

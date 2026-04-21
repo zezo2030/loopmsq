@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -8,14 +9,18 @@ import {
   UseGuards,
   ParseUUIDPipe,
   ParseIntPipe,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { SubscriptionPurchasesService } from './subscription-purchases.service';
 import { SubscriptionQuoteDto } from './dto/subscription-quote.dto';
@@ -46,6 +51,19 @@ export class SubscriptionPurchasesController {
   })
   async getQuote(@CurrentUser() user: User, @Body() dto: SubscriptionQuoteDto) {
     return this.service.getQuote(user.id, dto);
+  }
+
+  @Post('upload-holder-photo')
+  @ApiOperation({ summary: 'Upload subscription holder photo' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 201, description: 'Photo uploaded successfully' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadHolderPhoto(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Subscription holder photo is required');
+    }
+
+    return this.service.uploadHolderPhoto(file);
   }
 
   @Post()
