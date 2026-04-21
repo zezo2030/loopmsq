@@ -40,6 +40,7 @@ type SubscriptionPlan = {
   mealItems?: string[] | null
   durationType: 'monthly' | 'quarterly' | 'yearly' | 'custom_months'
   durationMonths: number
+  isGiftable: boolean
   isActive: boolean
   startsAt?: string | null
   endsAt?: string | null
@@ -60,6 +61,7 @@ type CreateSubscriptionPlanDto = {
   mealItems?: string[]
   durationType: 'monthly' | 'quarterly' | 'yearly' | 'custom_months'
   durationMonths: number
+  isGiftable?: boolean
   startsAt?: string | null
   endsAt?: string | null
 }
@@ -240,6 +242,11 @@ export default function SubscriptionPlans() {
         r.mealItems?.length ? r.mealItems.join(' + ') : t('subscriptionPlans.no_meals'),
     },
     {
+      title: t('subscriptionPlans.giftable'),
+      dataIndex: 'isGiftable',
+      render: (v: boolean) => (v ? t('subscriptionPlans.yes') : t('subscriptionPlans.no')),
+    },
+    {
       title: t('subscriptionPlans.active'),
       dataIndex: 'isActive',
       render: (v: boolean) => (v ? t('subscriptionPlans.yes') : t('subscriptionPlans.no')),
@@ -312,6 +319,7 @@ export default function SubscriptionPlans() {
               usageMode: 'flexible_total_hours',
               durationType: 'monthly',
               durationMonths: 1,
+              isGiftable: false,
               isActive: true,
               currency: 'SAR',
             })
@@ -358,6 +366,7 @@ export default function SubscriptionPlans() {
               mealItems: values.mealItems?.filter((item: string) => item?.trim()),
               durationType: values.durationType,
               durationMonths: Number(values.durationMonths),
+              isGiftable: values.isGiftable ?? false,
               startsAt: start ? start.toISOString() : undefined,
               endsAt: end ? end.toISOString() : undefined,
             }
@@ -377,6 +386,7 @@ export default function SubscriptionPlans() {
             usageMode: 'flexible_total_hours',
             durationType: 'monthly',
             durationMonths: 1,
+            isGiftable: false,
             isActive: true,
             currency: 'SAR',
           }}
@@ -476,6 +486,13 @@ export default function SubscriptionPlans() {
               placeholder={t('subscriptionPlans.meals_placeholder')}
               open={false}
             />
+          </Form.Item>
+          <Form.Item
+            name="isGiftable"
+            label={t('subscriptionPlans.giftable')}
+            valuePropName="checked"
+          >
+            <Switch />
           </Form.Item>
           <Form.Item
             name="durationType"

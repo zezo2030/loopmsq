@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsIn,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -55,4 +56,13 @@ export class ConfirmPaymentDto {
   @IsOptional()
   @IsObject()
   gatewayPayload?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description: 'Gateway provider used by the client checkout flow',
+    enum: ['tap', 'moyasar'],
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['tap', 'moyasar'])
+  provider?: 'tap' | 'moyasar';
 }

@@ -705,6 +705,21 @@ export class PaymentsService {
         return {
           paymentId: existingPayment.id,
           clientSecret: existingPayment.gatewayRef,
+          chargeId: existingPayment.gatewayRef,
+          provider:
+            dto.method === PaymentMethod.SAMSUNG_PAY ? 'moyasar' : undefined,
+          flowType:
+            dto.method === PaymentMethod.SAMSUNG_PAY
+              ? 'embedded_wallet'
+              : undefined,
+          walletSessionData:
+            dto.method === PaymentMethod.SAMSUNG_PAY
+              ? {
+                  paymentId: existingPayment.id,
+                  amount: Number(existingPayment.amount),
+                  currency: existingPayment.currency,
+                }
+              : undefined,
           amount: existingPayment.amount,
           currency: existingPayment.currency,
           status: existingPayment.status,
@@ -760,6 +775,21 @@ export class PaymentsService {
         return {
           paymentId: existingPayment.id,
           clientSecret: existingPayment.gatewayRef,
+          chargeId: existingPayment.gatewayRef,
+          provider:
+            dto.method === PaymentMethod.SAMSUNG_PAY ? 'moyasar' : undefined,
+          flowType:
+            dto.method === PaymentMethod.SAMSUNG_PAY
+              ? 'embedded_wallet'
+              : undefined,
+          walletSessionData:
+            dto.method === PaymentMethod.SAMSUNG_PAY
+              ? {
+                  paymentId: existingPayment.id,
+                  amount: Number(existingPayment.amount),
+                  currency: existingPayment.currency,
+                }
+              : undefined,
           amount: existingPayment.amount,
           currency: existingPayment.currency,
           status: existingPayment.status,
@@ -955,6 +985,21 @@ export class PaymentsService {
         return {
           paymentId: existing.id,
           clientSecret: existing.gatewayRef,
+          chargeId: existing.gatewayRef,
+          provider:
+            dto.method === PaymentMethod.SAMSUNG_PAY ? 'moyasar' : undefined,
+          flowType:
+            dto.method === PaymentMethod.SAMSUNG_PAY
+              ? 'embedded_wallet'
+              : undefined,
+          walletSessionData:
+            dto.method === PaymentMethod.SAMSUNG_PAY
+              ? {
+                  paymentId: existing.id,
+                  amount: Number(existing.amount),
+                  currency: existing.currency,
+                }
+              : undefined,
           amount: existing.amount,
           currency: existing.currency,
           status: existing.status,
@@ -1073,6 +1118,19 @@ export class PaymentsService {
         paymentId: savedPayment.id,
         chargeId: savedPayment.gatewayRef || '',
         redirectUrl: null,
+        provider: dto.method === PaymentMethod.SAMSUNG_PAY ? 'moyasar' : null,
+        flowType:
+          dto.method === PaymentMethod.SAMSUNG_PAY
+            ? 'embedded_wallet'
+            : null,
+        walletSessionData:
+          dto.method === PaymentMethod.SAMSUNG_PAY
+            ? {
+                paymentId: savedPayment.id,
+                amount: Number(savedPayment.amount),
+                currency: savedPayment.currency,
+              }
+            : null,
         amount: savedPayment.amount,
         currency: savedPayment.currency,
         status: savedPayment.status,

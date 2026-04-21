@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsDateString,
   IsInt,
+  IsBoolean,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -132,4 +133,13 @@ export class CreateSubscriptionPlanDto {
   @IsOptional()
   @IsString({ each: true })
   mealItems?: string[];
+
+  @ApiProperty({
+    description: 'Whether the subscription plan can be sent as a gift',
+    required: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isGiftable?: boolean;
 }

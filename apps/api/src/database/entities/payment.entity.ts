@@ -27,6 +27,7 @@ export enum PaymentStatus {
 export enum PaymentMethod {
   CREDIT_CARD = 'credit_card',
   DEBIT_CARD = 'debit_card',
+  SAMSUNG_PAY = 'samsung_pay',
   MADA = 'mada', // مدى - بطاقة مدى السعودية
   WALLET = 'wallet',
   BANK_TRANSFER = 'bank_transfer',
