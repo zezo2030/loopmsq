@@ -26,8 +26,9 @@ const navItems: Array<{
   key: string
   href?: string
   labelKey: string
+  fallbackLabel?: string
   icon: React.ComponentType<{ className?: string }>
-  children?: Array<{ key: string; href: string; labelKey: string }>
+  children?: Array<{ key: string; href: string; labelKey: string; fallbackLabel?: string }>
 }> = [
   { key: 'dashboard', href: '/admin', labelKey: 'menu.dashboard', icon: LayoutDashboard },
   { key: 'search', href: '/admin/search', labelKey: 'menu.search', icon: Search },
@@ -90,6 +91,7 @@ const navItems: Array<{
     children: [
       { key: 'finance-payments', href: '/admin/finance/payments', labelKey: 'finance.payments' },
       { key: 'finance-wallets', href: '/admin/finance/wallets', labelKey: 'finance.wallets' },
+      { key: 'finance-gift-refunds', href: '/admin/finance/gift-refunds', labelKey: 'finance.giftRefunds', fallbackLabel: 'طلبات استرجاع الهدايا' },
     ],
   },
   {
@@ -181,7 +183,7 @@ export function Sidebar() {
                   )}
                 >
                   <item.icon className="h-5 w-5" />
-                  {t(item.labelKey)}
+                  {t(item.labelKey, { defaultValue: item.fallbackLabel || item.labelKey })}
                   {isOpen ? (
                     <ChevronDown className="ms-auto h-4 w-4" />
                   ) : (
@@ -201,7 +203,7 @@ export function Sidebar() {
                             childActive ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-50 hover:text-primary'
                           )}
                         >
-                          {t(child.labelKey)}
+                          {t(child.labelKey, { defaultValue: child.fallbackLabel || child.labelKey })}
                         </Link>
                       )
                     })}
@@ -221,7 +223,7 @@ export function Sidebar() {
               )}
             >
               <item.icon className="h-5 w-5" />
-              {t(item.labelKey)}
+              {t(item.labelKey, { defaultValue: item.fallbackLabel || item.labelKey })}
             </Link>
           )
         })}

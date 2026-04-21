@@ -11,12 +11,16 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { GiftOrdersService } from './gift-orders.service';
+import { Roles, UserRole } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { GiftQuoteDto } from './dto/gift-quote.dto';
 import { CreateGiftOrderDto } from './dto/create-gift-order.dto';
 import { ClaimGiftDto } from './dto/claim-gift.dto';
 import { ListGiftOrdersDto } from './dto/list-gift-orders.dto';
 import { CancelGiftDto } from './dto/cancel-gift.dto';
 import { ResolveClaimTokenDto } from './dto/resolve-claim-token.dto';
+import { ListGiftRefundRequestsDto } from './dto/list-gift-refund-requests.dto';
+import { ReviewGiftRefundDto } from './dto/review-gift-refund.dto';
 
 @ApiTags('gift-orders')
 @ApiBearerAuth()
@@ -95,5 +99,45 @@ export class GiftOrdersController {
     @Body() dto?: CancelGiftDto,
   ) {
     return this.giftOrdersService.cancelGift(req.user.id, id, dto);
+  }
+
+  @Get('admin/refund-requests')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List gift refund requests for admin review' })
+  async listRefundRequests(@Query() query: ListGiftRefundRequestsDto) {
+    return this.giftOrdersService.listRefundRequests(query);
+  }
+
+  @Post('admin/:id/refund-approve')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Approve gift refund request and credit wallet' })
+  async approveRefundRequest(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() dto: ReviewGiftRefundDto,
+  ) {
+    return this.giftOrdersService.approveRefundRequest(
+      req.user.id,
+      id,
+      dto?.note,
+    );
+  }
+
+  @Post('admin/:id/refund-reject')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Reject gift refund request' })
+  async rejectRefundRequest(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() dto: ReviewGiftRefundDto,
+  ) {
+    return this.giftOrdersService.rejectRefundRequest(
+      req.user.id,
+      id,
+      dto?.note,
+    );
   }
 }

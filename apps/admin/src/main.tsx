@@ -35,6 +35,7 @@ import OrganizingBranches from './pages/cms/OrganizingBranches'
 import IntroVideo from './pages/cms/IntroVideo'
 import PaymentsList from './pages/finance/PaymentsList'
 import PaymentDetail from './pages/finance/PaymentDetail'
+import GiftRefundRequests from './pages/finance/GiftRefundRequests'
 import SubscriptionsList from './pages/transactions/SubscriptionsList'
 import OfferBookingsList from './pages/transactions/OfferBookingsList'
 import SubscriptionDetail from './pages/transactions/SubscriptionDetail'
@@ -135,6 +136,7 @@ const router = createBrowserRouter([
           { path: 'finance/payments', element: <PaymentsList /> },
           { path: 'finance/payments/:id', element: <PaymentDetail /> },
           { path: 'finance/wallets', element: <WalletsList /> },
+          { path: 'finance/gift-refunds', element: <GiftRefundRequests /> },
           { path: 'finance/subscriptions', element: <SubscriptionsList /> },
           { path: 'finance/subscriptions/:id', element: <SubscriptionDetail /> },
           { path: 'finance/offer-bookings', element: <OfferBookingsList /> },

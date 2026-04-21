@@ -13,6 +13,7 @@ import {
   GiftType,
   GiftPaymentStatus,
   GiftStatus,
+  GiftRefundRequestStatus,
   FinalAssetType,
   WhatsAppStatus,
 } from '../../database/entities/gift-order.entity';
@@ -32,7 +33,7 @@ import { CancelGiftDto } from './dto/cancel-gift.dto';
 import { OfferBookingsService } from '../offer-bookings/offer-bookings.service';
 import { SubscriptionPurchasesService } from '../subscription-purchases/subscription-purchases.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { PaymentsService } from '../payments/payments.service';
+import { WalletService } from '../wallet/wallet.service';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
@@ -61,8 +62,12 @@ export class GiftOrdersService {
     private readonly offerBookingsService: OfferBookingsService,
     private readonly subscriptionPurchasesService: SubscriptionPurchasesService,
     private readonly notificationsService: NotificationsService,
-    private readonly paymentsService: PaymentsService,
+    private readonly walletService: WalletService,
   ) {}
+
+  private isRefundPending(gift: GiftOrder): boolean {
+    return gift.refundRequestStatus === GiftRefundRequestStatus.PENDING;
+  }
 
   private getGiftAppBaseUrl(): string {
     return (
@@ -440,6 +445,9 @@ export class GiftOrdersService {
         currency: go.currency,
         paymentStatus: go.paymentStatus,
         giftStatus: go.giftStatus,
+        refundRequestStatus: go.refundRequestStatus,
+        refundRequestedAt: go.refundRequestedAt,
+        refundReviewedAt: go.refundReviewedAt,
         claimStatus: go.metadata?.claimStatus?.toString() ?? go.giftStatus,
         whatsappMessageStatus: go.whatsappMessageStatus,
         claimUrl: go.metadata?.claimUrl?.toString() ?? null,
@@ -534,6 +542,11 @@ export class GiftOrdersService {
       currency: gift.currency,
       paymentStatus: gift.paymentStatus,
       giftStatus: gift.giftStatus,
+      refundRequestStatus: gift.refundRequestStatus,
+      refundRequestedAt: gift.refundRequestedAt,
+      refundReviewedAt: gift.refundReviewedAt,
+      refundRequestReason: isSender ? gift.refundRequestReason : null,
+      refundReviewNote: isSender ? gift.refundReviewNote : null,
       claimStatus: gift.metadata?.claimStatus?.toString() ?? gift.giftStatus,
       claimExpiresAt: gift.claimTokenExpiresAt,
       whatsappMessageStatus: gift.whatsappMessageStatus,
@@ -572,6 +585,12 @@ export class GiftOrdersService {
       throw new BadRequestException({
         code: 'GIFT_NOT_CLAIMABLE',
         message: 'Gift is not in a claimable state',
+      });
+    }
+    if (this.isRefundPending(gift)) {
+      throw new BadRequestException({
+        code: 'GIFT_REFUND_PENDING',
+        message: 'Gift cannot be claimed while a refund request is under review',
       });
     }
     if (gift.paymentStatus !== GiftPaymentStatus.PAID) {
@@ -745,6 +764,7 @@ export class GiftOrdersService {
       claimable:
         !isExpired &&
         gift.giftStatus === GiftStatus.PENDING_CLAIM &&
+        gift.refundRequestStatus !== GiftRefundRequestStatus.PENDING &&
         gift.paymentStatus === GiftPaymentStatus.PAID,
       finalAssetType: gift.finalAssetType,
       finalAssetId: gift.finalAssetId,
@@ -778,6 +798,12 @@ export class GiftOrdersService {
       throw new BadRequestException({
         code: 'GIFT_CANCELLED',
         message: 'This gift has been cancelled',
+      });
+    }
+    if (this.isRefundPending(gift)) {
+      throw new BadRequestException({
+        code: 'GIFT_REFUND_PENDING',
+        message: 'This gift has a pending refund request under review',
       });
     }
 
@@ -848,6 +874,13 @@ export class GiftOrdersService {
       });
     }
 
+    if (gift.refundRequestStatus === GiftRefundRequestStatus.PENDING) {
+      throw new BadRequestException({
+        code: 'REFUND_REQUEST_ALREADY_PENDING',
+        message: 'A refund request is already pending admin review',
+      });
+    }
+
     if (gift.paymentStatus !== GiftPaymentStatus.PAID) {
       throw new BadRequestException({
         code: 'PAYMENT_NOT_COMPLETED',
@@ -871,22 +904,31 @@ export class GiftOrdersService {
     await queryRunner.startTransaction();
 
     try {
-      gift.giftStatus = GiftStatus.CANCELLED;
+      const requestedAt = new Date();
+      gift.refundRequestStatus = GiftRefundRequestStatus.PENDING;
+      gift.refundRequestedAt = requestedAt;
+      gift.refundRequestedByUserId = userId;
+      gift.refundRequestReason = dto?.reason ?? null;
+      gift.refundReviewedAt = null;
+      gift.refundReviewedByUserId = null;
+      gift.refundReviewNote = null;
+      gift.refundWalletReference = null;
+      gift.metadata = {
+        ...(gift.metadata || {}),
+        claimStatus: gift.metadata?.claimStatus?.toString() ?? gift.giftStatus,
+        refundRequestedAt: requestedAt.toISOString(),
+      };
       await queryRunner.manager.save(gift);
-
-      await this.paymentsService.refundPayment({
-        paymentId: payment.id,
-        reason: dto?.reason ?? 'Gift cancelled by sender',
-      });
 
       await this.logEvent(
         gift.id,
-        'gift_cancelled',
+        'gift_refund_requested',
         isSender ? 'sender' : 'admin',
         userId,
         {
           reason: dto?.reason,
-          refundInitiated: true,
+          paymentId: payment.id,
+          refundInitiated: false,
         },
       );
 
@@ -912,7 +954,8 @@ export class GiftOrdersService {
       return {
         id: gift.id,
         giftStatus: gift.giftStatus,
-        paymentStatus: GiftPaymentStatus.REFUNDED,
+        paymentStatus: gift.paymentStatus,
+        refundRequestStatus: GiftRefundRequestStatus.PENDING,
       };
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -920,5 +963,261 @@ export class GiftOrdersService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async listRefundRequests(query: {
+    status?: GiftRefundRequestStatus;
+    query?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const qb = this.giftOrderRepo
+      .createQueryBuilder('go')
+      .leftJoinAndSelect('go.branch', 'branch')
+      .leftJoinAndSelect('go.senderUser', 'senderUser')
+      .where('go.refundRequestStatus != :none', {
+        none: GiftRefundRequestStatus.NONE,
+      })
+      .orderBy('go.refundRequestedAt', 'DESC', 'NULLS LAST')
+      .addOrderBy('go.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (query.status) {
+      qb.andWhere('go.refundRequestStatus = :status', { status: query.status });
+    }
+
+    if (query.query?.trim()) {
+      const search = `%${query.query.trim().toLowerCase()}%`;
+      qb.andWhere(
+        `(
+          LOWER(COALESCE(senderUser.name, '')) LIKE :search OR
+          LOWER(COALESCE(go.normalizedRecipientPhone, '')) LIKE :search OR
+          LOWER(COALESCE(go.sourceProductSnapshot->>'title', '')) LIKE :search
+        )`,
+        { search },
+      );
+    }
+
+    const [items, total] = await qb.getManyAndCount();
+
+    return {
+      items: items.map((gift) => ({
+        id: gift.id,
+        giftType: gift.giftType,
+        giftStatus: gift.giftStatus,
+        paymentStatus: gift.paymentStatus,
+        refundRequestStatus: gift.refundRequestStatus,
+        refundRequestedAt: gift.refundRequestedAt,
+        refundRequestedByUserId: gift.refundRequestedByUserId,
+        refundRequestReason: gift.refundRequestReason,
+        refundReviewedAt: gift.refundReviewedAt,
+        refundReviewedByUserId: gift.refundReviewedByUserId,
+        refundReviewNote: gift.refundReviewNote,
+        branchName: (gift as any).branch?.name_ar ?? '',
+        senderName: (gift as any).senderUser?.name ?? null,
+        senderUserId: gift.senderUserId,
+        recipientPhoneMasked: maskPhone(gift.recipientPhone),
+        sourceProductTitle: gift.sourceProductSnapshot?.title ?? '',
+        total: Number(gift.total),
+        currency: gift.currency,
+        createdAt: gift.createdAt,
+      })),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async approveRefundRequest(
+    adminUserId: string,
+    giftId: string,
+    note?: string,
+  ) {
+    const admin = await this.userRepo.findOne({ where: { id: adminUserId } });
+    if (!admin || !(admin.roles?.includes(UserRole.ADMIN) ?? false)) {
+      throw new ForbiddenException({
+        code: 'NOT_AUTHORIZED',
+        message: 'Admin privileges required',
+      });
+    }
+
+    const gift = await this.giftOrderRepo.findOne({ where: { id: giftId } });
+    if (!gift) {
+      throw new NotFoundException({
+        code: 'GIFT_NOT_FOUND',
+        message: 'Gift not found',
+      });
+    }
+
+    if (gift.refundRequestStatus !== GiftRefundRequestStatus.PENDING) {
+      throw new BadRequestException({
+        code: 'REFUND_REQUEST_NOT_PENDING',
+        message: 'Refund request is not pending review',
+      });
+    }
+
+    const payment = await this.paymentRepo.findOne({
+      where: { giftOrderId: giftId, status: PaymentStatus.COMPLETED },
+    });
+
+    if (!payment) {
+      throw new NotFoundException({
+        code: 'PAYMENT_NOT_FOUND',
+        message: 'No completed payment found for this gift',
+      });
+    }
+
+    const refundedAt = new Date();
+    const refundAmount = Number(payment.amount);
+    const walletReference = `gift_refund_${gift.id}`;
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      await this.walletService.creditWallet(
+        gift.senderUserId,
+        refundAmount,
+        {
+          reference: walletReference,
+          metadata: {
+            flowType: 'gift_refund',
+            giftOrderId: gift.id,
+            paymentId: payment.id,
+            approvedByUserId: adminUserId,
+          },
+        },
+        queryRunner.manager,
+      );
+
+      payment.refundedAmount = refundAmount;
+      payment.refundedAt = refundedAt;
+      payment.status = PaymentStatus.REFUNDED;
+      await queryRunner.manager.save(payment);
+
+      gift.paymentStatus = GiftPaymentStatus.REFUNDED;
+      gift.giftStatus = GiftStatus.CANCELLED;
+      gift.refundRequestStatus = GiftRefundRequestStatus.APPROVED;
+      gift.refundReviewedAt = refundedAt;
+      gift.refundReviewedByUserId = adminUserId;
+      gift.refundReviewNote = note ?? null;
+      gift.refundWalletReference = walletReference;
+      gift.metadata = {
+        ...(gift.metadata || {}),
+        claimStatus: GiftStatus.CANCELLED,
+        refundApprovedAt: refundedAt.toISOString(),
+        refundWalletReference: walletReference,
+      };
+      await queryRunner.manager.save(gift);
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+
+    await this.logEvent(gift.id, 'gift_refund_approved', 'admin', adminUserId, {
+      note: note ?? null,
+      walletReference,
+      amount: refundAmount,
+    });
+
+    await this.notificationsService
+      .enqueue({
+        type: 'GIFT_EXPIRED',
+        to: { userId: gift.senderUserId },
+        data: {
+          productTitle: gift.sourceProductSnapshot?.title ?? '',
+          reason: 'Refund approved and credited to your wallet',
+        },
+        channels: ['push'],
+        lang: 'ar',
+      })
+      .catch((err) =>
+        this.logger.warn(
+          `Failed to notify sender about refund approval: ${err.message}`,
+        ),
+      );
+
+    return {
+      id: gift.id,
+      giftStatus: GiftStatus.CANCELLED,
+      paymentStatus: GiftPaymentStatus.REFUNDED,
+      refundRequestStatus: GiftRefundRequestStatus.APPROVED,
+      refundWalletReference: walletReference,
+    };
+  }
+
+  async rejectRefundRequest(
+    adminUserId: string,
+    giftId: string,
+    note?: string,
+  ) {
+    const admin = await this.userRepo.findOne({ where: { id: adminUserId } });
+    if (!admin || !(admin.roles?.includes(UserRole.ADMIN) ?? false)) {
+      throw new ForbiddenException({
+        code: 'NOT_AUTHORIZED',
+        message: 'Admin privileges required',
+      });
+    }
+
+    const gift = await this.giftOrderRepo.findOne({ where: { id: giftId } });
+    if (!gift) {
+      throw new NotFoundException({
+        code: 'GIFT_NOT_FOUND',
+        message: 'Gift not found',
+      });
+    }
+
+    if (gift.refundRequestStatus !== GiftRefundRequestStatus.PENDING) {
+      throw new BadRequestException({
+        code: 'REFUND_REQUEST_NOT_PENDING',
+        message: 'Refund request is not pending review',
+      });
+    }
+
+    gift.refundRequestStatus = GiftRefundRequestStatus.REJECTED;
+    gift.refundReviewedAt = new Date();
+    gift.refundReviewedByUserId = adminUserId;
+    gift.refundReviewNote = note ?? null;
+    gift.metadata = {
+      ...(gift.metadata || {}),
+      refundRejectedAt: new Date().toISOString(),
+    };
+    await this.giftOrderRepo.save(gift);
+
+    await this.logEvent(gift.id, 'gift_refund_rejected', 'admin', adminUserId, {
+      note: note ?? null,
+    });
+
+    await this.notificationsService
+      .enqueue({
+        type: 'GIFT_EXPIRED',
+        to: { userId: gift.senderUserId },
+        data: {
+          productTitle: gift.sourceProductSnapshot?.title ?? '',
+          reason: 'Refund request was reviewed and not approved',
+        },
+        channels: ['push'],
+        lang: 'ar',
+      })
+      .catch((err) =>
+        this.logger.warn(
+          `Failed to notify sender about refund rejection: ${err.message}`,
+        ),
+      );
+
+    return {
+      id: gift.id,
+      giftStatus: gift.giftStatus,
+      paymentStatus: gift.paymentStatus,
+      refundRequestStatus: GiftRefundRequestStatus.REJECTED,
+    };
   }
 }

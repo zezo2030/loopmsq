@@ -225,6 +225,68 @@ export class WalletService {
     };
   }
 
+  async creditWallet(
+    userId: string,
+    amount: number,
+    link: {
+      reference: string;
+      method?: PaymentMethod;
+      metadata?: Record<string, unknown>;
+    },
+    manager?: any,
+  ) {
+    const walletRepository = manager
+      ? manager.getRepository(Wallet)
+      : this.walletRepository;
+    const transactionRepository = manager
+      ? manager.getRepository(WalletTransaction)
+      : this.transactionRepository;
+
+    const wallet = await walletRepository.findOne({
+      where: { userId },
+    });
+    if (!wallet) throw new NotFoundException('Wallet not found');
+
+    const existingTransaction = await transactionRepository.findOne({
+      where: {
+        userId,
+        reference: link.reference,
+      },
+    });
+    if (existingTransaction) {
+      return {
+        success: true,
+        transactionId: existingTransaction.id,
+        amount,
+        newBalance: Number(wallet.balance),
+      };
+    }
+
+    wallet.balance = Number(wallet.balance) + Number(amount);
+    wallet.totalEarned = Number(wallet.totalEarned) + Number(amount);
+    wallet.lastTransactionAt = new Date();
+    await walletRepository.save(wallet);
+
+    const transaction = transactionRepository.create({
+      walletId: wallet.id,
+      userId,
+      type: WalletTransactionType.DEPOSIT,
+      amount,
+      status: WalletTransactionStatus.SUCCESS,
+      method: link.method ?? PaymentMethod.WALLET,
+      reference: link.reference,
+      metadata: link.metadata ?? {},
+    });
+    const savedTransaction = await transactionRepository.save(transaction);
+
+    return {
+      success: true,
+      transactionId: savedTransaction.id,
+      amount,
+      newBalance: Number(wallet.balance),
+    };
+  }
+
   /**
    * Deduct wallet balance. `relatedBookingId` must only be set when it exists in `bookings`
    * (FK). For event/trip flows use `metadata` + `reference` instead.

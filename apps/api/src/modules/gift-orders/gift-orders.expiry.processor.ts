@@ -6,10 +6,10 @@ import {
   GiftOrder,
   GiftStatus,
   GiftPaymentStatus,
+  GiftRefundRequestStatus,
 } from '../../database/entities/gift-order.entity';
 import { GiftOrderEvent } from '../../database/entities/gift-order-event.entity';
 import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
-import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -24,7 +24,6 @@ export class GiftOrdersExpiryProcessor {
     @InjectRepository(Payment)
     private readonly paymentRepo: Repository<Payment>,
     private readonly dataSource: DataSource,
-    private readonly paymentsService: PaymentsService,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -71,28 +70,40 @@ export class GiftOrdersExpiryProcessor {
     await queryRunner.startTransaction();
 
     try {
+      const requestedAt = new Date();
       gift.giftStatus = GiftStatus.EXPIRED;
+      gift.refundRequestStatus = GiftRefundRequestStatus.PENDING;
+      gift.refundRequestedAt = requestedAt;
+      gift.refundRequestedByUserId = null;
+      gift.refundRequestReason = 'Gift claim window expired';
+      gift.refundReviewedAt = null;
+      gift.refundReviewedByUserId = null;
+      gift.refundReviewNote = null;
+      gift.refundWalletReference = null;
+      gift.metadata = {
+        ...(gift.metadata || {}),
+        claimStatus: GiftStatus.EXPIRED,
+        refundRequestedAt: requestedAt.toISOString(),
+      };
       await queryRunner.manager.save(gift);
-
-      await this.paymentsService.refundPayment({
-        paymentId: payment.id,
-        reason: 'Gift claim window expired',
-      });
 
       const event = new GiftOrderEvent();
       event.giftOrderId = gift.id;
       event.eventType = 'gift_expired';
       event.actorType = 'system';
       event.actorId = '';
-      event.payload = { refundInitiated: true };
+      event.payload = { refundRequestStatus: GiftRefundRequestStatus.PENDING };
       await queryRunner.manager.save(event);
 
       const refundEvent = new GiftOrderEvent();
       refundEvent.giftOrderId = gift.id;
-      refundEvent.eventType = 'refund_initiated';
+      refundEvent.eventType = 'gift_refund_requested';
       refundEvent.actorType = 'system';
       refundEvent.actorId = '';
-      refundEvent.payload = { paymentId: payment.id };
+      refundEvent.payload = {
+        paymentId: payment.id,
+        reason: 'Gift claim window expired',
+      };
       await queryRunner.manager.save(refundEvent);
 
       await queryRunner.commitTransaction();

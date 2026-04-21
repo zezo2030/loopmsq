@@ -32,6 +32,13 @@ export enum GiftStatus {
   EXPIRED = 'expired',
 }
 
+export enum GiftRefundRequestStatus {
+  NONE = 'none',
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+}
+
 export enum FinalAssetType {
   OFFER_BOOKING = 'offer_booking',
   SUBSCRIPTION_PURCHASE = 'subscription_purchase',
@@ -48,6 +55,7 @@ export enum WhatsAppStatus {
 @Index('idx_gift_orders_sender', ['senderUserId'])
 @Index('idx_gift_orders_status', ['giftStatus'])
 @Index('idx_gift_orders_payment_status', ['paymentStatus'])
+@Index('idx_gift_orders_refund_request_status', ['refundRequestStatus'])
 @Index('idx_gift_orders_claim_token', ['claimTokenHash'], { unique: true })
 @Index('idx_gift_orders_expiry', ['giftStatus', 'claimTokenExpiresAt'])
 export class GiftOrder {
@@ -108,6 +116,34 @@ export class GiftOrder {
 
   @Column({ type: 'enum', enum: GiftStatus, default: GiftStatus.PENDING_CLAIM })
   giftStatus: GiftStatus;
+
+  @Column({
+    type: 'enum',
+    enum: GiftRefundRequestStatus,
+    default: GiftRefundRequestStatus.NONE,
+  })
+  refundRequestStatus: GiftRefundRequestStatus;
+
+  @Column({ type: 'timestamp', nullable: true })
+  refundRequestedAt: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  refundRequestedByUserId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  refundRequestReason: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  refundReviewedAt: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  refundReviewedByUserId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  refundReviewNote: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  refundWalletReference: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true, unique: true })
   claimTokenHash: string;
