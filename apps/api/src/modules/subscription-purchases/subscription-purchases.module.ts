@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SubscriptionPurchase } from '../../database/entities/subscription-purchase.entity';
 import { SubscriptionUsageLog } from '../../database/entities/subscription-usage-log.entity';
@@ -21,7 +21,7 @@ import { CloudinaryModule } from '../../utils/cloudinary.module';
       Payment,
       User,
     ]),
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
     CloudinaryModule,
   ],
   controllers: [SubscriptionPurchasesController, StaffSubscriptionsController],

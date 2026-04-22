@@ -155,6 +155,7 @@ export class NotificationsService {
             {
               to: n.to.phone || resolved.phone!,
               type: 'gift_invite',
+              giftOrderId: String(n.data.giftOrderId || ''),
               data: n.data,
               lang,
             },

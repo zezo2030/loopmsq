@@ -25,6 +25,14 @@ type PrivateEventTermsConfig = {
   terms: string[];
 };
 
+type TestGiftTemplatePayload = {
+  to: string;
+  senderName: string;
+  productTitle: string;
+  branchName: string;
+  claimUrl: string;
+};
+
 @Injectable()
 export class AdminConfigService {
   private readonly logger = new Logger(AdminConfigService.name);
@@ -102,6 +110,38 @@ export class AdminConfigService {
       type: 'OTP',
       to: { phone: to },
       data: { otp: message },
+      channels: ['whatsapp'],
+      lang: 'ar',
+    });
+
+    return { success: true };
+  }
+
+  async testGiftTemplate(
+    payload: TestGiftTemplatePayload,
+  ): Promise<{ success: boolean }> {
+    if (
+      !payload.to ||
+      !payload.senderName ||
+      !payload.productTitle ||
+      !payload.branchName ||
+      !payload.claimUrl
+    ) {
+      throw new BadRequestException(
+        'to, senderName, productTitle, branchName, and claimUrl are required',
+      );
+    }
+
+    await this.notifications.enqueue({
+      type: 'GIFT_INVITE',
+      to: { phone: payload.to },
+      data: {
+        senderName: payload.senderName,
+        productTitle: payload.productTitle,
+        branchName: payload.branchName,
+        claimUrl: payload.claimUrl,
+        deepLinkUrl: payload.claimUrl,
+      },
       channels: ['whatsapp'],
       lang: 'ar',
     });

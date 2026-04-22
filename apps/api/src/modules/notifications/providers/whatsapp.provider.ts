@@ -106,11 +106,41 @@ export class WhatsAppProvider {
     );
   }
 
+  private getGiftTemplateName(): string {
+    return (
+      this.configService.get<string>('WHATSAPP_GIFT_TEMPLATE_NAME') ||
+      'send_giff'
+    );
+  }
+
   private getForcedTemplateLanguage(): string | null {
     const forced = this.configService.get<string>('WHATSAPP_OTP_LANGUAGE');
     if (!forced) return null;
     const normalized = forced.trim();
     return normalized.length > 0 ? normalized : null;
+  }
+
+  private getGiftTemplateLanguageCandidates(lang: 'ar' | 'en'): string[] {
+    const forced = this.configService.get<string>('WHATSAPP_GIFT_LANGUAGE');
+    const normalized = forced?.trim();
+    if (normalized) {
+      // Meta locale codes: `en_US` alone used to mean a single candidate and no retries.
+      if (normalized === 'en') {
+        return ['en_US', 'en', 'en_GB'];
+      }
+      if (/^en_/i.test(normalized)) {
+        return Array.from(new Set([normalized, 'en_US', 'en', 'en_GB']));
+      }
+      if (normalized === 'ar') {
+        return ['ar', 'ar_SA', 'ar_EG'];
+      }
+      if (/^ar_/i.test(normalized)) {
+        return Array.from(new Set([normalized, 'ar', 'ar_SA', 'ar_EG']));
+      }
+      return [normalized];
+    }
+
+    return this.getLanguageCandidates(lang);
   }
 
   private getLanguageCandidates(lang: 'ar' | 'en'): string[] {
@@ -140,7 +170,7 @@ export class WhatsAppProvider {
       return;
     }
 
-    // تنظيف رقم الهاتف (إزالة + والمسافات)
+    // Clean phone number by removing the leading + and any whitespace.
     const cleanPhone = to.replace(/^\+/, '').replace(/\s/g, '');
     const templateName = this.getTemplateName();
     const languageCandidates = this.getLanguageCandidates(lang);
@@ -182,7 +212,7 @@ export class WhatsAppProvider {
         });
 
         this.logger.log(
-          `✅ WhatsApp OTP sent to ${to} using template "${templateName}" and language "${languageCode}"`,
+          `WhatsApp OTP sent to ${to} using template "${templateName}" and language "${languageCode}"`,
         );
         return;
       } catch (e: any) {
@@ -205,14 +235,14 @@ export class WhatsAppProvider {
         }
 
         this.logger.error(
-          `❌ WhatsApp send failed: ${errorMessage} (Code: ${errorCode}) — tried languages: [${languageCandidates.join(', ')}]`,
+          `WhatsApp send failed: ${errorMessage} (Code: ${errorCode}) - tried languages: [${languageCandidates.join(', ')}]`,
         );
         return;
       }
     }
 
     this.logger.error(
-      `❌ WhatsApp send failed: template "${templateName}" exhausted all language candidates [${languageCandidates.join(', ')}] for preferred language "${lang}"`,
+      `WhatsApp send failed: template "${templateName}" exhausted all language candidates [${languageCandidates.join(', ')}] for preferred language "${lang}"`,
     );
     // Do not throw to avoid breaking auth flow when WhatsApp fails.
   }
@@ -220,75 +250,88 @@ export class WhatsAppProvider {
   async sendGiftInvite(
     to: string,
     payload: {
-      branchName: string;
-      productTitle: string;
       senderName?: string;
-      deepLinkUrl: string;
+      productTitle: string;
+      branchName: string;
+      claimUrl: string;
     },
     lang: 'ar' | 'en' = 'ar',
-  ): Promise<void> {
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     await this.loadConfig();
 
     if (!this.http || !this.phoneNumberId) {
       this.logger.warn('WhatsApp not configured, skipping gift invite send');
-      return;
+      return { success: false, error: 'WHATSAPP_NOT_CONFIGURED' };
     }
 
     const cleanPhone = to.replace(/^\+/, '').replace(/\s/g, '');
-    const templateName =
-      this.configService.get<string>('WHATSAPP_GIFT_TEMPLATE_NAME') ||
-      'gift_invite';
-    const languageCandidates = this.getLanguageCandidates(lang);
+    const templateName = this.getGiftTemplateName();
+    const languageCandidates = this.getGiftTemplateLanguageCandidates(lang);
+    const fallbackSenderName =
+      lang === 'ar' ? '\u0623\u062d\u062f \u0623\u062d\u0628\u0627\u0626\u0643' : 'A loved one';
 
     for (const languageCode of languageCandidates) {
+      const templatePayload = {
+        messaging_product: 'whatsapp',
+        to: cleanPhone,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: [
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: payload.senderName || fallbackSenderName },
+                { type: 'text', text: payload.productTitle },
+                { type: 'text', text: payload.branchName },
+                { type: 'text', text: payload.claimUrl },
+              ],
+            },
+          ],
+        },
+      };
       try {
-        await this.http.post('/messages', {
-          messaging_product: 'whatsapp',
-          to: cleanPhone,
-          type: 'template',
-          template: {
-            name: templateName,
-            language: { code: languageCode },
-            components: [
-              {
-                type: 'body',
-                parameters: [
-                  { type: 'text', text: payload.branchName },
-                  { type: 'text', text: payload.productTitle },
-                  {
-                    type: 'text',
-                    text: payload.senderName || '',
-                  },
-                  { type: 'text', text: payload.deepLinkUrl },
-                ],
-              },
-            ],
-          },
-        });
+        const response = await this.http.post('/messages', templatePayload);
 
+        const messageId = response.data?.messages?.[0]?.id;
         this.logger.log(
-          `WhatsApp gift invite sent to ${to} using template "${templateName}"`,
+          `WhatsApp gift invite sent to ${to} using template "${templateName}" and language "${languageCode}"`,
         );
-        return;
+        return { success: true, messageId };
       } catch (e: any) {
         const errorMessage = e.response?.data?.error?.message || String(e);
         const errorCode = e.response?.data?.error?.code;
+        const errorDetails = e.response?.data?.error?.error_data?.details;
         const isRetryable =
-          errorCode === 132001 || errorCode === 132005 || errorCode === 132015;
+          errorCode === 132001 || // missing translation
+          errorCode === 132005 || // template not found
+          errorCode === 132015 || // template paused
+          errorCode === 132012; // parameter format does not match template (try next locale / structure)
+
+        this.logger.warn(
+          `Gift template "${templateName}" send failed for language "${languageCode}" (code ${errorCode})${errorDetails ? ` details: ${errorDetails}` : ''}. Payload components: ${JSON.stringify({ languageCode, components: templatePayload.template.components })}`,
+        );
 
         if (
           isRetryable &&
           languageCandidates.indexOf(languageCode) <
             languageCandidates.length - 1
         ) {
+          this.logger.warn(`Trying fallback language...`);
           continue;
         }
 
         this.logger.error(
-          `WhatsApp gift invite failed: ${errorMessage} (Code: ${errorCode})`,
+          `WhatsApp gift invite failed: ${errorMessage} (Code: ${errorCode})${errorDetails ? ` details: ${errorDetails}` : ''} - tried languages: [${languageCandidates.join(', ')}]`,
         );
-        return;
+        return { success: false, error: errorMessage };
       }
     }
+
+    return {
+      success: false,
+      error: `Template "${templateName}" exhausted all language candidates`,
+    };
   }
 }

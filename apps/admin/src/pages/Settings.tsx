@@ -15,6 +15,7 @@ import {
   updateWhatsAppConfig,
   updateOtpConfig,
   testWhatsApp,
+  testGiftTemplate,
   getPrivateEventTermsConfig,
   updatePrivateEventTermsConfig,
   type OtpConfig,
@@ -243,19 +244,40 @@ export default function Settings() {
               </Form.Item>
             </Col>
             <Col xs={24} md={10}>
-              <Button
-                onClick={async () => {
-                  const v = form.getFieldsValue()
-                  try {
-                    await testWhatsApp(v.testPhone, '123456')
-                    message.success(t('settings.whatsapp_test_success') || 'Test WhatsApp message sent')
-                  } catch (e: any) {
-                    message.error(e?.message || (t('settings.whatsapp_test_failed') || 'WhatsApp test failed'))
-                  }
-                }}
-              >
-                {t('settings.test_whatsapp') || 'Test WhatsApp'}
-              </Button>
+              <Space wrap>
+                <Button
+                  onClick={async () => {
+                    const v = form.getFieldsValue()
+                    try {
+                      await testWhatsApp(v.testPhone, '123456')
+                      message.success(t('settings.whatsapp_test_success') || 'Test WhatsApp message sent')
+                    } catch (e: any) {
+                      message.error(e?.message || (t('settings.whatsapp_test_failed') || 'WhatsApp test failed'))
+                    }
+                  }}
+                >
+                  {t('settings.test_whatsapp') || 'Test WhatsApp'}
+                </Button>
+                <Button
+                  onClick={async () => {
+                    const v = form.getFieldsValue()
+                    try {
+                      await testGiftTemplate({
+                        to: v.testPhone,
+                        senderName: 'أحد أحبّائك',
+                        productTitle: 'اشتراك تجريبي',
+                        branchName: 'فرع تجريبي',
+                        claimUrl: 'https://kinetic-app-sa.org/gift/claim?token=test-token',
+                      })
+                      message.success('Gift template test sent')
+                    } catch (e: any) {
+                      message.error(e?.message || 'Gift template test failed')
+                    }
+                  }}
+                >
+                  Test Gift Template
+                </Button>
+              </Space>
             </Col>
           </Row>
         </div>

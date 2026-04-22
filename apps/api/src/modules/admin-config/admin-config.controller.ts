@@ -50,6 +50,21 @@ export class AdminConfigController {
     return this.service.testSms(body.to, body.message);
   }
 
+  @Post('whatsapp/test-gift-template')
+  @ApiOperation({ summary: 'Send a test WhatsApp gift template message' })
+  async testGiftTemplate(
+    @Body()
+    body: {
+      to: string;
+      senderName: string;
+      productTitle: string;
+      branchName: string;
+      claimUrl: string;
+    },
+  ) {
+    return this.service.testGiftTemplate(body);
+  }
+
   @Get('otp')
   @ApiOperation({ summary: 'Get OTP configuration' })
   async getOtp() {

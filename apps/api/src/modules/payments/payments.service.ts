@@ -71,6 +71,7 @@ import {
   GiftStatus,
 } from '../../database/entities/gift-order.entity';
 import { TripsService } from '../trips/trips.service';
+import { GiftOrdersService } from '../gift-orders/gift-orders.service';
 
 @Injectable()
 export class PaymentsService {
@@ -88,6 +89,8 @@ export class PaymentsService {
     private readonly loyalty: LoyaltyService,
     @Inject(forwardRef(() => TripsService))
     private readonly tripsService: TripsService,
+    @Inject(forwardRef(() => GiftOrdersService))
+    private readonly giftOrdersService?: GiftOrdersService,
     private readonly referrals?: ReferralsService,
     private readonly realtime?: RealtimeGateway,
     private readonly bookings?: BookingsService,
@@ -2013,6 +2016,19 @@ export class PaymentsService {
         } catch (e) {
           this.logger.error(
             `Failed to confirm subscription purchase payment: ${e?.message || e}`,
+          );
+        }
+      }
+
+      if (payment.giftOrderId && this.giftOrdersService) {
+        try {
+          await this.giftOrdersService.dispatchGiftInvite(
+            payment.giftOrderId,
+            'payment_confirmed',
+          );
+        } catch (e) {
+          this.logger.error(
+            `Failed to queue gift invite after payment: ${e?.message || e}`,
           );
         }
       }

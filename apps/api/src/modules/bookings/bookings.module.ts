@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
@@ -19,7 +19,7 @@ import { CouponsModule } from '../coupons/coupons.module';
     TypeOrmModule.forFeature([Booking, Ticket, User, Offer, SchoolTripRequest]),
     ContentModule,
     CouponsModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
     RealtimeModule,
   ],
   controllers: [BookingsController],

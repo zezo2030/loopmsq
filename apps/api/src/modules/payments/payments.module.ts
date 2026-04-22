@@ -27,7 +27,7 @@ import { TripsModule } from '../trips/trips.module';
     ConfigModule,
     TypeOrmModule.forFeature([Payment, Booking, EventRequest]),
     UsersModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
     BookingsModule,
     EventsModule,
     LoyaltyModule,

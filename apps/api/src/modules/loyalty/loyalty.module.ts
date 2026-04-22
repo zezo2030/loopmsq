@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LoyaltyService } from './loyalty.service';
 import { LoyaltyController } from './loyalty.controller';
@@ -22,7 +22,7 @@ import { RedisService } from '../../utils/redis.service';
       Branch,
     ]),
     UsersModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
   ],
   providers: [LoyaltyService, QRCodeService, RedisService],
   controllers: [LoyaltyController],

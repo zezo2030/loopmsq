@@ -27,7 +27,7 @@ export class GiftOrderEvent {
   actorType: string;
 
   @Column({ type: 'uuid', nullable: true })
-  actorId: string;
+  actorId: string | null;
 
   @Column({ type: 'jsonb', nullable: true })
   payload: Record<string, any>;

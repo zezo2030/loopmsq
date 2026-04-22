@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { NotificationsService } from './notifications.service';
@@ -17,10 +17,12 @@ import { PushProcessor } from './processors/push.processor';
 import { WhatsAppProvider } from './providers/whatsapp.provider';
 import { WhatsAppProcessor } from './processors/whatsapp.processor';
 import { RedisService } from '../../utils/redis.service';
+import { GiftOrdersModule } from '../gift-orders/gift-orders.module';
 
 @Module({
   imports: [
     ConfigModule,
+    forwardRef(() => GiftOrdersModule),
     TypeOrmModule.forFeature([User, DeviceToken, Notification]),
     BullModule.registerQueue(
       { name: 'notifications_sms' },

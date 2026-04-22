@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { OfferBooking } from '../../database/entities/offer-booking.entity';
@@ -22,7 +22,7 @@ import { User } from '../../database/entities/user.entity';
       User,
     ]),
     BullModule.registerQueue({ name: 'offer_ticket_expiry' }),
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [OfferBookingsController],
   providers: [OfferBookingsService, QRCodeService, OfferTicketExpiryProcessor],

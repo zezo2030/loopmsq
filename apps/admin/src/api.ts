@@ -111,6 +111,16 @@ export async function testWhatsApp(to: string, message: string): Promise<{ succe
   return apiPost('/admin/config/whatsapp/test', { to, message })
 }
 
+export async function testGiftTemplate(body: {
+  to: string
+  senderName: string
+  productTitle: string
+  branchName: string
+  claimUrl: string
+}): Promise<{ success: boolean }> {
+  return apiPost('/admin/config/whatsapp/test-gift-template', body)
+}
+
 export async function getOtpConfig(): Promise<OtpConfig> {
   return apiGet('/admin/config/otp')
 }
@@ -126,5 +136,4 @@ export async function getPrivateEventTermsConfig(): Promise<PrivateEventTermsCon
 export async function updatePrivateEventTermsConfig(body: PrivateEventTermsConfig): Promise<PrivateEventTermsConfig> {
   return apiPut('/admin/config/private-event-terms', body)
 }
-
 

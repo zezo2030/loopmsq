@@ -28,7 +28,7 @@ import { ContentModule } from '../content/content.module';
     UsersModule,
     forwardRef(() => PaymentsModule),
     BookingsModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
     ContentModule,
   ],
   controllers: [TripsController, TripsPublicController],

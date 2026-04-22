@@ -171,7 +171,7 @@ export class GiftOrder {
   whatsappMessageStatus: WhatsAppStatus;
 
   @Column({ type: 'timestamp', nullable: true })
-  whatsappSentAt: Date;
+  whatsappSentAt: Date | null;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;

@@ -12,7 +12,6 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
-import { Branch } from '../../database/entities/branch.entity';
 import { RedisService } from '../../utils/redis.service';
 import { EncryptionService } from '../../utils/encryption.util';
 import { SendOtpDto } from './dto/send-otp.dto';
@@ -30,17 +29,6 @@ import { NotificationsService } from '../notifications/notifications.service';
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-
-  /** Branch summary for staff app /auth/me and login (localized name). */
-  private branchForStaffResponse(
-    branch: Branch | undefined | null,
-    language: string,
-  ): { name: string; isOpen: boolean } | undefined {
-    if (!branch) return undefined;
-    const name = language === 'en' ? branch.name_en : branch.name_ar;
-    const isOpen = branch.status === 'active';
-    return { name, isOpen };
-  }
 
   constructor(
     @InjectRepository(User)
@@ -362,7 +350,6 @@ export class AuthService {
         email,
         isActive: true,
       },
-      relations: ['branch'],
     });
 
     if (!user || !user.passwordHash) {
@@ -411,15 +398,14 @@ export class AuthService {
         roles: user.roles,
         language: user.language,
         branchId: user.branchId,
-        branch: this.branchForStaffResponse(user.branch, user.language),
       },
     };
   }
 
-  async getProfile(userId: string) {
+  async getProfile(userId: string): Promise<Partial<User>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['wallet', 'branch'],
+      relations: ['wallet'],
     });
 
     if (!user) {
@@ -437,7 +423,6 @@ export class AuthService {
       language: user.language,
       isActive: user.isActive,
       branchId: user.branchId,
-      branch: this.branchForStaffResponse(user.branch, user.language),
       createdAt: user.createdAt,
       wallet: user.wallet || null,
     };

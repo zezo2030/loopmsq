@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   EventRequest,
@@ -20,7 +20,7 @@ import { AdminConfigModule } from '../admin-config/admin-config.module';
     TypeOrmModule.forFeature([EventRequest, Booking, Ticket, Payment]),
     BookingsModule,
     UsersModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
     ContentModule,
     AdminConfigModule,
   ],

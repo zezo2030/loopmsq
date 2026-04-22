@@ -77,13 +77,6 @@ export class GiftOrdersService {
     ).replace(/\/+$/, '');
   }
 
-  private getGiftCustomSchemeBaseUrl(): string {
-    return (
-      this.configService.get<string>('GIFT_CUSTOM_SCHEME_BASE_URL') ||
-      'loopmsq://gift/claim'
-    ).replace(/\/+$/, '');
-  }
-
   private buildClaimUrl(token: string): string {
     return `${this.getGiftAppBaseUrl()}/gift/claim?token=${encodeURIComponent(token)}`;
   }
@@ -148,6 +141,138 @@ export class GiftOrdersService {
       claimUrl,
       messageLine,
     ].join('\n');
+  }
+
+  private getGiftInviteSenderName(gift: GiftOrder): string {
+    const snapshotName = gift.senderDisplayNameSnapshot?.trim();
+    if (gift.showSenderInfo && snapshotName) {
+      return snapshotName;
+    }
+
+    return 'أحد أحبّائك';
+  }
+
+  async dispatchGiftInvite(
+    giftId: string,
+    trigger: 'payment_confirmed' | 'manual_resend',
+    actorId?: string | null,
+  ) {
+    const gift = await this.giftOrderRepo
+      .createQueryBuilder('go')
+      .leftJoinAndSelect('go.branch', 'branch')
+      .where('go.id = :id', { id: giftId })
+      .getOne();
+
+    if (!gift) {
+      throw new NotFoundException({
+        code: 'GIFT_NOT_FOUND',
+        message: 'Gift not found',
+      });
+    }
+
+    const claimLink = this.ensureClaimLink(gift);
+    const branchName =
+      (gift as any).branch?.name_ar ||
+      gift.sourceProductSnapshot?.branchName?.toString() ||
+      '';
+    const productTitle = gift.sourceProductSnapshot?.title?.toString() || '';
+    const senderName = this.getGiftInviteSenderName(gift);
+
+    gift.whatsappMessageStatus = WhatsAppStatus.PENDING;
+    gift.whatsappSentAt = null;
+    gift.metadata = {
+      ...(gift.metadata || {}),
+      claimStatus: gift.metadata?.claimStatus?.toString() ?? gift.giftStatus,
+      lastGiftInviteQueuedAt: new Date().toISOString(),
+      lastGiftInviteTrigger: trigger,
+    };
+    await this.giftOrderRepo.save(gift);
+
+    await this.logEvent(
+      gift.id,
+      trigger === 'manual_resend' ? 'gift_invite_resent' : 'gift_invite_queued',
+      trigger === 'manual_resend' ? 'sender' : 'system',
+      actorId ?? null,
+      {
+        recipientPhone: gift.normalizedRecipientPhone,
+        branchName,
+        productTitle,
+      },
+    );
+
+    await this.notificationsService.enqueue({
+      type: 'GIFT_INVITE',
+      to: { phone: gift.recipientPhone },
+      data: {
+        giftOrderId: gift.id,
+        senderName,
+        productTitle,
+        branchName,
+        deepLinkUrl: claimLink.claimUrl,
+        claimUrl: claimLink.claimUrl,
+      },
+      channels: ['whatsapp'],
+      lang: 'ar',
+      jobId:
+        trigger === 'payment_confirmed'
+          ? `gift:${gift.id}:invite:auto`
+          : `gift:${gift.id}:invite:resend:${Date.now()}`,
+    });
+
+    return {
+      id: gift.id,
+      whatsappMessageStatus: gift.whatsappMessageStatus,
+      whatsappSentAt: gift.whatsappSentAt,
+      deliveryMethod: 'server_whatsapp_template',
+    };
+  }
+
+  async markGiftInviteSent(
+    giftId: string,
+    payload?: { whatsappMessageId?: string | null },
+  ) {
+    const gift = await this.giftOrderRepo.findOne({ where: { id: giftId } });
+    if (!gift) {
+      this.logger.warn(
+        `Skipping gift invite success update because gift ${giftId} was not found`,
+      );
+      return;
+    }
+
+    gift.whatsappMessageStatus = WhatsAppStatus.SENT;
+    gift.whatsappSentAt = new Date();
+    gift.metadata = {
+      ...(gift.metadata || {}),
+      lastGiftInviteSentAt: gift.whatsappSentAt.toISOString(),
+      whatsappMessageId: payload?.whatsappMessageId ?? null,
+    };
+    await this.giftOrderRepo.save(gift);
+
+    await this.logEvent(gift.id, 'gift_invite_sent', 'system', null, {
+      whatsappMessageId: payload?.whatsappMessageId ?? null,
+    });
+  }
+
+  async markGiftInviteFailed(giftId: string, reason?: string | null) {
+    const gift = await this.giftOrderRepo.findOne({ where: { id: giftId } });
+    if (!gift) {
+      this.logger.warn(
+        `Skipping gift invite failure update because gift ${giftId} was not found`,
+      );
+      return;
+    }
+
+    gift.whatsappMessageStatus = WhatsAppStatus.FAILED;
+    gift.metadata = {
+      ...(gift.metadata || {}),
+      lastGiftInviteFailedAt: new Date().toISOString(),
+      lastGiftInviteFailureReason: reason ?? null,
+    };
+    await this.giftOrderRepo.save(gift);
+
+    await this.logEvent(gift.id, 'gift_invite_failed', 'system', null, {
+      reason: reason ?? null,
+    });
   }
 
   async getQuote(userId: string, dto: GiftQuoteDto) {
@@ -412,7 +537,8 @@ export class GiftOrdersService {
     event.giftOrderId = giftOrderId;
     event.eventType = eventType;
     event.actorType = actorType;
-    event.actorId = actorId ?? '';
+    event.actorId =
+      actorId && String(actorId).trim().length > 0 ? String(actorId).trim() : null;
     event.payload = payload ?? {};
     return this.giftOrderEventRepo.save(event);
   }
@@ -450,6 +576,7 @@ export class GiftOrdersService {
         refundReviewedAt: go.refundReviewedAt,
         claimStatus: go.metadata?.claimStatus?.toString() ?? go.giftStatus,
         whatsappMessageStatus: go.whatsappMessageStatus,
+        whatsappSentAt: go.whatsappSentAt,
         claimUrl: go.metadata?.claimUrl?.toString() ?? null,
         claimedByDisplayName: (go as any).claimedByUser?.name ?? null,
         claimExpiresAt: go.claimTokenExpiresAt,
@@ -550,6 +677,7 @@ export class GiftOrdersService {
       claimStatus: gift.metadata?.claimStatus?.toString() ?? gift.giftStatus,
       claimExpiresAt: gift.claimTokenExpiresAt,
       whatsappMessageStatus: gift.whatsappMessageStatus,
+      whatsappSentAt: gift.whatsappSentAt,
       claimUrl: isSender ? gift.metadata?.claimUrl?.toString() ?? null : null,
       claimedByDisplayName: gift.claimedByUserId === userId ? user?.name : null,
       claimedAt: gift.claimedAt,
@@ -818,30 +946,7 @@ export class GiftOrdersService {
       });
     }
 
-    const claimLink = this.ensureClaimLink(gift);
-
-    gift.whatsappMessageStatus = WhatsAppStatus.SENT;
-    gift.whatsappSentAt = new Date();
-    gift.metadata = {
-      ...(gift.metadata || {}),
-      claimStatus: gift.metadata?.claimStatus?.toString() ?? gift.giftStatus,
-    };
-    await this.giftOrderRepo.save(gift);
-
-    await this.logEvent(gift.id, 'invite_resent', 'sender', userId, {
-      recipientPhone: gift.normalizedRecipientPhone,
-    });
-
-    return {
-      id: gift.id,
-      whatsappMessageStatus: gift.whatsappMessageStatus,
-      recipientPhone: gift.recipientPhone,
-      claimUrl: claimLink.claimUrl,
-      claimToken: claimLink.token,
-      whatsappText: this.buildWhatsappText(gift, claimLink.claimUrl),
-      schemeUrl:
-        `${this.getGiftCustomSchemeBaseUrl()}?token=${encodeURIComponent(claimLink.token)}`,
-    };
+    return this.dispatchGiftInvite(gift.id, 'manual_resend', userId);
   }
 
   async cancelGift(userId: string, giftId: string, dto?: CancelGiftDto) {

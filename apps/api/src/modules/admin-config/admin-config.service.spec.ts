@@ -52,4 +52,28 @@ describe('AdminConfigService', () => {
     ]);
     expect(redis.set).toHaveBeenCalled();
   });
+
+  it('queues a WhatsApp gift template test with Arabic payload', async () => {
+    await service.testGiftTemplate({
+      to: '+966500000000',
+      senderName: '\u0623\u062d\u0645\u062f',
+      productTitle: '\u0627\u0634\u062a\u0631\u0627\u0643 \u0634\u0647\u0631\u064a',
+      branchName: '\u0641\u0631\u0639 \u0627\u0644\u0631\u064a\u0627\u0636',
+      claimUrl: 'https://example.com/gift/claim?token=abc',
+    });
+
+    expect(notifications.enqueue).toHaveBeenCalledWith({
+      type: 'GIFT_INVITE',
+      to: { phone: '+966500000000' },
+      data: {
+        senderName: '\u0623\u062d\u0645\u062f',
+        productTitle: '\u0627\u0634\u062a\u0631\u0627\u0643 \u0634\u0647\u0631\u064a',
+        branchName: '\u0641\u0631\u0639 \u0627\u0644\u0631\u064a\u0627\u0636',
+        claimUrl: 'https://example.com/gift/claim?token=abc',
+        deepLinkUrl: 'https://example.com/gift/claim?token=abc',
+      },
+      channels: ['whatsapp'],
+      lang: 'ar',
+    });
+  });
 });
