@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
+import { Branch } from '../../database/entities/branch.entity';
 import { RedisService } from '../../utils/redis.service';
 import { EncryptionService } from '../../utils/encryption.util';
 import { SendOtpDto } from './dto/send-otp.dto';
@@ -337,6 +338,31 @@ export class AuthService {
     };
   }
 
+  private serializeBranchForStaff(
+    branch: Branch | undefined,
+    language: string | undefined,
+  ):
+    | {
+        id: string;
+        name: string;
+        name_ar: string;
+        name_en: string;
+        isOpen: boolean;
+      }
+    | undefined {
+    if (!branch) {
+      return undefined;
+    }
+    const useEn = (language ?? 'ar') === 'en';
+    return {
+      id: branch.id,
+      name: useEn ? branch.name_en : branch.name_ar,
+      name_ar: branch.name_ar,
+      name_en: branch.name_en,
+      isOpen: branch.status === 'active',
+    };
+  }
+
   async staffLogin(staffLoginDto: StaffLoginDto): Promise<{
     accessToken: string;
     refreshToken: string;
@@ -350,6 +376,7 @@ export class AuthService {
         email,
         isActive: true,
       },
+      relations: ['branch'],
     });
 
     if (!user || !user.passwordHash) {
@@ -398,6 +425,10 @@ export class AuthService {
         roles: user.roles,
         language: user.language,
         branchId: user.branchId,
+        branch: this.serializeBranchForStaff(
+          user.branch,
+          user.language,
+        ) as User['branch'],
       },
     };
   }
@@ -405,7 +436,7 @@ export class AuthService {
   async getProfile(userId: string): Promise<Partial<User>> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['wallet'],
+      relations: ['wallet', 'branch'],
     });
 
     if (!user) {
@@ -425,6 +456,10 @@ export class AuthService {
       branchId: user.branchId,
       createdAt: user.createdAt,
       wallet: user.wallet || null,
+      branch: this.serializeBranchForStaff(
+        user.branch,
+        user.language,
+      ) as User['branch'],
     };
   }
 
