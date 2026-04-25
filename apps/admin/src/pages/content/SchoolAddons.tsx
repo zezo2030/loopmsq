@@ -43,7 +43,7 @@ export default function SchoolAddons() {
       const params = new URLSearchParams()
       if (filters.branchId) params.set('branchId', filters.branchId)
       if (typeof filters.isActive === 'boolean') params.set('isActive', String(filters.isActive))
-      const allAddons = await apiGet(`/content/admin/addons${params.toString() ? `?${params}` : ''}`)
+      const allAddons = await apiGet(`/content/admin/school-trip-addons${params.toString() ? `?${params}` : ''}`)
       if (!Array.isArray(allAddons)) return []
       const branchIdsWithSchoolTrips = new Set((branches || []).map(b => b.id))
       return allAddons.filter((addon: Addon) => !addon.branchId || branchIdsWithSchoolTrips.has(addon.branchId))
@@ -52,7 +52,7 @@ export default function SchoolAddons() {
   })
 
   const createMutation = useMutation({
-    mutationFn: async (payload: Partial<Addon>) => apiPost('/content/admin/addons', payload),
+    mutationFn: async (payload: Partial<Addon>) => apiPost('/content/admin/school-trip-addons', payload),
     onSuccess: () => {
       message.success(t('common.created') || 'Created')
       qc.invalidateQueries({ queryKey: ['school-addons'] })
@@ -63,7 +63,7 @@ export default function SchoolAddons() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, body }: { id: string; body: Partial<Addon> }) =>
-      apiPut(`/content/admin/addons/${id}`, body),
+      apiPut(`/content/admin/school-trip-addons/${id}`, body),
     onSuccess: () => {
       message.success(t('common.updated') || 'Updated')
       qc.invalidateQueries({ queryKey: ['school-addons'] })
@@ -74,7 +74,7 @@ export default function SchoolAddons() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => apiDelete(`/content/admin/addons/${id}`),
+    mutationFn: async (id: string) => apiDelete(`/content/admin/school-trip-addons/${id}`),
     onSuccess: () => {
       message.success(t('common.deleted') || 'Deleted')
       qc.invalidateQueries({ queryKey: ['school-addons'] })

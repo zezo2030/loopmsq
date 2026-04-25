@@ -86,6 +86,9 @@ export class SubscriptionPurchase {
   @Column({ type: 'text', nullable: true })
   holderImageUrl: string | null;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  holderName: string | null;
+
   @Column({ type: 'jsonb', nullable: true })
   metadata: any;
 

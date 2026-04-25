@@ -3,7 +3,6 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
-  ConflictException,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
@@ -81,6 +80,7 @@ export class SubscriptionPurchasesService {
     userId: string,
     branchId: string,
     subscriptionPlanId: string,
+    holderName: string,
     loyaltyStatus: { isEligibleForFreePurchase: boolean },
   ): Promise<{ purchase: SubscriptionPurchase; payment: Payment } | null> {
     if (loyaltyStatus.isEligibleForFreePurchase) {
@@ -91,6 +91,7 @@ export class SubscriptionPurchasesService {
         userId,
         branchId,
         subscriptionPlanId,
+        holderName,
         status: SubscriptionPurchaseStatus.ACTIVE,
         paymentStatus: SubscriptionPurchasePaymentStatus.PENDING,
       },
@@ -101,6 +102,7 @@ export class SubscriptionPurchasesService {
         userId,
         branchId,
         subscriptionPlanId,
+        holderName,
         status: SubscriptionPurchaseStatus.PENDING_PAYMENT,
       },
       order: { createdAt: 'DESC' },
@@ -132,22 +134,6 @@ export class SubscriptionPurchasesService {
       plan.branchId,
       plan.id,
     );
-
-    // Paid-and-active subscription only (unpaid checkouts are not "active")
-    const existingActive = await this.purchaseRepo.findOne({
-      where: {
-        userId,
-        branchId: plan.branchId,
-        status: SubscriptionPurchaseStatus.ACTIVE,
-        paymentStatus: SubscriptionPurchasePaymentStatus.COMPLETED,
-      },
-    });
-
-    if (existingActive) {
-      throw new ConflictException(
-        'User already has an active subscription in this branch',
-      );
-    }
 
     return {
       subscriptionPlanId: plan.id,
@@ -280,22 +266,11 @@ export class SubscriptionPurchasesService {
     }
 
     const trimmedHolder = dto.holderImageUrl?.trim();
-
-    // Paid-and-active subscription only
-    const existingActive = await this.purchaseRepo.findOne({
-      where: {
-        userId,
-        branchId: plan.branchId,
-        status: SubscriptionPurchaseStatus.ACTIVE,
-        paymentStatus: SubscriptionPurchasePaymentStatus.COMPLETED,
-      },
-    });
-
-    if (existingActive) {
-      throw new ConflictException(
-        'User already has an active subscription in this branch',
-      );
+    const trimmedHolderName = dto.holderName?.trim();
+    if (!trimmedHolderName && !allowMissingHolderImage) {
+      throw new BadRequestException('Subscription holder name is required');
     }
+    const holderName = trimmedHolderName || 'Gift recipient';
 
     const loyaltyStatus = await this.getSixthPurchaseLoyaltyStatus(
       userId,
@@ -310,10 +285,15 @@ export class SubscriptionPurchasesService {
       userId,
       plan.branchId,
       plan.id,
+      holderName,
       loyaltyStatus,
     );
     if (resumable) {
       const { purchase: rp, payment: pay } = resumable;
+      if (rp.holderName !== holderName) {
+        rp.holderName = holderName;
+        await this.purchaseRepo.save(rp);
+      }
       if (!allowMissingHolderImage) {
         const nextHolderImageUrl = trimmedHolder!;
         if (rp.holderImageUrl !== nextHolderImageUrl) {
@@ -392,6 +372,7 @@ export class SubscriptionPurchasesService {
         startedAt: provisionalStartedAt,
         endsAt: provisionalEndsAt,
         qrTokenHash: provisionalQrTokenHash,
+        holderName,
         holderImageUrl: allowMissingHolderImage
           ? trimmedHolder || null
           : trimmedHolder!,
@@ -725,9 +706,13 @@ export class SubscriptionPurchasesService {
         : null;
 
     return {
+      holderName: purchase.holderName,
+      customerName: purchase.holderName || purchase.user?.name || 'User',
       holderImageUrl: purchase.holderImageUrl,
       subscription: {
         id: purchase.id,
+        holderName: purchase.holderName,
+        customerName: purchase.holderName || purchase.user?.name || 'User',
         status: purchase.status,
         totalHours: purchase.totalHours,
         remainingHours: purchase.remainingHours,
@@ -749,7 +734,7 @@ export class SubscriptionPurchasesService {
       },
       user: {
         id: purchase.userId,
-        name: purchase.user?.name || 'User',
+        name: purchase.holderName || purchase.user?.name || 'User',
         phone: purchase.user?.phone || '',
         imageUrl: purchase.holderImageUrl,
       },
@@ -966,7 +951,10 @@ export class SubscriptionPurchasesService {
         deductedHours: Number(log.deductedHours),
         notes: log.notes,
         createdAt: log.createdAt,
-        customerName: log.subscriptionPurchase?.user?.name || 'Unknown',
+        customerName:
+          log.subscriptionPurchase?.holderName ||
+          log.subscriptionPurchase?.user?.name ||
+          'Unknown',
         branchName:
           log.branch?.name_ar ||
           log.branch?.name_en ||
@@ -1111,6 +1099,7 @@ export class SubscriptionPurchasesService {
       qb.andWhere(
         `(
           LOWER(COALESCE(user.name, '')) LIKE :search OR
+          LOWER(COALESCE(purchase."holderName", '')) LIKE :search OR
           LOWER(COALESCE(user.phone, '')) LIKE :search OR
           LOWER(COALESCE(branch.name_ar, branch.name_en, '')) LIKE :search OR
           LOWER(COALESCE(subscriptionPlan.title, purchase.planSnapshot->>'title', '')) LIKE :search OR
@@ -1218,6 +1207,7 @@ export class SubscriptionPurchasesService {
         id: purchase.id,
         status: purchase.status,
         paymentStatus: purchase.paymentStatus,
+        holderName: purchase.holderName,
         holderImageUrl: purchase.holderImageUrl,
         totalHours:
           purchase.totalHours != null ? Number(purchase.totalHours) : null,
@@ -1235,7 +1225,7 @@ export class SubscriptionPurchasesService {
         updatedAt: purchase.updatedAt,
         user: {
           id: purchase.userId,
-          name: purchase.user?.name || 'User',
+          name: purchase.holderName || purchase.user?.name || 'User',
           phone: purchase.user?.phone || '',
           email: purchase.user?.email || '',
           imageUrl: purchase.holderImageUrl,
@@ -1306,6 +1296,7 @@ export class SubscriptionPurchasesService {
       id: purchase.id,
       status: purchase.status,
       paymentStatus: purchase.paymentStatus,
+      holderName: purchase.holderName,
       holderImageUrl: purchase.holderImageUrl,
       totalHours:
         purchase.totalHours != null ? Number(purchase.totalHours) : null,
@@ -1323,7 +1314,7 @@ export class SubscriptionPurchasesService {
       updatedAt: purchase.updatedAt,
       user: {
         id: purchase.userId,
-        name: purchase.user?.name || 'User',
+        name: purchase.holderName || purchase.user?.name || 'User',
         phone: purchase.user?.phone || '',
         email: purchase.user?.email || '',
         imageUrl: purchase.holderImageUrl,

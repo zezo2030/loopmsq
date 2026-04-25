@@ -24,8 +24,6 @@ type Branch = {
   hasEventBookings?: boolean
 }
 
-const LEGACY_EVENT_ADDON_CATEGORIES = ['event_private', 'event_balloon', 'event_cake', 'event_decor'] as const
-
 export default function PrivateEventAddons() {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -55,23 +53,20 @@ export default function PrivateEventAddons() {
       if (filters.branchId) params.set('branchId', filters.branchId)
       if (typeof filters.isActive === 'boolean') params.set('isActive', String(filters.isActive))
 
-      const allAddons = await apiGet(`/content/admin/addons${params.toString() ? `?${params}` : ''}`)
+      const allAddons = await apiGet(`/content/admin/special-booking-addons${params.toString() ? `?${params}` : ''}`)
       if (!Array.isArray(allAddons)) return []
 
       const branchIdsWithEventBookings = new Set((branches || []).map(branch => branch.id))
       return allAddons.filter((addon: Addon) => {
-        const belongsToEventBookings =
-          addon.metadata?.privateEventAddon === true ||
-          LEGACY_EVENT_ADDON_CATEGORIES.includes(addon.category as (typeof LEGACY_EVENT_ADDON_CATEGORIES)[number])
         const branchAllowed = !addon.branchId || branchIdsWithEventBookings.has(addon.branchId)
-        return belongsToEventBookings && branchAllowed
+        return branchAllowed
       })
     },
     enabled: !!branches,
   })
 
   const createMutation = useMutation({
-    mutationFn: async (payload: Partial<Addon>) => apiPost('/content/admin/addons', payload),
+    mutationFn: async (payload: Partial<Addon>) => apiPost('/content/admin/special-booking-addons', payload),
     onSuccess: () => {
       message.success(t('common.created') || 'Created')
       qc.invalidateQueries({ queryKey: ['private-event-addons'] })
@@ -82,7 +77,7 @@ export default function PrivateEventAddons() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, body }: { id: string; body: Partial<Addon> }) =>
-      apiPut(`/content/admin/addons/${id}`, body),
+      apiPut(`/content/admin/special-booking-addons/${id}`, body),
     onSuccess: () => {
       message.success(t('common.updated') || 'Updated')
       qc.invalidateQueries({ queryKey: ['private-event-addons'] })
@@ -93,7 +88,7 @@ export default function PrivateEventAddons() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => apiDelete(`/content/admin/addons/${id}`),
+    mutationFn: async (id: string) => apiDelete(`/content/admin/special-booking-addons/${id}`),
     onSuccess: () => {
       message.success(t('common.deleted') || 'Deleted')
       qc.invalidateQueries({ queryKey: ['private-event-addons'] })

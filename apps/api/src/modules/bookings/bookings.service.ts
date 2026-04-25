@@ -215,6 +215,7 @@ export class BookingsService {
       // Calculate add-ons cost (lookup real prices from content service)
       const availableAddOns = await this.contentService.getBranchAddOns(
         branch.id,
+        ['general', 'hall_booking'],
       );
       const addOnById = new Map(availableAddOns.map((a) => [a.id, a]));
 

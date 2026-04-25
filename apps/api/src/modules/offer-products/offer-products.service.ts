@@ -256,7 +256,15 @@ export class OfferProductsService {
 
     const addons = addonIds.length
       ? await this.addonRepo.find({
-          where: { branchId, isActive: true, id: In(addonIds) },
+          where: [
+            { branchId, isActive: true, id: In(addonIds), category: 'offer' },
+            {
+              branchId: IsNull(),
+              isActive: true,
+              id: In(addonIds),
+              category: 'offer',
+            },
+          ],
         })
       : [];
     const addonsMap = new Map(addons.map((addon) => [addon.id, addon]));
@@ -298,7 +306,7 @@ export class OfferProductsService {
     }
 
     const addons = await this.addonRepo.find({
-      where: { id: In(addonIds) },
+      where: { id: In(addonIds), category: 'offer' },
     });
     const addonsMap = new Map(addons.map((addon) => [addon.id, addon]));
 

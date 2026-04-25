@@ -17,7 +17,15 @@ type Addon = {
   branchId?: string | null
 }
 
-const SPECIAL_ADDON_CATEGORIES = ['event_private', 'event_balloon', 'event_cake', 'event_decor'] as const
+const SPECIAL_ADDON_CATEGORIES = [
+  'school_trip',
+  'event_private',
+  'event_balloon',
+  'event_cake',
+  'event_decor',
+  'private_event',
+  'private_booking',
+] as const
 
 export default function Addons() {
   const { t } = useTranslation()
@@ -39,6 +47,10 @@ export default function Addons() {
   })
 
   const branchOptions = useMemo(() => (branches || []).map(b => ({ value: b.id, label: b.name_ar || b.name_en || b.id })), [branches])
+  const categoryLabel = (category?: string) => {
+    const value = category || 'general'
+    return t(`addons.categories.${value}`, { defaultValue: value })
+  }
 
   const { data, isLoading } = useQuery<Addon[]>({
     queryKey: ['addons', filters],
@@ -71,7 +83,7 @@ export default function Addons() {
   const columns = [
     { title: t('common.name') || 'Name', dataIndex: 'name' },
     { title: t('common.price') || 'Price', dataIndex: 'price', render: (v: number) => Number(v).toFixed(2) },
-    { title: 'Category', dataIndex: 'category', render: (v?: string) => v || 'general' },
+    { title: t('addons.category') || 'Category', dataIndex: 'category', render: (v?: string) => categoryLabel(v) },
     { title: 'Image', dataIndex: 'imageUrl', render: (v?: string | null) => v ? <a href={v} target="_blank" rel="noreferrer">View</a> : '-' },
     { title: t('addons.default_qty') || 'Default Qty', dataIndex: 'defaultQuantity' },
     { title: t('common.active') || 'Active', dataIndex: 'isActive', render: (v: boolean) => v ? t('common.yes') || 'Yes' : t('common.no') || 'No' },
@@ -138,10 +150,12 @@ export default function Addons() {
           <Form.Item name="name" label={t('common.name') || 'Name'} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="category" label="Category" initialValue="general">
+          <Form.Item name="category" label={t('addons.category') || 'Category'} initialValue="general">
             <Select
               options={[
-                { value: 'general', label: 'General' },
+                { value: 'general', label: categoryLabel('general') },
+                { value: 'hall_booking', label: categoryLabel('hall_booking') },
+                { value: 'offer', label: categoryLabel('offer') },
               ]}
             />
           </Form.Item>

@@ -48,13 +48,6 @@ export class EventsService {
     '22:00-00:00',
   ] as const;
 
-  private static readonly EVENT_ADDON_CATEGORIES = [
-    'event_private',
-    'event_balloon',
-    'event_cake',
-    'event_decor',
-  ] as const;
-
   constructor(
     @InjectRepository(EventRequest)
     private readonly eventRepo: Repository<EventRequest>,
@@ -621,16 +614,7 @@ export class EventsService {
   }
 
   private async getEventAddOnCatalog(branchId?: string) {
-    const catalog = await this.contentService.getBranchAddOns(branchId);
-    const eventCatalog = catalog.filter(
-      (item) =>
-        item.metadata?.privateEventAddon === true ||
-        EventsService.EVENT_ADDON_CATEGORIES.includes(
-          (item.category ||
-            'general') as (typeof EventsService.EVENT_ADDON_CATEGORIES)[number],
-        ),
-    );
-    return eventCatalog;
+    return this.contentService.getBranchSpecialBookingAddOns(branchId);
   }
 
   private async resolveSelectedAddOns(

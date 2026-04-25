@@ -510,9 +510,34 @@ export class ContentController {
 
   @Get('branches/:id/addons')
   @ApiOperation({ summary: 'List available add-ons for a branch' })
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: ['hall_booking', 'school_trip', 'private_event', 'offer'],
+  })
   @ApiResponse({ status: 200, description: 'Add-ons retrieved successfully' })
-  async getBranchAddOns(@Param('id', ParseUUIDPipe) id: string) {
-    return this.contentService.getBranchAddOns(id);
+  async getBranchAddOns(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('scope') scope?: string,
+  ) {
+    if (scope === 'school_trip') {
+      return this.contentService.getBranchSchoolTripAddOns(id);
+    }
+
+    if (scope === 'private_event') {
+      return this.contentService.getBranchSpecialBookingAddOns(id);
+    }
+
+    const categoriesByScope: Record<string, string[]> = {
+      hall_booking: ['general', 'hall_booking'],
+      offer: ['offer'],
+    };
+
+    return this.contentService.getBranchAddOns(
+      id,
+      categoriesByScope[scope || 'hall_booking'] ||
+        categoriesByScope.hall_booking,
+    );
   }
 
   // Compatibility endpoints: /halls/:id/* redirects to /branches/:id/*
@@ -703,6 +728,104 @@ export class ContentController {
   @ApiOperation({ summary: 'Delete addon (admin)' })
   async deleteAddon(@Param('id', ParseUUIDPipe) id: string) {
     await this.contentService.deleteAddon(id);
+    return { success: true };
+  }
+
+  @Post('admin/school-trip-addons')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create school trip addon (admin)' })
+  async createSchoolTripAddon(@Body() dto: CreateAddonDto) {
+    return this.contentService.createSchoolTripAddon(dto);
+  }
+
+  @Get('admin/school-trip-addons')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List school trip addons (admin)' })
+  async listSchoolTripAddons(
+    @Query('branchId') branchId?: string,
+    @Query('isActive') isActiveParam?: string,
+  ) {
+    const isActive =
+      isActiveParam === 'true'
+        ? true
+        : isActiveParam === 'false'
+          ? false
+          : undefined;
+    return this.contentService.listSchoolTripAddons({ branchId, isActive });
+  }
+
+  @Put('admin/school-trip-addons/:id')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update school trip addon (admin)' })
+  async updateSchoolTripAddon(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateAddonDto,
+  ) {
+    return this.contentService.updateSchoolTripAddon(id, dto);
+  }
+
+  @Delete('admin/school-trip-addons/:id')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Delete school trip addon (admin)' })
+  async deleteSchoolTripAddon(@Param('id', ParseUUIDPipe) id: string) {
+    await this.contentService.deleteSchoolTripAddon(id);
+    return { success: true };
+  }
+
+  @Post('admin/special-booking-addons')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create special booking addon (admin)' })
+  async createSpecialBookingAddon(@Body() dto: CreateAddonDto) {
+    return this.contentService.createSpecialBookingAddon(dto);
+  }
+
+  @Get('admin/special-booking-addons')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List special booking addons (admin)' })
+  async listSpecialBookingAddons(
+    @Query('branchId') branchId?: string,
+    @Query('isActive') isActiveParam?: string,
+  ) {
+    const isActive =
+      isActiveParam === 'true'
+        ? true
+        : isActiveParam === 'false'
+          ? false
+          : undefined;
+    return this.contentService.listSpecialBookingAddons({ branchId, isActive });
+  }
+
+  @Put('admin/special-booking-addons/:id')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update special booking addon (admin)' })
+  async updateSpecialBookingAddon(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateAddonDto,
+  ) {
+    return this.contentService.updateSpecialBookingAddon(id, dto);
+  }
+
+  @Delete('admin/special-booking-addons/:id')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Delete special booking addon (admin)' })
+  async deleteSpecialBookingAddon(@Param('id', ParseUUIDPipe) id: string) {
+    await this.contentService.deleteSpecialBookingAddon(id);
     return { success: true };
   }
 

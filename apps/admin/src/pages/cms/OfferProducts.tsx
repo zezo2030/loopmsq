@@ -86,8 +86,13 @@ export default function OfferProducts() {
   const { data: branchAddons } = useQuery<any[]>({
     queryKey: ['branch-addons-for-offers', selectedBranchId],
     enabled: !!selectedBranchId,
-    queryFn: async () => apiGet(`/content/branches/${selectedBranchId}/addons`),
+    queryFn: async () =>
+      apiGet(`/content/branches/${selectedBranchId}/addons?scope=offer`),
   })
+  const offerAddons = useMemo(
+    () => (branchAddons || []).filter((addon: any) => (addon.category || 'general') === 'offer'),
+    [branchAddons]
+  )
 
   const createMutation = useMutation({
     mutationFn: (body: CreateOfferProductDto) => apiPost<OfferProduct>('/admin/offer-products', body),
@@ -387,7 +392,7 @@ export default function OfferProducts() {
                       <Select
                         style={{ width: 240 }}
                         placeholder="اختر إضافة من الفرع"
-                        options={(branchAddons || []).map((addon: any) => ({
+                        options={offerAddons.map((addon: any) => ({
                           value: addon.id,
                           label: `${addon.name}${Number(addon.price || 0) > 0 ? ` - ${Number(addon.price).toFixed(2)} SAR` : ''}`,
                         }))}

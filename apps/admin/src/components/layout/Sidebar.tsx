@@ -91,7 +91,6 @@ const navItems: Array<{
     children: [
       { key: 'finance-payments', href: '/admin/finance/payments', labelKey: 'finance.payments' },
       { key: 'finance-wallets', href: '/admin/finance/wallets', labelKey: 'finance.wallets' },
-      { key: 'finance-gift-refunds', href: '/admin/finance/gift-refunds', labelKey: 'finance.giftRefunds', fallbackLabel: 'طلبات استرجاع الهدايا' },
     ],
   },
   {

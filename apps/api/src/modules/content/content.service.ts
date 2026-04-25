@@ -11,6 +11,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, IsNull, Between } from 'typeorm';
 import { Branch } from '../../database/entities/branch.entity';
 import { Addon } from '../../database/entities/addon.entity';
+import { SchoolTripAddon } from '../../database/entities/school-trip-addon.entity';
+import { SpecialBookingAddon } from '../../database/entities/special-booking-addon.entity';
 import { Offer } from '../../database/entities/offer.entity';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
 import {
@@ -27,12 +29,25 @@ export class ContentService {
   private readonly logger = new Logger(ContentService.name);
   private readonly slotMinutes: number;
   private readonly maxBookingDurationHours = 12;
+  private readonly specialAddonCategories = new Set([
+    'school_trip',
+    'event_private',
+    'event_balloon',
+    'event_cake',
+    'event_decor',
+    'private_event',
+    'private_booking',
+  ]);
 
   constructor(
     @InjectRepository(Branch)
     private branchRepository: Repository<Branch>,
     @InjectRepository(Addon)
     private addonRepository: Repository<Addon>,
+    @InjectRepository(SchoolTripAddon)
+    private schoolTripAddonRepository: Repository<SchoolTripAddon>,
+    @InjectRepository(SpecialBookingAddon)
+    private specialBookingAddonRepository: Repository<SpecialBookingAddon>,
     @InjectRepository(Offer)
     private offerRepository: Repository<Offer>,
     @InjectRepository(Booking)
@@ -876,7 +891,57 @@ export class ContentService {
   }
 
   // Add-ons fetching
-  async getBranchAddOns(branchId?: string): Promise<
+  async getBranchAddOns(
+    branchId?: string,
+    categories?: string[],
+  ): Promise<
+    {
+      id: string;
+      name: string;
+      category: string;
+      description: string | null;
+      imageUrl: string | null;
+      price: number;
+      defaultQuantity: number;
+      metadata: Record<string, unknown> | null;
+    }[]
+  > {
+    const normalizeCategory = (category?: string | null) =>
+      String(category || 'general').trim() || 'general';
+    const categorySet = categories?.length
+      ? new Set(categories.map(normalizeCategory))
+      : null;
+    const where = branchId
+      ? [
+          { isActive: true, branchId },
+          { isActive: true, branchId: IsNull() },
+        ]
+      : [{ isActive: true, branchId: IsNull() }];
+
+    const branchAddons = await this.addonRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+    });
+
+    return branchAddons
+      .filter((a) =>
+        !this.specialAddonCategories.has(normalizeCategory(a.category)) &&
+        a.metadata?.privateEventAddon !== true &&
+        (categorySet ? categorySet.has(normalizeCategory(a.category)) : true),
+      )
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        category: normalizeCategory(a.category),
+        description: a.description ?? null,
+        imageUrl: a.imageUrl ?? null,
+        price: Number(a.price),
+        defaultQuantity: a.defaultQuantity || 1,
+        metadata: a.metadata ?? null,
+      }));
+  }
+
+  async getBranchSchoolTripAddOns(branchId?: string): Promise<
     {
       id: string;
       name: string;
@@ -895,15 +960,51 @@ export class ContentService {
         ]
       : [{ isActive: true, branchId: IsNull() }];
 
-    const branchAddons = await this.addonRepository.find({
+    const addOns = await this.schoolTripAddonRepository.find({
       where,
       order: { createdAt: 'DESC' },
     });
 
-    return branchAddons.map((a) => ({
+    return addOns.map((a) => ({
       id: a.id,
       name: a.name,
-      category: a.category || 'general',
+      category: 'school_trip',
+      description: a.description ?? null,
+      imageUrl: a.imageUrl ?? null,
+      price: Number(a.price),
+      defaultQuantity: a.defaultQuantity || 1,
+      metadata: a.metadata ?? null,
+    }));
+  }
+
+  async getBranchSpecialBookingAddOns(branchId?: string): Promise<
+    {
+      id: string;
+      name: string;
+      category: string;
+      description: string | null;
+      imageUrl: string | null;
+      price: number;
+      defaultQuantity: number;
+      metadata: Record<string, unknown> | null;
+    }[]
+  > {
+    const where = branchId
+      ? [
+          { isActive: true, branchId },
+          { isActive: true, branchId: IsNull() },
+        ]
+      : [{ isActive: true, branchId: IsNull() }];
+
+    const addOns = await this.specialBookingAddonRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+    });
+
+    return addOns.map((a) => ({
+      id: a.id,
+      name: a.name,
+      category: 'private_event',
       description: a.description ?? null,
       imageUrl: a.imageUrl ?? null,
       price: Number(a.price),
@@ -924,9 +1025,16 @@ export class ContentService {
     metadata?: Record<string, unknown>;
     branchId?: string | null;
   }): Promise<Addon> {
+    const category = String(data.category ?? 'general').trim() || 'general';
+    if (this.specialAddonCategories.has(category)) {
+      throw new BadRequestException(
+        'Use the dedicated school trip or special booking add-on endpoint',
+      );
+    }
+
     const addon = this.addonRepository.create({
       name: data.name,
-      category: data.category ?? 'general',
+      category,
       description: data.description ?? null,
       imageUrl: data.imageUrl ?? null,
       price: data.price,
@@ -938,6 +1046,52 @@ export class ContentService {
     return this.addonRepository.save(addon);
   }
 
+  async createSchoolTripAddon(data: {
+    name: string;
+    description?: string;
+    imageUrl?: string;
+    price: number;
+    defaultQuantity?: number;
+    isActive?: boolean;
+    metadata?: Record<string, unknown>;
+    branchId?: string | null;
+  }): Promise<SchoolTripAddon> {
+    const addon = this.schoolTripAddonRepository.create({
+      name: data.name,
+      description: data.description ?? null,
+      imageUrl: data.imageUrl ?? null,
+      price: data.price,
+      defaultQuantity: data.defaultQuantity ?? 1,
+      isActive: data.isActive ?? true,
+      metadata: data.metadata ?? null,
+      branchId: data.branchId ?? null,
+    });
+    return this.schoolTripAddonRepository.save(addon);
+  }
+
+  async createSpecialBookingAddon(data: {
+    name: string;
+    description?: string;
+    imageUrl?: string;
+    price: number;
+    defaultQuantity?: number;
+    isActive?: boolean;
+    metadata?: Record<string, unknown>;
+    branchId?: string | null;
+  }): Promise<SpecialBookingAddon> {
+    const addon = this.specialBookingAddonRepository.create({
+      name: data.name,
+      description: data.description ?? null,
+      imageUrl: data.imageUrl ?? null,
+      price: data.price,
+      defaultQuantity: data.defaultQuantity ?? 1,
+      isActive: data.isActive ?? true,
+      metadata: { ...(data.metadata ?? {}), privateEventAddon: true },
+      branchId: data.branchId ?? null,
+    });
+    return this.specialBookingAddonRepository.save(addon);
+  }
+
   async listAddons(filter?: {
     branchId?: string;
     isActive?: boolean;
@@ -945,17 +1099,99 @@ export class ContentService {
     const where: any = {};
     if (filter?.branchId) where.branchId = filter.branchId;
     if (filter?.isActive !== undefined) where.isActive = filter.isActive;
-    return this.addonRepository.find({ where, order: { createdAt: 'DESC' } });
+    const addons = await this.addonRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+    });
+    return addons.filter(
+      (addon) =>
+        !this.specialAddonCategories.has(addon.category || 'general') &&
+        addon.metadata?.privateEventAddon !== true,
+    );
+  }
+
+  async listSchoolTripAddons(filter?: {
+    branchId?: string;
+    isActive?: boolean;
+  }): Promise<SchoolTripAddon[]> {
+    const where: any = {};
+    if (filter?.branchId) where.branchId = filter.branchId;
+    if (filter?.isActive !== undefined) where.isActive = filter.isActive;
+    return this.schoolTripAddonRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async listSpecialBookingAddons(filter?: {
+    branchId?: string;
+    isActive?: boolean;
+  }): Promise<SpecialBookingAddon[]> {
+    const where: any = {};
+    if (filter?.branchId) where.branchId = filter.branchId;
+    if (filter?.isActive !== undefined) where.isActive = filter.isActive;
+    return this.specialBookingAddonRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async updateAddon(id: string, update: Partial<Addon>): Promise<Addon> {
+    const category =
+      update.category !== undefined
+        ? String(update.category).trim() || 'general'
+        : undefined;
+    if (category && this.specialAddonCategories.has(category)) {
+      throw new BadRequestException(
+        'Use the dedicated school trip or special booking add-on endpoint',
+      );
+    }
+
     const found = await this.addonRepository.findOne({ where: { id } });
     if (!found) throw new NotFoundException('Addon not found');
-    Object.assign(found, update);
+    Object.assign(found, { ...update, ...(category ? { category } : {}) });
     return this.addonRepository.save(found);
+  }
+
+  async updateSchoolTripAddon(
+    id: string,
+    update: Partial<SchoolTripAddon>,
+  ): Promise<SchoolTripAddon> {
+    const found = await this.schoolTripAddonRepository.findOne({
+      where: { id },
+    });
+    if (!found) throw new NotFoundException('School trip addon not found');
+    Object.assign(found, update);
+    return this.schoolTripAddonRepository.save(found);
+  }
+
+  async updateSpecialBookingAddon(
+    id: string,
+    update: Partial<SpecialBookingAddon>,
+  ): Promise<SpecialBookingAddon> {
+    const found = await this.specialBookingAddonRepository.findOne({
+      where: { id },
+    });
+    if (!found) throw new NotFoundException('Special booking addon not found');
+    Object.assign(found, {
+      ...update,
+      metadata:
+        update.metadata !== undefined
+          ? { ...(update.metadata ?? {}), privateEventAddon: true }
+          : found.metadata,
+    });
+    return this.specialBookingAddonRepository.save(found);
   }
 
   async deleteAddon(id: string): Promise<void> {
     await this.addonRepository.delete(id);
+  }
+
+  async deleteSchoolTripAddon(id: string): Promise<void> {
+    await this.schoolTripAddonRepository.delete(id);
+  }
+
+  async deleteSpecialBookingAddon(id: string): Promise<void> {
+    await this.specialBookingAddonRepository.delete(id);
   }
 }

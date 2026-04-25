@@ -180,7 +180,7 @@ export class TripsService {
     }
 
     const addOns = branch?.id
-      ? await this.contentService.getBranchAddOns(branch.id)
+      ? await this.contentService.getBranchSchoolTripAddOns(branch.id)
       : [];
     return {
       minimumStudents: this.getMinimumStudents(branch),
@@ -212,7 +212,9 @@ export class TripsService {
   ): Promise<ResolvedTripAddOn[]> {
     if (!selected?.length) return [];
 
-    const catalog = await this.contentService.getBranchAddOns(branchId);
+    const catalog = await this.contentService.getBranchSchoolTripAddOns(
+      branchId,
+    );
     const catalogMap = new Map(catalog.map((item) => [item.id, item]));
 
     return selected.map((item) => {

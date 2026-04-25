@@ -4,6 +4,8 @@ import { ContentController } from './content.controller';
 import { ContentService } from './content.service';
 import { Branch } from '../../database/entities/branch.entity';
 import { Addon } from '../../database/entities/addon.entity';
+import { SchoolTripAddon } from '../../database/entities/school-trip-addon.entity';
+import { SpecialBookingAddon } from '../../database/entities/special-booking-addon.entity';
 import { Offer } from '../../database/entities/offer.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { EventRequest } from '../../database/entities/event-request.entity';
@@ -14,7 +16,15 @@ import { CloudinaryModule } from '../../utils/cloudinary.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Branch, Addon, Offer, Booking, EventRequest]),
+    TypeOrmModule.forFeature([
+      Branch,
+      Addon,
+      SchoolTripAddon,
+      SpecialBookingAddon,
+      Offer,
+      Booking,
+      EventRequest,
+    ]),
     RealtimeModule,
     CloudinaryModule,
   ],

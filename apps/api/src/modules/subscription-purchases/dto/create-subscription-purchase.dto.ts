@@ -1,4 +1,4 @@
-import { IsBoolean, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsString, IsUUID, Length } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateSubscriptionPurchaseDto {
@@ -18,6 +18,14 @@ export class CreateSubscriptionPurchaseDto {
   acceptedTerms: boolean;
 
   @ApiProperty({
+    description: 'Child/subscription holder display name',
+    example: 'Omar Ahmed',
+  })
+  @IsString()
+  @Length(2, 100)
+  holderName: string;
+
+  @ApiProperty({
     description: 'Uploaded image URL for the subscription holder',
     example: 'https://res.cloudinary.com/demo/image/upload/holder-photo.jpg',
   })
@@ -33,7 +41,7 @@ export type CreateSubscriptionPurchasePayload = Pick<
   CreateSubscriptionPurchaseDto,
   'subscriptionPlanId' | 'acceptedTerms'
 > &
-  Partial<Pick<CreateSubscriptionPurchaseDto, 'holderImageUrl'>>;
+  Partial<Pick<CreateSubscriptionPurchaseDto, 'holderImageUrl' | 'holderName'>>;
 
 export type CreateSubscriptionPurchaseOptions = {
   /**
