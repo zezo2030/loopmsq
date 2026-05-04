@@ -10,6 +10,7 @@ import {
   ValidateNested,
   IsInt,
   Min,
+  IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { GiftType } from '../../../database/entities/gift-order.entity';
@@ -60,6 +61,21 @@ export class CreateGiftOrderDto {
   @ValidateNested({ each: true })
   @Type(() => CreateGiftAddOnDto)
   addOns?: CreateGiftAddOnDto[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  holderName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUrl(
+    { require_protocol: true },
+    { message: 'holderImageUrl must be a valid URL' },
+  )
+  @MaxLength(1000)
+  holderImageUrl?: string;
 
   @ApiProperty({ enum: PaymentMethod })
   @IsEnum(PaymentMethod)

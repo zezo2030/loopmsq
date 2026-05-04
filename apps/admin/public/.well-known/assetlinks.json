@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.company.kinetic",
+      "sha256_cert_fingerprints": [
+        "D4:03:5F:F7:F7:F1:52:29:96:77:68:F2:03:4B:1E:0B:AB:21:3E:9A:39:DB:01:45:0D:EB:E7:A9:04:69:31:FC"
+      ]
+    }
+  }
+]

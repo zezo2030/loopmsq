@@ -502,7 +502,15 @@ export class GiftOrdersService {
     giftOrder.paymentStatus = GiftPaymentStatus.PENDING;
     giftOrder.giftStatus = GiftStatus.PENDING_CLAIM;
     giftOrder.whatsappMessageStatus = WhatsAppStatus.PENDING;
-    giftOrder.metadata = dto.addOns ? { addOns: dto.addOns } : {};
+    giftOrder.metadata = {
+      ...(dto.addOns ? { addOns: dto.addOns } : {}),
+      ...(dto.holderName?.trim()
+        ? { holderName: dto.holderName.trim() }
+        : {}),
+      ...(dto.holderImageUrl?.trim()
+        ? { holderImageUrl: dto.holderImageUrl.trim() }
+        : {}),
+    };
     const claimLink = this.ensureClaimLink(giftOrder);
 
     const saved = await this.giftOrderRepo.save(giftOrder);
