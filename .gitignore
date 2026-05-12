@@ -1,5 +1,6 @@
 # Exclude planning/temporary docs from repository
 adminfolder/
+uploads/
 BUILD_INSTRUCTIONS_AR.md
 SUCCESS_SUMMARY.md
 QUICK_START.md

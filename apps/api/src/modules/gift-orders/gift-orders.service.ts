@@ -358,7 +358,7 @@ export class GiftOrdersService {
       subtotal = Number(plan.price);
     }
 
-    tax = subtotal * 0.15;
+    tax = 0;
     const total = subtotal + tax;
 
     return {
@@ -475,7 +475,7 @@ export class GiftOrdersService {
       };
     }
 
-    tax = subtotal * 0.15;
+    tax = 0;
     const total = subtotal + tax;
 
     let senderDisplayName: string | null = null;
