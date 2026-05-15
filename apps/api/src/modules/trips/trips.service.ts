@@ -25,6 +25,7 @@ import { InvoiceTripRequestDto } from './dto/invoice-trip-request.dto';
 import { IssueTicketsDto } from './dto/issue-tickets.dto';
 import { CreateTripRequestDto } from './dto/create-trip-request.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { SubmitTripRequestDto } from './dto/submit-trip-request.dto';
 import { RejectTripRequestDto } from './dto/reject-trip-request.dto';
 import { CancelTripRequestDto } from './dto/cancel-trip-request.dto';
@@ -60,6 +61,7 @@ export class TripsService {
     @InjectRepository(Payment)
     private readonly paymentRepo: Repository<Payment>,
     private readonly notifications: NotificationsService,
+    private readonly adminNotifications: AdminNotificationsService,
     private readonly contentService: ContentService,
     private readonly qrCodeService: QRCodeService,
   ) {}
@@ -504,6 +506,25 @@ export class TripsService {
       pricingSnapshot: pricing.pricingSnapshot as any,
     });
     const saved = await this.tripRepo.save(req);
+
+    await this.adminNotifications.notify({
+      type: 'TRIP_REQUEST_CREATED',
+      severity: 'warning',
+      title: 'طلب رحلة مدرسية جديد',
+      body: `${saved.schoolName} — ${saved.studentsCount} طالب — ${new Date(saved.preferredDate).toLocaleDateString('ar')}`,
+      branchId: saved.branchId || null,
+      resourceType: 'trip_request',
+      resourceId: saved.id,
+      data: {
+        userId,
+        schoolName: saved.schoolName,
+        studentsCount: saved.studentsCount,
+        preferredDate: saved.preferredDate,
+        preferredTime: saved.preferredTime,
+        totalAmount: saved.totalAmount,
+      },
+    });
+
     return { id: saved.id, request: saved };
   }
 

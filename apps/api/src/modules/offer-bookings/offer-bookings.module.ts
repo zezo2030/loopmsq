@@ -10,6 +10,7 @@ import { OfferBookingsService } from './offer-bookings.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { OfferTicketExpiryProcessor } from './offer-ticket-expiry.processor';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { User } from '../../database/entities/user.entity';
 
 @Module({
@@ -23,6 +24,7 @@ import { User } from '../../database/entities/user.entity';
     ]),
     BullModule.registerQueue({ name: 'offer_ticket_expiry' }),
     forwardRef(() => NotificationsModule),
+    AdminNotificationsModule,
   ],
   controllers: [OfferBookingsController],
   providers: [OfferBookingsService, QRCodeService, OfferTicketExpiryProcessor],

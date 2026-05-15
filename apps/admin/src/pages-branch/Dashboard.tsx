@@ -12,7 +12,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
 import { apiGet } from '../shared/api'
-import { useAuth } from '../shared/auth'
+import { useAuth, canViewRevenue } from '../shared/auth'
 import { resolveFileUrlWithBust } from '../shared/url'
 import { cn } from '@/lib/utils'
 import { formatDateTimeAr } from '../utils/formatDateTimeDisplay'
@@ -20,6 +20,7 @@ import { formatDateTimeAr } from '../utils/formatDateTimeDisplay'
 export default function Dashboard() {
   const { t } = useTranslation()
   const { me } = useAuth()
+  const showRevenue = canViewRevenue(me as any)
   const [overview, setOverview] = useState<{
     bookings: { total: number; confirmed: number; cancelled: number; pending?: number }
     scans: number
@@ -170,25 +171,27 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md group">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-600 transition-colors group-hover:text-primary">
-              {t('dashboard.kpi_revenue') || 'الإيرادات'}
-            </CardTitle>
-            <div className="rounded-lg bg-slate-50 p-2 transition-colors group-hover:bg-primary/10">
-              <DollarSign className="h-4 w-4 text-slate-600 group-hover:text-primary" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight text-slate-900">
-              {totalRevenue} <span className="text-base font-medium">{t('common.currency')}</span>
-            </div>
-          </CardContent>
-        </Card>
+        {showRevenue && (
+          <Card className="overflow-hidden border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-md group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-600 transition-colors group-hover:text-primary">
+                {t('dashboard.kpi_revenue') || 'الإيرادات'}
+              </CardTitle>
+              <div className="rounded-lg bg-slate-50 p-2 transition-colors group-hover:bg-primary/10">
+                <DollarSign className="h-4 w-4 text-slate-600 group-hover:text-primary" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tracking-tight text-slate-900">
+                {totalRevenue} <span className="text-base font-medium">{t('common.currency')}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Revenue by Method */}
-      {revenueEntries.length > 0 && (
+      {showRevenue && revenueEntries.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {revenueEntries.map(([k, v]) => (
             <Card key={k} className="border-slate-100 bg-white shadow-sm">
@@ -301,21 +304,23 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-blue-800">
-                      {t('dashboard.this_week') || 'هذا الأسبوع'}
+              {showRevenue && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-blue-800">
+                        {t('dashboard.this_week') || 'هذا الأسبوع'}
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        {t('dashboard.revenue') || 'الإيرادات'}
+                      </div>
                     </div>
-                    <div className="text-xs text-slate-600">
-                      {t('dashboard.revenue') || 'الإيرادات'}
+                    <div className="text-xl font-bold text-blue-700">
+                      {totalRevenue} <span className="text-sm font-medium">{t('common.currency')}</span>
                     </div>
-                  </div>
-                  <div className="text-xl font-bold text-blue-700">
-                    {totalRevenue} <span className="text-sm font-medium">{t('common.currency')}</span>
                   </div>
                 </div>
-              </div>
+              )}
               <div className="flex flex-wrap justify-center gap-2 pt-2">
                 <Button
                   variant="outline"

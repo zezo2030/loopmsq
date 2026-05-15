@@ -53,6 +53,17 @@ export class User {
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
+  // Fine-grained capability flags. Currently used to gate financial data
+  // visibility for branch managers from the admin dashboard.
+  @Column({ type: 'jsonb', nullable: true })
+  permissions?: {
+    canViewRevenue?: boolean;
+    canViewBookingAmounts?: boolean;
+    // Grants the manager read + adjust access to user wallets (list wallets,
+    // view balance/transactions, credit or debit balance and loyalty points).
+    canManageWallets?: boolean;
+  } | null;
+
   @Column({ type: 'timestamp', nullable: true })
   lastLoginAt: Date;
 

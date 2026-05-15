@@ -1,7 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query'
+import { ConfigProvider, App as AntdApp } from 'antd'
+import arEG from 'antd/locale/ar_EG'
+import { toast } from './shared/toast'
 import './i18n'
 import './index.css'
 import './theme.css'
@@ -15,6 +18,7 @@ import ClientsList from './pages/users/ClientsList'
 import UserDetail from './pages/users/UserDetail'
 import CreateStaff from './pages/users/CreateStaff'
 import CreateBranchManager from './pages/users/CreateBranchManager'
+import ManagerPermissions from './pages/users/ManagerPermissions'
 import CreateUser from './pages/users/CreateUser'
 import BookingsList from './pages/bookings/BookingsList'
 import BookingDetail from './pages/bookings/BookingDetail'
@@ -64,7 +68,7 @@ import BranchStaff from './pages-branch/staff/StaffList'
 import BranchReports from './pages-branch/reports/Overview'
 import BranchSubscriptions from './pages-branch/subscriptions/SubscriptionsList'
 import BranchSubscriptionDetail from './pages-branch/subscriptions/SubscriptionDetail'
-import { useAuth } from './shared/auth'
+import { useAuth, canManageWallets } from './shared/auth'
 
 function RequireRoles(props: { roles: string[]; element: any }) {
   const { roles, element } = props
@@ -73,6 +77,16 @@ function RequireRoles(props: { roles: string[]; element: any }) {
     if (status === 'loading') return null
     const allowed = me?.roles?.some(r => roles.includes(r))
     return allowed ? element : <Navigate to="/login" replace />
+  }
+  return <Guarded />
+}
+
+function RequireWalletAccess(props: { element: any; fallback?: string }) {
+  const { element, fallback = '/branch' } = props
+  const Guarded = () => {
+    const { me, status } = useAuth()
+    if (status === 'loading') return null
+    return canManageWallets(me as any) ? element : <Navigate to={fallback} replace />
   }
   return <Guarded />
 }
@@ -98,6 +112,7 @@ const router = createBrowserRouter([
           { path: 'clients/new', element: <CreateUser /> },
           { path: 'staff/new', element: <CreateStaff /> },
           { path: 'branch-managers/new', element: <CreateBranchManager /> },
+          { path: 'branch-managers/permissions', element: <ManagerPermissions /> },
       
           // Bookings Management
           { path: 'bookings', element: <BookingsList /> },
@@ -169,6 +184,7 @@ const router = createBrowserRouter([
           { path: 'subscriptions', element: <BranchSubscriptions /> },
           { path: 'subscriptions/:id', element: <BranchSubscriptionDetail /> },
           { path: 'staff', element: <BranchStaff /> },
+          { path: 'wallets', element: <RequireWalletAccess element={<WalletsList />} /> },
           { path: 'reports', element: <BranchReports /> },
           { path: '*', element: <NotFound /> },
         ],
@@ -178,17 +194,41 @@ const router = createBrowserRouter([
   },
 ])
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onError: (error, _vars, _ctx, mutation) => {
+      // Allow per-mutation opt-out via meta.silent or meta.silentError
+      const meta = (mutation.meta || {}) as { silent?: boolean; silentError?: boolean; errorMessage?: string }
+      if (meta.silent || meta.silentError) return
+      const msg = meta.errorMessage || (error as any)?.message || 'حدث خطأ — حاول مرة أخرى'
+      toast.error(String(msg))
+    },
+    onSuccess: (_data, _vars, _ctx, mutation) => {
+      // Opt-in success toast via meta.successMessage; pages that already call message.success
+      // simply don't set meta and avoid duplicate toasts.
+      const meta = (mutation.meta || {}) as { silent?: boolean; successMessage?: string }
+      if (meta.silent || !meta.successMessage) return
+      toast.success(meta.successMessage)
+    },
+  }),
+})
+
+const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('console_lang')) || 'ar'
+const direction = lang === 'ar' ? 'rtl' : 'ltr'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>
-        <Analytics />
-        <MetaPixel />
-        <RouterProvider router={router} />
-      </ErrorBoundary>
-    </QueryClientProvider>
+    <ConfigProvider direction={direction} locale={lang === 'ar' ? arEG : undefined}>
+      <AntdApp>
+        <QueryClientProvider client={queryClient}>
+          <ErrorBoundary>
+            <Analytics />
+            <MetaPixel />
+            <RouterProvider router={router} />
+          </ErrorBoundary>
+        </QueryClientProvider>
+      </AntdApp>
+    </ConfigProvider>
   </StrictMode>,
 )
 

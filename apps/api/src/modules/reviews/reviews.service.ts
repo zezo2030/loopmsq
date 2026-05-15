@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Review } from '../../database/entities/review.entity';
 import { Booking, BookingStatus } from '../../database/entities/booking.entity';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 
 @Injectable()
 export class ReviewsService {
@@ -14,6 +15,7 @@ export class ReviewsService {
     @InjectRepository(Review) private readonly reviewRepo: Repository<Review>,
     @InjectRepository(Booking)
     private readonly bookingRepo: Repository<Booking>,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   async create(
@@ -42,7 +44,26 @@ export class ReviewsService {
       rating: dto.rating,
       comment: dto.comment || null,
     });
-    return this.reviewRepo.save(review);
+    const saved = await this.reviewRepo.save(review);
+
+    if (dto.rating <= 2) {
+      await this.adminNotifications.notify({
+        type: 'REVIEW_NEGATIVE',
+        severity: 'critical',
+        title: `تقييم سلبي (${dto.rating}★)`,
+        body: dto.comment?.slice(0, 200) || 'لا يوجد تعليق',
+        branchId: booking.branchId || null,
+        resourceType: 'review',
+        resourceId: saved.id,
+        data: {
+          userId,
+          bookingId: booking.id,
+          rating: dto.rating,
+        },
+      });
+    }
+
+    return saved;
   }
 
   async get(userId: string, bookingId: string) {

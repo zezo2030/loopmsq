@@ -17,6 +17,7 @@ import {
 } from 'antd'
 import { CalendarOutlined, CreditCardOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { apiGet } from '../../shared/api'
+import { useAuth, canViewBookingAmounts } from '../../shared/auth'
 
 const { RangePicker } = DatePicker
 const { Text, Title } = Typography
@@ -44,6 +45,8 @@ type ResponseShape = {
 }
 
 export default function OfferBookingsList() {
+  const { me } = useAuth()
+  const showAmounts = canViewBookingAmounts(me as any)
   const [rows, setRows] = useState<OfferBookingRow[]>([])
   const [stats, setStats] = useState<ResponseShape['stats']>({ total: 0, active: 0, completed: 0, cancelled: 0, paid: 0, revenue: 0 })
   const [loading, setLoading] = useState(false)
@@ -107,16 +110,24 @@ export default function OfferBookingsList() {
           </div>
         ),
       },
-      {
-        title: 'الإجمالي',
-        key: 'totalPrice',
-        render: (_: unknown, row: OfferBookingRow) => (
-          <div>
-            <div>{formatCurrency(row.totalPrice, row.offer.currency)}</div>
-            <Text type="secondary">التذاكر: {row.ticketsCount}</Text>
-          </div>
-        ),
-      },
+      ...(showAmounts
+        ? [{
+            title: 'الإجمالي',
+            key: 'totalPrice',
+            render: (_: unknown, row: OfferBookingRow) => (
+              <div>
+                <div>{formatCurrency(row.totalPrice, row.offer.currency)}</div>
+                <Text type="secondary">التذاكر: {row.ticketsCount}</Text>
+              </div>
+            ),
+          }]
+        : [{
+            title: 'التذاكر',
+            key: 'ticketsCount',
+            render: (_: unknown, row: OfferBookingRow) => (
+              <Text>{row.ticketsCount}</Text>
+            ),
+          }]),
       {
         title: 'الحالة',
         key: 'status',
@@ -138,7 +149,7 @@ export default function OfferBookingsList() {
         render: (_: unknown, row: OfferBookingRow) => <a onClick={() => navigate(`/branch/offer-bookings/${row.id}`)}>عرض</a>,
       },
     ],
-    [],
+    [showAmounts],
   )
 
   return (
@@ -159,7 +170,9 @@ export default function OfferBookingsList() {
             <Col xs={12} xl={4}><Card><Statistic title="مكتملة" value={stats.completed} valueStyle={{ color: '#2563eb' }} /></Card></Col>
             <Col xs={12} xl={4}><Card><Statistic title="ملغية" value={stats.cancelled} valueStyle={{ color: '#dc2626' }} /></Card></Col>
             <Col xs={12} xl={4}><Card><Statistic title="مدفوعة" value={stats.paid} prefix={<CreditCardOutlined />} /></Card></Col>
-            <Col xs={12} xl={4}><Card><Statistic title="الإيراد" value={stats.revenue} formatter={(v) => formatCurrency(Number(v || 0))} /></Card></Col>
+            {showAmounts && (
+              <Col xs={12} xl={4}><Card><Statistic title="الإيراد" value={stats.revenue} formatter={(v) => formatCurrency(Number(v || 0))} /></Card></Col>
+            )}
           </Row>
           <Card style={{ marginBottom: 24 }}>
             <Space wrap size="middle" style={{ width: '100%', justifyContent: 'space-between' }}>

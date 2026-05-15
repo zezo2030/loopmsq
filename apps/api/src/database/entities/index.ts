@@ -56,3 +56,8 @@ export {
   WhatsAppStatus,
 } from './gift-order.entity';
 export { GiftOrderEvent } from './gift-order-event.entity';
+export {
+  AdminNotification,
+  type AdminNotificationType,
+  type AdminNotificationSeverity,
+} from './admin-notification.entity';

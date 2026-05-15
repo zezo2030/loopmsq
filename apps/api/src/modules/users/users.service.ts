@@ -298,10 +298,11 @@ export class UsersService {
       updatedAt: user.updatedAt,
       branchId: user.branchId,
       branch: user.branch,
+      permissions: user.permissions || null,
       wallet: user.wallet,
       bookings: user.bookings,
       supportTickets: user.supportTickets,
-    };
+    } as any;
   }
 
   async update(
@@ -360,6 +361,94 @@ export class UsersService {
       isActive: updatedUser.isActive,
       updatedAt: updatedUser.updatedAt,
     };
+  }
+
+  async listBranchManagerPermissions(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      email?: string;
+      branchId?: string;
+      isActive: boolean;
+      permissions: {
+        canViewRevenue: boolean;
+        canViewBookingAmounts: boolean;
+        canManageWallets: boolean;
+      };
+    }>
+  > {
+    const managers = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.branch', 'branch')
+      .where(':role = ANY(user.roles)', { role: UserRole.BRANCH_MANAGER })
+      .orderBy('user.createdAt', 'DESC')
+      .getMany();
+
+    return managers.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      branchId: u.branchId,
+      branchName: (u.branch as any)?.nameAr || (u.branch as any)?.nameEn,
+      isActive: u.isActive,
+      permissions: {
+        canViewRevenue: u.permissions?.canViewRevenue ?? true,
+        canViewBookingAmounts: u.permissions?.canViewBookingAmounts ?? true,
+        // Wallet management is opt-in; defaults to false so existing managers
+        // keep their pre-feature behaviour until an admin grants the flag.
+        canManageWallets: u.permissions?.canManageWallets ?? false,
+      },
+    })) as any;
+  }
+
+  async updatePermissions(
+    id: string,
+    body: {
+      canViewRevenue?: boolean;
+      canViewBookingAmounts?: boolean;
+      canManageWallets?: boolean;
+    },
+  ): Promise<{
+    id: string;
+    permissions: {
+      canViewRevenue: boolean;
+      canViewBookingAmounts: boolean;
+      canManageWallets: boolean;
+    };
+  }> {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    if (!user.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      throw new BadRequestException(
+        'Permissions can only be set for branch managers',
+      );
+    }
+
+    const current = user.permissions || {};
+    const next = {
+      canViewRevenue:
+        typeof body.canViewRevenue === 'boolean'
+          ? body.canViewRevenue
+          : (current.canViewRevenue ?? true),
+      canViewBookingAmounts:
+        typeof body.canViewBookingAmounts === 'boolean'
+          ? body.canViewBookingAmounts
+          : (current.canViewBookingAmounts ?? true),
+      canManageWallets:
+        typeof body.canManageWallets === 'boolean'
+          ? body.canManageWallets
+          : (current.canManageWallets ?? false),
+    };
+
+    user.permissions = next;
+    await this.userRepository.save(user);
+    this.logger.log(
+      `Permissions updated for ${id}: ${JSON.stringify(next)}`,
+    );
+
+    return { id, permissions: next };
   }
 
   async deactivate(id: string, requester?: User): Promise<void> {
@@ -443,44 +532,134 @@ export class UsersService {
     };
   }
 
-  async deleteHard(id: string): Promise<void> {
-    const user = await this.userRepository.findOne({
-      where: { id },
-      relations: ['bookings', 'supportTickets'],
-    });
+  async deleteHard(id: string, requester?: User): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    if (
-      (user.bookings && user.bookings.length > 0) ||
-      (user.supportTickets && user.supportTickets.length > 0)
-    ) {
-      throw new BadRequestException(
-        'User has related records; deactivate instead',
-      );
+    if (requester && requester.id === id) {
+      throw new BadRequestException('You cannot delete your own account');
     }
 
-    const wallet = await this.walletRepository.findOne({
-      where: { userId: id },
-      relations: ['transactions'] as any,
+    await this.userRepository.manager.transaction(async (m) => {
+      // 1) Detach references where this user acted on others' records.
+      //    Keep the records but null out the staff/admin pointer.
+      await m.query(
+        `UPDATE tickets SET "staffId" = NULL WHERE "staffId" = $1`,
+        [id],
+      );
+      await m.query(
+        `UPDATE offer_tickets SET "staffId" = NULL WHERE "staffId" = $1 AND "userId" <> $1`,
+        [id],
+      );
+      await m.query(
+        `UPDATE subscription_usage_logs SET "staffId" = NULL
+         WHERE "staffId" = $1
+           AND "subscriptionPurchaseId" NOT IN (
+             SELECT id FROM subscription_purchases WHERE "userId" = $1
+           )`,
+        [id],
+      );
+      await m.query(
+        `UPDATE support_tickets SET "assignedTo" = NULL WHERE "assignedTo" = $1`,
+        [id],
+      );
+      await m.query(
+        `UPDATE school_trip_requests SET "approvedBy" = NULL WHERE "approvedBy" = $1`,
+        [id],
+      );
+      await m.query(
+        `UPDATE gift_orders SET "claimedByUserId" = NULL
+         WHERE "claimedByUserId" = $1 AND "senderUserId" <> $1`,
+        [id],
+      );
+
+      // 2) Delete payments tied to anything this user owns.
+      await m.query(
+        `DELETE FROM payments WHERE "bookingId" IN (SELECT id FROM bookings WHERE "userId" = $1)`,
+        [id],
+      );
+      await m.query(
+        `DELETE FROM payments WHERE "offerBookingId" IN (SELECT id FROM offer_bookings WHERE "userId" = $1)`,
+        [id],
+      );
+      await m.query(
+        `DELETE FROM payments WHERE "tripRequestId" IN (SELECT id FROM school_trip_requests WHERE "requesterId" = $1)`,
+        [id],
+      );
+      await m.query(
+        `DELETE FROM payments WHERE "eventRequestId" IN (SELECT id FROM event_requests WHERE "requesterId" = $1)`,
+        [id],
+      );
+      await m.query(
+        `DELETE FROM payments WHERE "subscriptionPurchaseId" IN (SELECT id FROM subscription_purchases WHERE "userId" = $1)`,
+        [id],
+      );
+      await m.query(
+        `DELETE FROM payments WHERE "giftOrderId" IN (SELECT id FROM gift_orders WHERE "senderUserId" = $1)`,
+        [id],
+      );
+
+      // 3) Delete bookings and their dependents.
+      await m.query(
+        `DELETE FROM tickets WHERE "bookingId" IN (SELECT id FROM bookings WHERE "userId" = $1)`,
+        [id],
+      );
+      await m.query(`DELETE FROM reviews WHERE "userId" = $1`, [id]);
+      await m.query(`DELETE FROM bookings WHERE "userId" = $1`, [id]);
+
+      // 4) Subscriptions, offers, trips, events, gifts owned by this user.
+      await m.query(
+        `DELETE FROM subscription_usage_logs WHERE "subscriptionPurchaseId" IN (SELECT id FROM subscription_purchases WHERE "userId" = $1)`,
+        [id],
+      );
+      await m.query(`DELETE FROM offer_tickets WHERE "userId" = $1`, [id]);
+      await m.query(`DELETE FROM offer_bookings WHERE "userId" = $1`, [id]);
+      await m.query(
+        `DELETE FROM subscription_purchases WHERE "userId" = $1`,
+        [id],
+      );
+      await m.query(
+        `DELETE FROM school_trip_requests WHERE "requesterId" = $1`,
+        [id],
+      );
+      await m.query(`DELETE FROM event_requests WHERE "requesterId" = $1`, [
+        id,
+      ]);
+      await m.query(`DELETE FROM gift_orders WHERE "senderUserId" = $1`, [id]);
+
+      // 5) Support, favorites, referrals, notifications, devices.
+      await m.query(`DELETE FROM support_tickets WHERE "userId" = $1`, [id]);
+      await m.query(`DELETE FROM favorites WHERE "userId" = $1`, [id]);
+      await m.query(
+        `DELETE FROM referral_attributions WHERE "refereeId" = $1 OR "referrerId" = $1`,
+        [id],
+      );
+      await m.query(
+        `DELETE FROM referral_earnings WHERE "referrerId" = $1 OR "refereeId" = $1`,
+        [id],
+      );
+      await m.query(`DELETE FROM referral_codes WHERE "userId" = $1`, [id]);
+      await m.query(`DELETE FROM device_tokens WHERE "userId" = $1`, [id]);
+      await m.query(`DELETE FROM notifications WHERE "userId" = $1`, [id]);
+
+      // 6) Wallet + financial trail.
+      await m.query(`DELETE FROM loyalty_transactions WHERE "userId" = $1`, [
+        id,
+      ]);
+      await m.query(`DELETE FROM wallet_transactions WHERE "userId" = $1`, [
+        id,
+      ]);
+      await m.query(`DELETE FROM wallets WHERE "userId" = $1`, [id]);
+
+      // 7) Finally, the user.
+      await m.query(`DELETE FROM users WHERE id = $1`, [id]);
     });
-    if (
-      wallet &&
-      (wallet as any).transactions &&
-      (wallet as any).transactions.length > 0
-    ) {
-      throw new BadRequestException(
-        'User wallet has transactions; deactivate instead',
-      );
-    }
 
-    if (wallet) {
-      await this.walletRepository.delete(wallet.id);
-    }
-
-    await this.userRepository.delete(id);
-    this.logger.log(`User hard-deleted: ${id}`);
+    this.logger.log(
+      `User hard-deleted (cascade): ${id} by ${requester?.id || 'system'}`,
+    );
   }
 
   async deleteStaff(id: string, requester: User): Promise<void> {

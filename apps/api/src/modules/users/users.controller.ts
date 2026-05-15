@@ -208,6 +208,37 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto);
   }
 
+  @Get('branch-managers/permissions')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'List all branch managers with their permission flags (Admin only)',
+  })
+  @ApiResponse({ status: 200, description: 'Managers retrieved successfully' })
+  async listBranchManagerPermissions() {
+    return this.usersService.listBranchManagerPermissions();
+  }
+
+  @Patch(':id/permissions')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Update a branch manager permission flags (Admin only)',
+  })
+  @ApiResponse({ status: 200, description: 'Permissions updated successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async updatePermissions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body()
+    body: {
+      canViewRevenue?: boolean;
+      canViewBookingAmounts?: boolean;
+      canManageWallets?: boolean;
+    },
+  ) {
+    return this.usersService.updatePermissions(id, body);
+  }
+
   @Patch(':id/deactivate')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
@@ -249,8 +280,11 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async deleteHard(@Param('id', ParseUUIDPipe) id: string) {
-    await this.usersService.deleteHard(id);
+  async deleteHard(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() requester: User,
+  ) {
+    await this.usersService.deleteHard(id, requester);
     return { message: 'User deleted permanently' };
   }
 

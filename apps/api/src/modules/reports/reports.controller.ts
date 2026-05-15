@@ -37,7 +37,8 @@ export class ReportsController {
       }
       branchId = user.branchId;
     }
-    return this.reports.overview({ from, to, branchId });
+    const data = await this.reports.overview({ from, to, branchId });
+    return this.maskRevenue(data, user);
   }
 
   @Get('export')
@@ -57,6 +58,12 @@ export class ReportsController {
       if (!user.branchId) {
         throw new ForbiddenException('Not allowed');
       }
+      // Branch managers without revenue access cannot export financial reports
+      if (!this.canViewRevenue(user)) {
+        throw new ForbiddenException(
+          'Revenue access required to export reports',
+        );
+      }
       branchId = user.branchId;
     }
     const data = await this.reports.overview({ from, to, branchId });
@@ -67,6 +74,20 @@ export class ReportsController {
       `attachment; filename="${type || 'overview'}.csv"`,
     );
     res.send(csv);
+  }
+
+  private canViewRevenue(user: User): boolean {
+    if (!user.roles?.includes(UserRole.BRANCH_MANAGER)) return true;
+    return user.permissions?.canViewRevenue ?? true;
+  }
+
+  private maskRevenue(data: any, user: User) {
+    if (this.canViewRevenue(user)) return data;
+    return {
+      ...data,
+      revenueByMethod: {},
+      revenueHidden: true,
+    };
   }
 
   private toCSV(name: string, data: any) {

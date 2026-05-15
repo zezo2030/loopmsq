@@ -236,11 +236,14 @@ export default function UsersList() {
             </Button>
           )}
           <Popconfirm
-            title={t('users.delete_q') || 'Delete permanently? This cannot be undone.'}
+            title={t('users.delete_q') || 'Delete this user permanently?'}
+            description={
+              t('users.delete_desc') ||
+              'All their bookings, tickets, payments, wallet, and related records will be removed. This cannot be undone.'
+            }
             okText={t('common.delete') || 'Delete'}
             okButtonProps={{ danger: true }}
             cancelText={t('common.cancel') || 'Cancel'}
-            disabled={record.isActive}
             onConfirm={async () => {
               try {
                 const token = localStorage.getItem('accessToken')
@@ -248,7 +251,17 @@ export default function UsersList() {
                   method: 'PATCH',
                   headers: { Authorization: `Bearer ${token}` },
                 })
-                if (!resp.ok) throw new Error(await resp.text() || (t('users.failed') || 'Failed'))
+                if (!resp.ok) {
+                  let msg = t('users.delete_failed') || 'Failed to delete user'
+                  try {
+                    const body = await resp.json()
+                    msg = body?.message || body?.error || msg
+                  } catch {
+                    const text = await resp.text()
+                    if (text) msg = text
+                  }
+                  throw new Error(msg)
+                }
                 message.success(t('users.deleted') || 'User deleted permanently')
                 setRows(rows => rows.filter(r => r.id !== record.id))
               } catch (e: any) {
@@ -256,7 +269,7 @@ export default function UsersList() {
               }
             }}
           >
-            <Button type="link" size="small" danger disabled={record.isActive}>
+            <Button type="link" size="small" danger>
               {t('common.delete') || 'Delete'}
             </Button>
           </Popconfirm>

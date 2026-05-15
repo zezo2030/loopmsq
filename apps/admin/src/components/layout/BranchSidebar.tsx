@@ -10,8 +10,10 @@ import {
   BadgeCheck,
   Users,
   BarChart3,
+  Wallet,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useAuth, canViewRevenue, canManageWallets } from '../../shared/auth'
 
 const navItems = [
   { key: 'dashboard', href: '/branch', labelKey: 'menu.dashboard', icon: LayoutDashboard },
@@ -22,13 +24,22 @@ const navItems = [
   { key: 'offer-bookings', href: '/branch/offer-bookings', labelKey: 'menu.offerBookings', icon: Ticket },
   { key: 'subscriptions', href: '/branch/subscriptions', labelKey: 'menu.subscriptions', icon: BadgeCheck },
   { key: 'staff', href: '/branch/staff', labelKey: 'menu.staff', icon: Users },
-  { key: 'reports', href: '/branch/reports', labelKey: 'menu.reports', icon: BarChart3 },
-]
+  { key: 'wallets', href: '/branch/wallets', labelKey: 'menu.wallets', icon: Wallet, requiresWallets: true },
+  { key: 'reports', href: '/branch/reports', labelKey: 'menu.reports', icon: BarChart3, requiresRevenue: true },
+] as const
 
 export function BranchSidebar() {
   const location = useLocation()
   const pathname = location.pathname
   const { t } = useTranslation()
+  const { me } = useAuth()
+  const showRevenue = canViewRevenue(me as any)
+  const showWallets = canManageWallets(me as any)
+  const visibleItems = navItems.filter((i: any) => {
+    if (i.requiresRevenue && !showRevenue) return false
+    if (i.requiresWallets && !showWallets) return false
+    return true
+  })
 
   return (
     <div className="flex h-full w-64 flex-col border-r border-slate-100 bg-white shadow-sm shadow-slate-200/50">
@@ -41,7 +52,7 @@ export function BranchSidebar() {
         </h1>
       </div>
       <nav className="flex-1 space-y-1.5 overflow-y-auto px-4 py-6">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             pathname === item.href ||
             (item.href === '/branch' && pathname === '/branch')

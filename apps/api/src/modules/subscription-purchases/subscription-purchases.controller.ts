@@ -28,6 +28,7 @@ import { CreateSubscriptionPurchaseDto } from './dto/create-subscription-purchas
 import { DeductHoursDto } from './dto/deduct-hours.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
+import { maskAmounts } from '../../common/utils/financial-mask.util';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { User } from '../../database/entities/user.entity';
 
@@ -157,13 +158,14 @@ export class SubscriptionPurchasesController {
     @Query('to') to?: string,
     @Query('search') search?: string,
   ) {
-    return this.service.findBranchPurchases(user.branchId!, page, limit, {
+    const result = await this.service.findBranchPurchases(user.branchId!, page, limit, {
       status: status as any,
       paymentStatus: paymentStatus as any,
       from,
       to,
       search,
     });
+    return maskAmounts(result, user);
   }
 
   @Get('admin/all/:id')
@@ -184,7 +186,8 @@ export class SubscriptionPurchasesController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.service.findPurchaseForBranch(id, user.branchId!);
+    const result = await this.service.findPurchaseForBranch(id, user.branchId!);
+    return maskAmounts(result, user);
   }
 
   @Get(':id')

@@ -13,6 +13,7 @@ import { IntroVideoAdminController } from './intro-video.controller';
 import { HomeAdminService } from './home-admin.service';
 import { RedisService } from '../../utils/redis.service';
 import { CloudinaryModule } from '../../utils/cloudinary.module';
+import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { CloudinaryModule } from '../../utils/cloudinary.module';
       IntroVideo,
     ]),
     CloudinaryModule,
+    AdminNotificationsModule,
   ],
   controllers: [
     BannerAdminController,

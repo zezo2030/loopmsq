@@ -19,6 +19,7 @@ import {
 import { Addon } from '../../database/entities/addon.entity';
 import { CreateOfferProductDto } from './dto/create-offer-product.dto';
 import { UpdateOfferProductDto } from './dto/update-offer-product.dto';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 
 @Injectable()
 export class OfferProductsService {
@@ -29,6 +30,7 @@ export class OfferProductsService {
     private readonly repo: Repository<OfferProduct>,
     @InjectRepository(Addon)
     private readonly addonRepo: Repository<Addon>,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   /**
@@ -169,7 +171,18 @@ export class OfferProductsService {
       includedAddOns,
       ticketConfig,
     } as Partial<OfferProduct>);
-    return this.hydrateOfferAddOns(await this.repo.save(offer));
+    const saved = await this.repo.save(offer);
+    await this.adminNotifications.notify({
+      type: 'OFFER_PRODUCT_CREATED',
+      severity: 'success',
+      title: 'منتج عرض جديد',
+      body: saved.title || 'عرض',
+      branchId: saved.branchId || null,
+      resourceType: 'offer_product',
+      resourceId: saved.id,
+      data: { offerCategory: saved.offerCategory },
+    });
+    return this.hydrateOfferAddOns(saved);
   }
 
   async update(id: string, dto: UpdateOfferProductDto): Promise<OfferProduct> {
@@ -198,7 +211,17 @@ export class OfferProductsService {
   async softDelete(id: string): Promise<OfferProduct> {
     const offer = await this.findById(id);
     offer.isActive = false;
-    return this.repo.save(offer);
+    const saved = await this.repo.save(offer);
+    await this.adminNotifications.notify({
+      type: 'OFFER_PRODUCT_DELETED',
+      severity: 'warning',
+      title: 'تم تعطيل منتج عرض',
+      body: saved.title || 'عرض',
+      branchId: saved.branchId || null,
+      resourceType: 'offer_product',
+      resourceId: saved.id,
+    });
+    return saved;
   }
 
   async findAll(params: {

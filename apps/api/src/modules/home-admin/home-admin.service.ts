@@ -7,6 +7,7 @@ import { Offer } from '../../database/entities/offer.entity';
 import { Activity } from '../../database/entities/activity.entity';
 import { OrganizingBranch } from '../../database/entities/organizing-branch.entity';
 import { IntroVideo } from '../../database/entities/intro-video.entity';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 
 @Injectable()
 export class HomeAdminService {
@@ -20,6 +21,7 @@ export class HomeAdminService {
     @InjectRepository(IntroVideo)
     private readonly introVideoRepo: Repository<IntroVideo>,
     private readonly redis: RedisService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   // Banner
@@ -30,6 +32,14 @@ export class HomeAdminService {
     const entity = this.bannerRepo.create(dto);
     const saved = await this.bannerRepo.save(entity);
     await this.redis.del('home:v1');
+    await this.adminNotifications.notify({
+      type: 'BANNER_CREATED',
+      severity: 'info',
+      title: 'بانر جديد',
+      body: (saved as any).title || (saved as any).title_ar || 'بانر',
+      resourceType: 'banner',
+      resourceId: saved.id,
+    });
     return saved;
   }
   async updateBanner(id: string, dto: Partial<Banner>) {
@@ -38,8 +48,19 @@ export class HomeAdminService {
     return res;
   }
   async deleteBanner(id: string) {
+    const found = await this.bannerRepo.findOne({ where: { id } });
     const res = await this.bannerRepo.delete(id);
     await this.redis.del('home:v1');
+    if (found) {
+      await this.adminNotifications.notify({
+        type: 'BANNER_DELETED',
+        severity: 'warning',
+        title: 'تم حذف بانر',
+        body: (found as any).title || (found as any).title_ar || 'بانر',
+        resourceType: 'banner',
+        resourceId: found.id,
+      });
+    }
     return res;
   }
 
@@ -63,6 +84,19 @@ export class HomeAdminService {
     });
     const saved = await this.offerRepo.save(entity);
     await this.redis.del('home:v1');
+    await this.adminNotifications.notify({
+      type: 'OFFER_CREATED',
+      severity: 'success',
+      title: 'عرض جديد',
+      body: saved.title || 'عرض',
+      branchId: saved.branchId || null,
+      resourceType: 'offer',
+      resourceId: saved.id,
+      data: {
+        discountType: saved.discountType,
+        discountValue: saved.discountValue,
+      },
+    });
     return saved;
   }
   async updateOffer(id: string, dto: Partial<Offer>) {
@@ -72,8 +106,20 @@ export class HomeAdminService {
     return res;
   }
   async deleteOffer(id: string) {
+    const found = await this.offerRepo.findOne({ where: { id } });
     const res = await this.offerRepo.delete(id);
     await this.redis.del('home:v1');
+    if (found) {
+      await this.adminNotifications.notify({
+        type: 'OFFER_DELETED',
+        severity: 'warning',
+        title: 'تم حذف عرض',
+        body: found.title || 'عرض',
+        branchId: found.branchId || null,
+        resourceType: 'offer',
+        resourceId: found.id,
+      });
+    }
     return res;
   }
 

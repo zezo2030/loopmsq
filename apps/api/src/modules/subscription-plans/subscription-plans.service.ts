@@ -12,6 +12,7 @@ import {
 } from '../../database/entities/subscription-plan.entity';
 import { CreateSubscriptionPlanDto } from './dto/create-subscription-plan.dto';
 import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 
 @Injectable()
 export class SubscriptionPlansService {
@@ -20,6 +21,7 @@ export class SubscriptionPlansService {
   constructor(
     @InjectRepository(SubscriptionPlan)
     private readonly repo: Repository<SubscriptionPlan>,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   /**
@@ -137,7 +139,18 @@ export class SubscriptionPlansService {
     const plan = this.repo.create(
       this.normalizePlanInput(dto) as Partial<SubscriptionPlan>,
     );
-    return this.repo.save(plan);
+    const saved = await this.repo.save(plan);
+    await this.adminNotifications.notify({
+      type: 'SUBSCRIPTION_PLAN_CREATED',
+      severity: 'success',
+      title: 'باقة اشتراك جديدة',
+      body: saved.title || 'باقة',
+      branchId: saved.branchId || null,
+      resourceType: 'subscription_plan',
+      resourceId: saved.id,
+      data: { price: (saved as any).price },
+    });
+    return saved;
   }
 
   async update(
@@ -154,7 +167,17 @@ export class SubscriptionPlansService {
   async softDelete(id: string): Promise<SubscriptionPlan> {
     const plan = await this.findById(id);
     plan.isActive = false;
-    return this.repo.save(plan);
+    const saved = await this.repo.save(plan);
+    await this.adminNotifications.notify({
+      type: 'SUBSCRIPTION_PLAN_DELETED',
+      severity: 'warning',
+      title: 'تم تعطيل باقة اشتراك',
+      body: saved.title || 'باقة',
+      branchId: saved.branchId || null,
+      resourceType: 'subscription_plan',
+      resourceId: saved.id,
+    });
+    return saved;
   }
 
   async findAll(params: {

@@ -13,6 +13,7 @@ import { RedisService } from '../../utils/redis.service';
 import { RealtimeModule } from '../../realtime/realtime.module';
 import { SampleDataSeeder } from '../../database/seeders/sample-data.seeder';
 import { CloudinaryModule } from '../../utils/cloudinary.module';
+import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { CloudinaryModule } from '../../utils/cloudinary.module';
     ]),
     RealtimeModule,
     CloudinaryModule,
+    AdminNotificationsModule,
   ],
   controllers: [ContentController],
   providers: [ContentService, RedisService, SampleDataSeeder],

@@ -454,13 +454,14 @@ export class AuthService {
       language: user.language,
       isActive: user.isActive,
       branchId: user.branchId,
+      permissions: user.permissions || null,
       createdAt: user.createdAt,
       wallet: user.wallet || null,
       branch: this.serializeBranchForStaff(
         user.branch,
         user.language,
       ) as User['branch'],
-    };
+    } as Partial<User>;
   }
 
   async updateLanguage(

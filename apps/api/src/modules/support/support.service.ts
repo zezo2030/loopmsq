@@ -12,6 +12,7 @@ import {
   TicketStatus,
 } from '../../database/entities/support-ticket.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -20,6 +21,7 @@ export class SupportService {
     @InjectRepository(SupportTicket)
     private readonly ticketRepo: Repository<SupportTicket>,
     private readonly notifications: NotificationsService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   async create(
@@ -49,6 +51,24 @@ export class SupportService {
       to: { userId },
       data: { message: `تم فتح تذكرة دعم: ${saved.subject}` },
       channels: ['sms', 'push'],
+    });
+
+    await this.adminNotifications.notify({
+      type: 'SUPPORT_TICKET_CREATED',
+      severity:
+        saved.priority === TicketPriority.HIGH ||
+        saved.priority === TicketPriority.URGENT
+          ? 'critical'
+          : 'warning',
+      title: 'تذكرة دعم جديدة',
+      body: saved.subject,
+      resourceType: 'support_ticket',
+      resourceId: saved.id,
+      data: {
+        userId,
+        category: saved.category,
+        priority: saved.priority,
+      },
     });
     return saved;
   }

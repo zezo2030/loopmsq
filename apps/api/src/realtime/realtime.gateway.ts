@@ -7,12 +7,20 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { WsJwtGuard } from '../common/guards/ws-jwt.guard';
+import { User } from '../database/entities/user.entity';
 
 @UseGuards(WsJwtGuard)
 @WebSocketGateway({ cors: { origin: '*' } })
 export class RealtimeGateway {
   @WebSocketServer() server: Server;
+
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+  ) {}
 
   @SubscribeMessage('join:branch')
   handleJoinBranch(
@@ -87,9 +95,59 @@ export class RealtimeGateway {
     client.leave(`room:offers:branch:${branchId}`);
   }
 
+  // Admin/branch-manager notification room. JWT payload was attached by
+  // WsJwtGuard; only admins join the global admin room, branch managers join
+  // their branch-scoped room.
+  @SubscribeMessage('join:admin')
+  async handleJoinAdmin(@ConnectedSocket() client: Socket) {
+    const payload = (client as any).user || {};
+    const roles: string[] = payload.roles || [];
+    const isAdmin = roles.includes('admin');
+    const isBranchManager = roles.includes('branch_manager');
+    if (!isAdmin && !isBranchManager) return;
+
+    if (isAdmin) {
+      client.join('room:admin');
+    }
+    if (isBranchManager) {
+      // Resolve branchId from DB since JWT does not carry it.
+      try {
+        const user = await this.userRepo.findOne({ where: { id: payload.sub } });
+        if (user?.branchId) {
+          client.join(`room:admin:branch:${user.branchId}`);
+        }
+      } catch {
+        // ignore — fall through without branch room
+      }
+    }
+  }
+
+  @SubscribeMessage('leave:admin')
+  handleLeaveAdmin(@ConnectedSocket() client: Socket) {
+    client.leave('room:admin');
+    // Leave any branch-scoped admin rooms this socket joined
+    for (const r of client.rooms) {
+      if (typeof r === 'string' && r.startsWith('room:admin:branch:')) {
+        client.leave(r);
+      }
+    }
+  }
+
   // Emit helpers
   emitBranchUpdated(branchId: string, payload: any) {
     this.server.to(`room:branch:${branchId}`).emit('branch:updated', payload);
+  }
+
+  emitAdminNotification(payload: any) {
+    // Global admin firehose
+    this.server.to('room:admin').emit('admin:notification', payload);
+    // Branch-scoped fan-out so branch managers receive only their own
+    const branchId = payload?.branchId;
+    if (branchId) {
+      this.server
+        .to(`room:admin:branch:${branchId}`)
+        .emit('admin:notification', payload);
+    }
   }
 
   // Deprecated: Keep for backward compatibility

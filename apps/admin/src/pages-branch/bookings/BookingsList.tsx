@@ -3,6 +3,7 @@ import { Card, Table, Button, Select, DatePicker, Tag, message, Space, Row, Col,
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { apiGet, apiPatch } from '../../shared/api'
+import { useAuth, canViewBookingAmounts } from '../../shared/auth'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 
@@ -23,6 +24,8 @@ export default function BookingsList() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { me } = useAuth()
+  const showAmounts = canViewBookingAmounts(me as any)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | [null, null]>([null, null])
@@ -85,7 +88,9 @@ export default function BookingsList() {
     { title: t('bookings.start_time'), dataIndex: 'startTime', key: 'startTime', render: (v: string) => v ? formatDateTimeAr(v) : '-' },
     { title: t('bookings.end_time'), dataIndex: 'endTime', key: 'endTime', render: (v: string) => v ? formatDateTimeAr(v) : '-' },
     { title: t('bookings.status'), dataIndex: 'status', key: 'status', render: (v: string) => <Tag color={getStatusColor(v)}>{getStatusText(v)}</Tag> },
-    { title: t('bookings.amount'), dataIndex: 'totalAmount', key: 'totalAmount', render: (v: number) => v ? `${v} ${t('common.currency')}` : '-' },
+    ...(showAmounts
+      ? [{ title: t('bookings.amount'), dataIndex: 'totalAmount', key: 'totalAmount', render: (v: number) => v ? `${v} ${t('common.currency')}` : '-' }]
+      : []),
     {
       title: t('common.actions'),
       key: 'actions',

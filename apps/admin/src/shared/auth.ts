@@ -7,6 +7,38 @@ export type MeResponse = {
   email?: string
   language?: string
   branchId?: string
+  permissions?: {
+    canViewRevenue?: boolean
+    canViewBookingAmounts?: boolean
+    canManageWallets?: boolean
+  } | null
+}
+
+export function canViewRevenue(me: MeResponse | null | undefined): boolean {
+  if (!me) return false
+  if (me.roles?.includes('admin')) return true
+  if (me.roles?.includes('branch_manager')) {
+    return me.permissions?.canViewRevenue ?? true
+  }
+  return true
+}
+
+export function canViewBookingAmounts(me: MeResponse | null | undefined): boolean {
+  if (!me) return false
+  if (me.roles?.includes('admin')) return true
+  if (me.roles?.includes('branch_manager')) {
+    return me.permissions?.canViewBookingAmounts ?? true
+  }
+  return true
+}
+
+export function canManageWallets(me: MeResponse | null | undefined): boolean {
+  if (!me) return false
+  if (me.roles?.includes('admin')) return true
+  if (me.roles?.includes('branch_manager')) {
+    return me.permissions?.canManageWallets === true
+  }
+  return false
 }
 
 function getApiBase(): string {

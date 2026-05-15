@@ -5,12 +5,14 @@ import { SupportService } from './support.service';
 import { SupportTicket } from '../../database/entities/support-ticket.entity';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([SupportTicket]),
     UsersModule,
     NotificationsModule,
+    AdminNotificationsModule,
   ],
   controllers: [SupportController],
   providers: [SupportService],

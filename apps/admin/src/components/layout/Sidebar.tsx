@@ -42,6 +42,7 @@ const navItems: Array<{
       { key: 'create-user', href: '/admin/clients/new', labelKey: 'users.add_client' },
       { key: 'create-staff', href: '/admin/staff/new', labelKey: 'users.add_staff' },
       { key: 'create-manager', href: '/admin/branch-managers/new', labelKey: 'users.add_manager' },
+      { key: 'manager-permissions', href: '/admin/branch-managers/permissions', labelKey: 'manager_perms.title' },
     ],
   },
 

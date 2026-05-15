@@ -22,6 +22,7 @@ import {
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { RedisService } from '../../utils/redis.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { getBookingSlotMinutes } from '../../config/booking.config';
 
 @Injectable()
@@ -57,6 +58,7 @@ export class ContentService {
     private redisService: RedisService,
     private configService: ConfigService,
     private realtime: RealtimeGateway,
+    private adminNotifications: AdminNotificationsService,
   ) {
     this.slotMinutes = getBookingSlotMinutes(this.configService);
   }
@@ -1043,7 +1045,18 @@ export class ContentService {
       metadata: data.metadata ?? null,
       branchId: data.branchId ?? null,
     });
-    return this.addonRepository.save(addon);
+    const saved = await this.addonRepository.save(addon);
+    await this.adminNotifications.notify({
+      type: 'ADDON_CREATED',
+      severity: 'info',
+      title: 'إضافة جديدة',
+      body: `${saved.name} — ${saved.price} ر.س`,
+      branchId: saved.branchId || null,
+      resourceType: 'addon',
+      resourceId: saved.id,
+      data: { category: saved.category, price: saved.price, kind: 'general' },
+    });
+    return saved;
   }
 
   async createSchoolTripAddon(data: {
@@ -1066,7 +1079,18 @@ export class ContentService {
       metadata: data.metadata ?? null,
       branchId: data.branchId ?? null,
     });
-    return this.schoolTripAddonRepository.save(addon);
+    const saved = await this.schoolTripAddonRepository.save(addon);
+    await this.adminNotifications.notify({
+      type: 'ADDON_CREATED',
+      severity: 'info',
+      title: 'إضافة رحلة مدرسية جديدة',
+      body: `${saved.name} — ${saved.price} ر.س`,
+      branchId: saved.branchId || null,
+      resourceType: 'school_trip_addon',
+      resourceId: saved.id,
+      data: { price: saved.price, kind: 'school_trip' },
+    });
+    return saved;
   }
 
   async createSpecialBookingAddon(data: {
@@ -1089,7 +1113,18 @@ export class ContentService {
       metadata: { ...(data.metadata ?? {}), privateEventAddon: true },
       branchId: data.branchId ?? null,
     });
-    return this.specialBookingAddonRepository.save(addon);
+    const saved = await this.specialBookingAddonRepository.save(addon);
+    await this.adminNotifications.notify({
+      type: 'ADDON_CREATED',
+      severity: 'info',
+      title: 'إضافة مناسبة خاصة جديدة',
+      body: `${saved.name} — ${saved.price} ر.س`,
+      branchId: saved.branchId || null,
+      resourceType: 'special_booking_addon',
+      resourceId: saved.id,
+      data: { price: saved.price, kind: 'private_event' },
+    });
+    return saved;
   }
 
   async listAddons(filter?: {
@@ -1184,14 +1219,53 @@ export class ContentService {
   }
 
   async deleteAddon(id: string): Promise<void> {
+    const found = await this.addonRepository.findOne({ where: { id } });
     await this.addonRepository.delete(id);
+    if (found) {
+      await this.adminNotifications.notify({
+        type: 'ADDON_DELETED',
+        severity: 'warning',
+        title: 'تم حذف إضافة',
+        body: found.name,
+        branchId: found.branchId || null,
+        resourceType: 'addon',
+        resourceId: found.id,
+        data: { category: found.category, kind: 'general' },
+      });
+    }
   }
 
   async deleteSchoolTripAddon(id: string): Promise<void> {
+    const found = await this.schoolTripAddonRepository.findOne({ where: { id } });
     await this.schoolTripAddonRepository.delete(id);
+    if (found) {
+      await this.adminNotifications.notify({
+        type: 'ADDON_DELETED',
+        severity: 'warning',
+        title: 'تم حذف إضافة رحلة مدرسية',
+        body: found.name,
+        branchId: found.branchId || null,
+        resourceType: 'school_trip_addon',
+        resourceId: found.id,
+        data: { kind: 'school_trip' },
+      });
+    }
   }
 
   async deleteSpecialBookingAddon(id: string): Promise<void> {
+    const found = await this.specialBookingAddonRepository.findOne({ where: { id } });
     await this.specialBookingAddonRepository.delete(id);
+    if (found) {
+      await this.adminNotifications.notify({
+        type: 'ADDON_DELETED',
+        severity: 'warning',
+        title: 'تم حذف إضافة مناسبة خاصة',
+        body: found.name,
+        branchId: found.branchId || null,
+        resourceType: 'special_booking_addon',
+        resourceId: found.id,
+        data: { kind: 'private_event' },
+      });
+    }
   }
 }

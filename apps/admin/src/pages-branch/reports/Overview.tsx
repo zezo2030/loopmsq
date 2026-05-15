@@ -4,16 +4,36 @@ import { DownloadOutlined, CalendarOutlined, DollarOutlined, BarChartOutlined } 
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiGet } from '../../shared/api'
-import { useAuth } from '../../shared/auth'
+import { useAuth, canViewRevenue, canViewBookingAmounts } from '../../shared/auth'
 
 const { RangePicker } = DatePicker
 
 export default function Overview() {
   const { t } = useTranslation()
   const { me } = useAuth()
+  const showRevenue = canViewRevenue(me as any)
+  const showAmounts = canViewBookingAmounts(me as any)
   const [dateRange, setDateRange] = useState<any>(null)
   const [overview, setOverview] = useState<any>(null)
   const [recentBookings, setRecentBookings] = useState<any[]>([])
+
+  if (!showRevenue) {
+    return (
+      <div className="page-container">
+        <div className="page-header">
+          <div className="page-header-content">
+            <div>
+              <h1 className="page-title">{t('reports.overview') || 'Reports Overview'}</h1>
+              <p className="page-subtitle" style={{ color: '#ef4444' }}>
+                {t('reports.no_permission') ||
+                  'You do not have permission to view financial reports. Please contact your administrator.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   useEffect(() => {
     // Initialize default date range to last 30 days for better visibility
@@ -120,11 +140,13 @@ export default function Overview() {
       key: 'hall',
       render: (record: any) => record.hall?.nameAr || record.hall?.nameEn || '-',
     },
-    {
-      title: t('bookings.amount') || 'Amount',
-      key: 'amount',
-      render: (record: any) => `${record.amount || 0} SAR`,
-    },
+    ...(showAmounts
+      ? [{
+          title: t('bookings.amount') || 'Amount',
+          key: 'amount',
+          render: (record: any) => `${record.amount || 0} SAR`,
+        }]
+      : []),
     {
       title: t('bookings.status') || 'Status',
       dataIndex: 'status',

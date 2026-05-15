@@ -25,6 +25,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { User } from '../../database/entities/user.entity';
+import { maskAmounts } from '../../common/utils/financial-mask.util';
 
 @ApiTags('offer-bookings')
 @Controller('offer-bookings')
@@ -126,13 +127,14 @@ export class OfferBookingsController {
     @Query('to') to?: string,
     @Query('search') search?: string,
   ) {
-    return this.service.findBranchBookings(user.branchId!, page, limit, {
+    const result = await this.service.findBranchBookings(user.branchId!, page, limit, {
       status: status as any,
       paymentStatus: paymentStatus as any,
       from,
       to,
       search,
     });
+    return maskAmounts(result, user);
   }
 
   @Get('admin/all/:id')
@@ -151,7 +153,8 @@ export class OfferBookingsController {
     @CurrentUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.service.findBookingForBranch(id, user.branchId!);
+    const result = await this.service.findBookingForBranch(id, user.branchId!);
+    return maskAmounts(result, user);
   }
 
   @Get(':id')

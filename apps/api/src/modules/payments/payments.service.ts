@@ -32,6 +32,7 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { RedisService } from '../../utils/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { ReferralsService } from '../referrals/referrals.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
@@ -86,6 +87,7 @@ export class PaymentsService {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly notifications: NotificationsService,
+    private readonly adminNotifications: AdminNotificationsService,
     private readonly loyalty: LoyaltyService,
     @Inject(forwardRef(() => TripsService))
     private readonly tripsService: TripsService,
@@ -2111,11 +2113,51 @@ export class PaymentsService {
     });
     if (!payment) throw new NotFoundException('Payment not found');
 
+    if (dto.eventType === 'payment.failed') {
+      if (
+        payment.status !== PaymentStatus.FAILED &&
+        payment.status !== PaymentStatus.COMPLETED
+      ) {
+        payment.status = PaymentStatus.FAILED;
+        await this.paymentRepository.save(payment);
+        await this.adminNotifications.notify({
+          type: 'PAYMENT_FAILED',
+          severity: 'critical',
+          title: 'فشل دفع',
+          body: `فشل دفع بقيمة ${payment.amount} عبر ${payment.method || 'غير معروف'}`,
+          branchId: (payment as any).booking?.branchId || null,
+          resourceType: 'payment',
+          resourceId: payment.id,
+          data: {
+            amount: payment.amount,
+            method: payment.method,
+            failureReason: (dto.data as any)?.failureReason || null,
+          },
+        });
+      }
+    }
+
     if (dto.eventType === 'payment.succeeded') {
       if (payment.status !== PaymentStatus.COMPLETED) {
         payment.status = PaymentStatus.COMPLETED;
         payment.paidAt = new Date();
         await this.paymentRepository.save(payment);
+        await this.adminNotifications.notify({
+          type: 'PAYMENT_SUCCESS',
+          severity: 'success',
+          title: 'دفعة جديدة ناجحة',
+          body: `${payment.amount} عبر ${payment.method || 'غير معروف'}`,
+          branchId: (payment as any).booking?.branchId || null,
+          resourceType: 'payment',
+          resourceId: payment.id,
+          data: {
+            amount: payment.amount,
+            method: payment.method,
+            bookingId: payment.bookingId,
+            offerBookingId: payment.offerBookingId,
+            subscriptionPurchaseId: payment.subscriptionPurchaseId,
+          },
+        });
         const pendingFlowContext = this.getPendingFlowContext(payment);
         if (
           pendingFlowContext?.flowType &&

@@ -28,6 +28,7 @@ import { CreateFreeTicketDto } from './dto/create-free-ticket.dto';
 import { CreateFreeTicketAdminDto } from './dto/create-free-ticket-admin.dto';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { maskAmounts } from '../../common/utils/financial-mask.util';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { User } from '../../database/entities/user.entity';
@@ -138,7 +139,7 @@ export class BookingsController {
     @Query('to') to?: string,
     @Query('status') status?: string,
   ) {
-    return this.bookingsService.findBranchBookings(
+    const result = await this.bookingsService.findBranchBookings(
       user.branchId!,
       page,
       limit,
@@ -146,6 +147,7 @@ export class BookingsController {
       to,
       status,
     );
+    return maskAmounts(result, user);
   }
 
   @Get(':id')
@@ -160,12 +162,13 @@ export class BookingsController {
     const roles = user.roles || [];
     const isAdmin = roles.includes(UserRole.ADMIN);
     const isManager = roles.includes(UserRole.BRANCH_MANAGER);
-    return this.bookingsService.findBookingById(
+    const booking = await this.bookingsService.findBookingById(
       id,
       isAdmin ? undefined : user.id,
       user.branchId,
       isAdmin || isManager,
     );
+    return maskAmounts(booking, user);
   }
 
   @Get(':id/tickets')

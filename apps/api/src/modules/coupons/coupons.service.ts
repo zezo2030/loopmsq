@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual, MoreThanOrEqual, IsNull } from 'typeorm';
 import { Coupon } from '../../database/entities/coupon.entity';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 
 @Injectable()
 export class CouponsService {
   constructor(
     @InjectRepository(Coupon) private readonly repo: Repository<Coupon>,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   list(filter?: { branchId?: string }) {
@@ -19,20 +21,48 @@ export class CouponsService {
     return this.list({ branchId });
   }
 
-  create(dto: Partial<Coupon>) {
+  async create(dto: Partial<Coupon>) {
     if (!dto.branchId) {
       throw new Error('branchId is required');
     }
     const entity = this.repo.create(dto);
-    return this.repo.save(entity);
+    const saved = await this.repo.save(entity);
+    await this.adminNotifications.notify({
+      type: 'COUPON_CREATED',
+      severity: 'info',
+      title: 'كوبون جديد',
+      body: `${saved.code} — خصم ${saved.discountValue}${saved.discountType === 'percentage' ? '%' : ''}`,
+      branchId: saved.branchId || null,
+      resourceType: 'coupon',
+      resourceId: saved.id,
+      data: {
+        code: saved.code,
+        discountType: saved.discountType,
+        discountValue: saved.discountValue,
+      },
+    });
+    return saved;
   }
 
   update(id: string, dto: Partial<Coupon>) {
     return this.repo.update(id, dto as any);
   }
 
-  remove(id: string) {
-    return this.repo.delete(id);
+  async remove(id: string) {
+    const found = await this.repo.findOne({ where: { id } });
+    const res = await this.repo.delete(id);
+    if (found) {
+      await this.adminNotifications.notify({
+        type: 'COUPON_DELETED',
+        severity: 'warning',
+        title: 'تم حذف كوبون',
+        body: found.code,
+        branchId: found.branchId || null,
+        resourceType: 'coupon',
+        resourceId: found.id,
+      });
+    }
+    return res;
   }
 
   async preview(

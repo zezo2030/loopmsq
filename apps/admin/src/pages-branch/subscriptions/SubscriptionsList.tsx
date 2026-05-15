@@ -17,6 +17,7 @@ import {
 } from 'antd'
 import { CalendarOutlined, CreditCardOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { apiGet } from '../../shared/api'
+import { useAuth, canViewBookingAmounts } from '../../shared/auth'
 
 const { RangePicker } = DatePicker
 const { Text, Title } = Typography
@@ -43,6 +44,8 @@ type ResponseShape = {
 }
 
 export default function SubscriptionsList() {
+  const { me } = useAuth()
+  const showAmounts = canViewBookingAmounts(me as any)
   const [rows, setRows] = useState<SubscriptionRow[]>([])
   const [stats, setStats] = useState<ResponseShape['stats']>({ total: 0, active: 0, expired: 0, depleted: 0, paid: 0, revenue: 0 })
   const [loading, setLoading] = useState(false)
@@ -102,7 +105,9 @@ export default function SubscriptionsList() {
         render: (_: unknown, row: SubscriptionRow) => (
           <div>
             <div style={{ fontWeight: 700 }}>{row.plan.title}</div>
-            <Text type="secondary">{formatCurrency(row.plan.price, row.plan.currency)}</Text>
+            {showAmounts && (
+              <Text type="secondary">{formatCurrency(row.plan.price, row.plan.currency)}</Text>
+            )}
           </div>
         ),
       },
@@ -137,7 +142,7 @@ export default function SubscriptionsList() {
         render: (_: unknown, row: SubscriptionRow) => <a onClick={() => navigate(`/branch/subscriptions/${row.id}`)}>عرض</a>,
       },
     ],
-    [],
+    [showAmounts],
   )
 
   return (
@@ -158,7 +163,9 @@ export default function SubscriptionsList() {
             <Col xs={12} xl={4}><Card><Statistic title="منتهية" value={stats.expired} valueStyle={{ color: '#f59e0b' }} /></Card></Col>
             <Col xs={12} xl={4}><Card><Statistic title="مستهلكة" value={stats.depleted} valueStyle={{ color: '#dc2626' }} /></Card></Col>
             <Col xs={12} xl={4}><Card><Statistic title="مدفوعة" value={stats.paid} prefix={<CreditCardOutlined />} /></Card></Col>
-            <Col xs={12} xl={4}><Card><Statistic title="الإيراد" value={stats.revenue} formatter={(v) => formatCurrency(Number(v || 0))} /></Card></Col>
+            {showAmounts && (
+              <Col xs={12} xl={4}><Card><Statistic title="الإيراد" value={stats.revenue} formatter={(v) => formatCurrency(Number(v || 0))} /></Card></Col>
+            )}
           </Row>
           <Card style={{ marginBottom: 24 }}>
             <Space wrap size="middle" style={{ width: '100%', justifyContent: 'space-between' }}>

@@ -14,6 +14,7 @@ import { BookingsModule } from '../bookings/bookings.module';
 import { RedisService } from '../../utils/redis.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { ContentModule } from '../content/content.module';
 
 @Module({
@@ -29,6 +30,7 @@ import { ContentModule } from '../content/content.module';
     forwardRef(() => PaymentsModule),
     BookingsModule,
     forwardRef(() => NotificationsModule),
+    AdminNotificationsModule,
     ContentModule,
   ],
   controllers: [TripsController, TripsPublicController],

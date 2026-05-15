@@ -11,6 +11,7 @@ import { ContentModule } from '../content/content.module';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { RedisService } from '../../utils/redis.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { RealtimeModule } from '../../realtime/realtime.module';
 import { CouponsModule } from '../coupons/coupons.module';
 
@@ -20,6 +21,7 @@ import { CouponsModule } from '../coupons/coupons.module';
     ContentModule,
     CouponsModule,
     forwardRef(() => NotificationsModule),
+    AdminNotificationsModule,
     RealtimeModule,
   ],
   controllers: [BookingsController],

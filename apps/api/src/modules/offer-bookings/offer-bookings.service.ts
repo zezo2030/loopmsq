@@ -32,6 +32,7 @@ import {
 import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { User } from '../../database/entities/user.entity';
 import { instanceToPlain } from 'class-transformer';
 import { OfferQuoteDto } from './dto/offer-quote.dto';
@@ -63,6 +64,7 @@ export class OfferBookingsService {
     private readonly userRepo: Repository<User>,
     private readonly qrCodeService: QRCodeService,
     private readonly notificationsService: NotificationsService,
+    private readonly adminNotifications: AdminNotificationsService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -284,6 +286,22 @@ export class OfferBookingsService {
         },
         channels: ['push'],
         lang: 'ar',
+      });
+
+      await this.adminNotifications.notify({
+        type: 'OFFER_PURCHASED',
+        severity: 'success',
+        title: 'تم شراء عرض جديد',
+        body: `${offer.title} — ${tickets.length} تذكرة`,
+        branchId: offer.branchId,
+        resourceType: 'offer_booking',
+        resourceId: offerBookingId,
+        data: {
+          offerProductId: offer.id,
+          offerTitle: offer.title,
+          userId: booking.userId,
+          ticketCount: tickets.length,
+        },
       });
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -550,6 +568,9 @@ export class OfferBookingsService {
       ticket.scannedAt = now;
       ticket.staffId = staffId;
       await this.ticketRepo.save(ticket);
+
+      await this.notifyTicketScanned(ticket, 'used');
+
       return {
         success: true,
         message: 'Ticket validated successfully',
@@ -572,6 +593,8 @@ export class OfferBookingsService {
       ticket.staffId = staffId;
       await this.ticketRepo.save(ticket);
 
+      await this.notifyTicketScanned(ticket, 'started', { durationHours });
+
       return {
         success: true,
         message: 'Timer started',
@@ -583,6 +606,58 @@ export class OfferBookingsService {
     }
 
     throw new BadRequestException('Invalid ticket kind');
+  }
+
+  private async notifyTicketScanned(
+    ticket: OfferTicket,
+    mode: 'used' | 'started',
+    extra: Record<string, unknown> = {},
+  ): Promise<void> {
+    const offer = await this.offerProductRepo.findOne({
+      where: { id: ticket.offerProductId },
+    });
+    const offerTitle = offer?.title || '';
+
+    // User push: تأكيد له أن تذكرته استخدمت/بدأت
+    try {
+      await this.notificationsService.enqueue({
+        type: 'ADMIN_MESSAGE',
+        to: { userId: ticket.userId },
+        data: {
+          message:
+            mode === 'used'
+              ? `تم استخدام تذكرتك "${offerTitle}" الآن.`
+              : `بدأ مؤقت تذكرتك "${offerTitle}".`,
+          ticketId: ticket.id,
+          ...extra,
+        },
+        channels: ['push'],
+        lang: 'ar',
+      });
+    } catch (e) {
+      this.logger.warn(
+        `Failed to push scan notification to user: ${(e as Error).message}`,
+      );
+    }
+
+    // Admin event
+    await this.adminNotifications.notify({
+      type: 'OFFER_TICKET_SCANNED',
+      severity: 'info',
+      title: mode === 'used' ? 'مسح تذكرة عرض' : 'بدء مؤقت تذكرة',
+      body: offerTitle || 'تذكرة عرض',
+      branchId: ticket.branchId || offer?.branchId || null,
+      resourceType: 'offer_ticket',
+      resourceId: ticket.id,
+      data: {
+        offerProductId: ticket.offerProductId,
+        offerTitle,
+        userId: ticket.userId,
+        staffId: ticket.staffId,
+        mode,
+        ...extra,
+      },
+    });
   }
 
   async findStaffScans(

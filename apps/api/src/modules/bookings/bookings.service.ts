@@ -40,6 +40,7 @@ import { CouponsService } from '../coupons/coupons.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { RedisService } from '../../utils/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { getBookingSlotMinutes } from '../../config/booking.config';
 
@@ -65,6 +66,7 @@ export class BookingsService {
     private redisService: RedisService,
     private dataSource: DataSource,
     private notifications: NotificationsService,
+    private adminNotifications: AdminNotificationsService,
     private configService: ConfigService,
     private realtime?: RealtimeGateway,
   ) {
@@ -449,6 +451,22 @@ export class BookingsService {
           jobId: `booking:${savedBooking.id}:rating`,
         });
       }
+
+      await this.adminNotifications.notify({
+        type: 'BOOKING_CREATED',
+        severity: 'success',
+        title: 'حجز جديد',
+        body: `حجز جديد #${String(savedBooking.id).slice(0, 8)} يبدأ ${new Date(startTime).toLocaleString('ar')}`,
+        branchId: savedBooking.branchId || null,
+        resourceType: 'booking',
+        resourceId: savedBooking.id,
+        data: {
+          userId,
+          startTime,
+          status: savedBooking.status,
+          persons: (savedBooking as any).persons,
+        },
+      });
 
       return savedBooking;
     } catch (error) {
@@ -1557,6 +1575,21 @@ export class BookingsService {
         to: { userId: userIdOrRequesterId },
         data: { bookingId: booking.id, reason },
         channels: ['sms', 'push'],
+      });
+
+      await this.adminNotifications.notify({
+        type: 'BOOKING_CANCELLED',
+        severity: 'warning',
+        title: 'تم إلغاء حجز',
+        body: `حجز #${String(booking.id).slice(0, 8)}${reason ? ` — السبب: ${reason}` : ''}`,
+        branchId: booking.branchId || null,
+        resourceType: 'booking',
+        resourceId: booking.id,
+        data: {
+          userId: userIdOrRequesterId,
+          reason,
+          status: booking.status,
+        },
       });
 
       // realtime

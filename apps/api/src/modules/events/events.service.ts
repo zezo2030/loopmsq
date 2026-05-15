@@ -17,6 +17,7 @@ import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
 import { CreateEventRequestDto } from './dto/create-event-request.dto';
 import { QuoteEventRequestDto } from './dto/quote-event-request.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { ContentService } from '../content/content.service';
 import { AdminConfigService } from '../admin-config/admin-config.service';
 import { resolveEventTicketWindow } from '../../utils/event-ticket-window.util';
@@ -59,6 +60,7 @@ export class EventsService {
     private readonly paymentRepo: Repository<Payment>,
     private readonly dataSource: DataSource,
     private readonly notifications: NotificationsService,
+    private readonly adminNotifications: AdminNotificationsService,
     private readonly contentService: ContentService,
     private readonly adminConfigService: AdminConfigService,
   ) {}
@@ -281,6 +283,24 @@ export class EventsService {
       paymentMethod: dto.paymentMethod,
     });
     const saved = await this.eventRepo.save(req);
+
+    await this.adminNotifications.notify({
+      type: 'EVENT_REQUEST_CREATED',
+      severity: 'warning',
+      title: 'طلب مناسبة خاصة جديد',
+      body: `${saved.type} — ${saved.persons} شخص — ${new Date(saved.startTime).toLocaleString('ar')}`,
+      branchId: saved.branchId || null,
+      resourceType: 'event_request',
+      resourceId: saved.id,
+      data: {
+        userId,
+        eventType: saved.type,
+        persons: saved.persons,
+        startTime: saved.startTime,
+        totalAmount: saved.totalAmount,
+        paymentOption: saved.paymentOption,
+      },
+    });
 
     return { id: saved.id };
   }

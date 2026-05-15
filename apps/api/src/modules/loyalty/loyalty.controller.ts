@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -99,35 +100,69 @@ export class LoyaltyController {
     return this.loyalty.updateRule(id, body);
   }
 
-  // Wallet admin endpoints
+  // Wallet management endpoints — open to ADMIN, and to BRANCH_MANAGER only
+  // when the admin has granted the `canManageWallets` permission flag.
   @Get('wallets')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'List wallets with pagination (Admin only)' })
-  async listWallets(@Query() query: ListWalletsDto) {
+  @ApiOperation({
+    summary:
+      'List wallets with pagination (Admin, or Branch Manager with canManageWallets)',
+  })
+  async listWallets(
+    @CurrentUser() user: User,
+    @Query() query: ListWalletsDto,
+  ) {
+    this.ensureCanManageWallets(user);
     return this.loyalty.listWallets(query);
   }
 
   @Post('wallets/:userId/adjust')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Adjust wallet balance/points (Admin only)' })
+  @ApiOperation({
+    summary:
+      'Adjust wallet balance/points (Admin, or Branch Manager with canManageWallets)',
+  })
   async adjustWallet(
+    @CurrentUser() user: User,
     @Param('userId') userId: string,
     @Body() body: AdjustWalletDto,
   ) {
+    this.ensureCanManageWallets(user);
     return this.loyalty.adjustWallet(userId, body);
   }
 
   @Get(':userId')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get loyalty summary for a user (Admin only)' })
-  async getUserSummary(@Param('userId') userId: string) {
+  @ApiOperation({
+    summary:
+      "Get a user's loyalty summary (Admin, or Branch Manager with canManageWallets)",
+  })
+  async getUserSummary(
+    @CurrentUser() user: User,
+    @Param('userId') userId: string,
+  ) {
+    this.ensureCanManageWallets(user);
     return this.loyalty.getSummary(userId);
+  }
+
+  /** Admins always pass; branch managers require the canManageWallets flag. */
+  private ensureCanManageWallets(user: User): void {
+    if (user.roles?.includes(UserRole.ADMIN)) return;
+    if (
+      user.roles?.includes(UserRole.BRANCH_MANAGER) &&
+      user.permissions?.canManageWallets === true
+    ) {
+      return;
+    }
+    throw new ForbiddenException(
+      'You do not have permission to manage wallets',
+    );
   }
 }

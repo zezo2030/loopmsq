@@ -21,6 +21,7 @@ import { OfferBookingsModule } from '../offer-bookings/offer-bookings.module';
 import { SubscriptionPurchasesModule } from '../subscription-purchases/subscription-purchases.module';
 import { GiftOrdersModule } from '../gift-orders/gift-orders.module';
 import { TripsModule } from '../trips/trips.module';
+import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { TripsModule } from '../trips/trips.module';
     TypeOrmModule.forFeature([Payment, Booking, EventRequest]),
     UsersModule,
     forwardRef(() => NotificationsModule),
+    AdminNotificationsModule,
     BookingsModule,
     EventsModule,
     LoyaltyModule,

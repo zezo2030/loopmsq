@@ -12,6 +12,7 @@ import { EventsService } from './events.service';
 import { BookingsModule } from '../bookings/bookings.module';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { ContentModule } from '../content/content.module';
 import { AdminConfigModule } from '../admin-config/admin-config.module';
 
@@ -21,6 +22,7 @@ import { AdminConfigModule } from '../admin-config/admin-config.module';
     BookingsModule,
     UsersModule,
     forwardRef(() => NotificationsModule),
+    AdminNotificationsModule,
     ContentModule,
     AdminConfigModule,
   ],
