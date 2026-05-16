@@ -58,4 +58,13 @@ export class CreateOfferBookingDto {
   })
   @IsBoolean()
   acceptedTerms: boolean;
+
+  @ApiProperty({
+    description: 'Optional discount coupon code',
+    example: 'SAVE20',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }

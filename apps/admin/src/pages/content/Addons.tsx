@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Switch, Space, message } from 'antd'
+import { Card, Table, Button, Modal, Form, Image, Input, InputNumber, Select, Switch, Space, Upload, message } from 'antd'
+import { UploadOutlined } from '@ant-design/icons'
 import { apiGet, apiPost, apiPut, apiDelete } from '../../api'
+import { resolveFileUrlWithBust } from '../../shared/url'
 import { useTranslation } from 'react-i18next'
 
 type Addon = {
@@ -47,10 +49,6 @@ export default function Addons() {
   })
 
   const branchOptions = useMemo(() => (branches || []).map(b => ({ value: b.id, label: b.name_ar || b.name_en || b.id })), [branches])
-  const categoryLabel = (category?: string) => {
-    const value = category || 'general'
-    return t(`addons.categories.${value}`, { defaultValue: value })
-  }
 
   const { data, isLoading } = useQuery<Addon[]>({
     queryKey: ['addons', filters],
@@ -79,12 +77,18 @@ export default function Addons() {
     mutationFn: async (id: string) => apiDelete(`/content/admin/addons/${id}`),
     onSuccess: () => { message.success(t('common.deleted') || 'Deleted'); qc.invalidateQueries({ queryKey: ['addons'] }); },
   })
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return apiPost<{ imageUrl: string }>('/content/admin/addons/upload', fd)
+    },
+  })
 
   const columns = [
     { title: t('common.name') || 'Name', dataIndex: 'name' },
     { title: t('common.price') || 'Price', dataIndex: 'price', render: (v: number) => Number(v).toFixed(2) },
-    { title: t('addons.category') || 'Category', dataIndex: 'category', render: (v?: string) => categoryLabel(v) },
-    { title: 'Image', dataIndex: 'imageUrl', render: (v?: string | null) => v ? <a href={v} target="_blank" rel="noreferrer">View</a> : '-' },
+    { title: t('common.image') || 'Image', dataIndex: 'imageUrl', render: (v?: string | null) => v ? <Image src={resolveFileUrlWithBust(v)} width={56} height={56} style={{ objectFit: 'cover', borderRadius: 6 }} /> : '-' },
     { title: t('addons.default_qty') || 'Default Qty', dataIndex: 'defaultQuantity' },
     { title: t('common.active') || 'Active', dataIndex: 'isActive', render: (v: boolean) => v ? t('common.yes') || 'Yes' : t('common.no') || 'No' },
     { title: t('addons.branch') || 'Branch', dataIndex: 'branchId', render: (v?: string) => {
@@ -150,20 +154,46 @@ export default function Addons() {
           <Form.Item name="name" label={t('common.name') || 'Name'} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="category" label={t('addons.category') || 'Category'} initialValue="general">
-            <Select
-              options={[
-                { value: 'general', label: categoryLabel('general') },
-                { value: 'hall_booking', label: categoryLabel('hall_booking') },
-                { value: 'offer', label: categoryLabel('offer') },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="description" label="Description">
+          <Form.Item name="description" label={t('common.description') || 'Description'}>
             <Input.TextArea rows={3} />
           </Form.Item>
-          <Form.Item name="imageUrl" label="Image URL">
-            <Input />
+          <Form.Item label={t('common.image') || 'Image'}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.imageUrl !== cur.imageUrl}>
+                {() => {
+                  const url = form.getFieldValue('imageUrl')
+                  return url ? (
+                    <Image
+                      src={resolveFileUrlWithBust(url)}
+                      width={160}
+                      height={120}
+                      style={{ objectFit: 'cover', borderRadius: 8 }}
+                    />
+                  ) : null
+                }}
+              </Form.Item>
+              <Upload
+                accept="image/*"
+                showUploadList={false}
+                beforeUpload={file => {
+                  uploadMutation.mutate(file, {
+                    onSuccess: res => {
+                      form.setFieldsValue({ imageUrl: res.imageUrl })
+                      message.success(t('common.uploaded') || 'Uploaded')
+                    },
+                    onError: () => message.error(t('common.upload_failed') || 'Upload failed'),
+                  })
+                  return false
+                }}
+              >
+                <Button icon={<UploadOutlined />} loading={uploadMutation.isPending}>
+                  {t('common.upload_image') || 'Upload Image'}
+                </Button>
+              </Upload>
+              <Form.Item name="imageUrl" hidden>
+                <Input />
+              </Form.Item>
+            </Space>
           </Form.Item>
           <Form.Item name="price" label={t('common.price') || 'Price'} rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} step={0.5} />

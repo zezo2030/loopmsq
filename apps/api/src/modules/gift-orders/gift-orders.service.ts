@@ -34,6 +34,7 @@ import { OfferBookingsService } from '../offer-bookings/offer-bookings.service';
 import { SubscriptionPurchasesService } from '../subscription-purchases/subscription-purchases.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WalletService } from '../wallet/wallet.service';
+import { CouponsService } from '../coupons/coupons.service';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
@@ -63,7 +64,33 @@ export class GiftOrdersService {
     private readonly subscriptionPurchasesService: SubscriptionPurchasesService,
     private readonly notificationsService: NotificationsService,
     private readonly walletService: WalletService,
+    private readonly couponsService: CouponsService,
   ) {}
+
+  /**
+   * Validates a coupon code against [amount] and returns the discount.
+   * Throws if the coupon is provided but invalid/expired.
+   */
+  private async resolveCouponDiscount(
+    couponCode: string | undefined | null,
+    amount: number,
+    branchId?: string | null,
+  ): Promise<{ discount: number; finalAmount: number }> {
+    if (!couponCode || !couponCode.trim() || amount <= 0) {
+      return { discount: 0, finalAmount: amount };
+    }
+    const preview = await this.couponsService.preview(couponCode.trim(), amount, {
+      branchId: branchId || undefined,
+    });
+    if (!preview.valid) {
+      throw new BadRequestException('Invalid or expired coupon code');
+    }
+    const discount = Number(preview.discountAmount ?? 0);
+    return {
+      discount,
+      finalAmount: Number(preview.finalAmount ?? Math.max(0, amount - discount)),
+    };
+  }
 
   private isRefundPending(gift: GiftOrder): boolean {
     return gift.refundRequestStatus === GiftRefundRequestStatus.PENDING;
@@ -359,12 +386,18 @@ export class GiftOrdersService {
     }
 
     tax = 0;
-    const total = subtotal + tax;
+    const { discount: couponDiscount, finalAmount: total } =
+      await this.resolveCouponDiscount(
+        dto.couponCode,
+        subtotal + tax,
+        dto.branchId,
+      );
 
     return {
       giftType: dto.giftType,
       subtotal,
-      discount: 0,
+      discount: couponDiscount,
+      couponCode: dto.couponCode?.trim() || null,
       tax,
       total,
       currency: 'SAR',
@@ -476,7 +509,12 @@ export class GiftOrdersService {
     }
 
     tax = 0;
-    const total = subtotal + tax;
+    const { discount: couponDiscount, finalAmount: total } =
+      await this.resolveCouponDiscount(
+        dto.couponCode,
+        subtotal + tax,
+        dto.branchId,
+      );
 
     let senderDisplayName: string | null = null;
     if (sender) {
@@ -496,7 +534,7 @@ export class GiftOrdersService {
     giftOrder.sourceProductSnapshot = productSnapshot;
     giftOrder.currency = 'SAR';
     giftOrder.subtotal = subtotal;
-    giftOrder.discount = 0;
+    giftOrder.discount = couponDiscount;
     giftOrder.tax = tax;
     giftOrder.total = total;
     giftOrder.paymentStatus = GiftPaymentStatus.PENDING;

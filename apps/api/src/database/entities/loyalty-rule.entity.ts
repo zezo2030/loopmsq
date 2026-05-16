@@ -19,6 +19,10 @@ export class LoyaltyRule {
   @Column({ type: 'int', default: 500 })
   pointsPerTicket: number;
 
+  // loyalty points granted to the referrer when a new user uses their code
+  @Column({ type: 'int', default: 100 })
+  referralRewardPoints: number;
+
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 

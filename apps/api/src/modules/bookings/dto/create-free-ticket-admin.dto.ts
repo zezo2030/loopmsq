@@ -28,11 +28,14 @@ export class CreateFreeTicketAdminDto {
   branchId: string;
 
   @ApiProperty({
-    description: 'Booking start time',
+    description:
+      'Optional booking start time. When omitted, the ticket has no fixed date — it is valid from the first scan for its duration.',
     example: '2024-01-15T14:00:00.000Z',
+    required: false,
   })
+  @IsOptional()
   @IsDateString()
-  startTime: string;
+  startTime?: string;
 
   @ApiProperty({
     description: 'Duration in hours',
@@ -44,12 +47,14 @@ export class CreateFreeTicketAdminDto {
   durationHours: number;
 
   @ApiProperty({
-    description: 'Number of persons (tickets to create)',
+    description: 'Number of persons (tickets to create). Defaults to 1.',
     example: 1,
+    required: false,
   })
+  @IsOptional()
   @IsInt()
   @Min(1)
-  persons: number;
+  persons?: number = 1;
 
   @ApiProperty({
     description: 'Special notes or requests',

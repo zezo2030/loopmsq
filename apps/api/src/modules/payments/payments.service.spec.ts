@@ -22,7 +22,6 @@ import { BookingsService } from '../bookings/bookings.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OfferBookingsService } from '../offer-bookings/offer-bookings.service';
-import { ReferralsService } from '../referrals/referrals.service';
 import { SubscriptionPurchasesService } from '../subscription-purchases/subscription-purchases.service';
 import { WalletService } from '../wallet/wallet.service';
 import { TripsService } from '../trips/trips.service';
@@ -93,10 +92,6 @@ describe('PaymentsService', () => {
     awardPoints: jest.fn(async () => undefined),
   };
 
-  const referralsMock = {
-    createEarningForFirstPayment: jest.fn(async () => undefined),
-  };
-
   const bookingsMock = {
     issueTicketsForBooking: jest.fn(async () => undefined),
   };
@@ -152,7 +147,6 @@ describe('PaymentsService', () => {
         { provide: RedisService, useValue: redisMock },
         { provide: NotificationsService, useValue: notificationsMock },
         { provide: LoyaltyService, useValue: loyaltyMock },
-        { provide: ReferralsService, useValue: referralsMock },
         { provide: RealtimeGateway, useValue: {} },
         { provide: BookingsService, useValue: bookingsMock },
         { provide: MoyasarService, useValue: moyasarService },

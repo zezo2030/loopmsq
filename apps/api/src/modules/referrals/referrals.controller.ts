@@ -4,7 +4,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Param,
   Post,
   Query,
   UseGuards,
@@ -15,7 +14,6 @@ import { CreateReferralCodeDto } from './dto/create-code.dto';
 import { ListCodesDto } from './dto/list-codes.dto';
 import { AttributeReferralDto } from './dto/attribute.dto';
 import { ListEarningsDto } from './dto/list-earnings.dto';
-import { ApproveEarningDto } from './dto/approve-earning.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -74,17 +72,5 @@ export class ReferralsController {
   @ApiOperation({ summary: 'List referral earnings (Admin only)' })
   async listEarnings(@Query() query: ListEarningsDto) {
     return this.referrals.listEarnings(query);
-  }
-
-  @Post('earnings/:id/approve')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Approve referral earning and credit wallet (Admin only)',
-  })
-  async approve(@Param('id') id: string, @Body() dto: ApproveEarningDto) {
-    return this.referrals.approveEarning(id, dto);
   }
 }

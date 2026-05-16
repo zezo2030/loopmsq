@@ -1,4 +1,4 @@
-import { IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SubscriptionQuoteDto {
@@ -8,4 +8,13 @@ export class SubscriptionQuoteDto {
   })
   @IsUUID()
   subscriptionPlanId: string;
+
+  @ApiProperty({
+    description: 'Optional discount coupon code',
+    example: 'SAVE20',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }

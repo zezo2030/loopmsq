@@ -6,47 +6,26 @@ import {
   Input,
   InputNumber,
   Select,
-  DatePicker,
   Button,
   Space,
   message,
   Row,
   Col,
-  TimePicker,
-  Alert,
-  Spin,
 } from 'antd'
 import {
   ArrowLeftOutlined,
   SaveOutlined,
-  TeamOutlined,
-  ClockCircleOutlined,
 } from '@ant-design/icons'
 import { apiGet, apiPost } from '../../api'
 import { useQuery } from '@tanstack/react-query'
 import '../../theme.css'
-import dayjs from 'dayjs'
-import { formatTimeAr } from '../../utils/formatDateTimeDisplay'
 
 const { TextArea } = Input
-
-type TimeSlot = {
-  start: string
-  end: string
-  available: boolean
-  consecutiveSlots: number
-}
 
 export default function CreateFreeTicket() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
-  
-  // Watch form values for slots fetching
-  const selectedDate = Form.useWatch('date', form)
-  const selectedBranchId = Form.useWatch('branchId', form)
-  const selectedDuration = Form.useWatch('durationHours', form) || 2
-  const selectedPersons = Form.useWatch('persons', form) || 1
 
   // Load users (clients only - filter to get only users with 'user' role)
   const { data: users, isLoading: usersLoading } = useQuery<any[]>({
@@ -71,22 +50,6 @@ export default function CreateFreeTicket() {
     },
   })
 
-  // Load available time slots for selected branch, date, and duration
-  const { data: slotsData, isLoading: slotsLoading } = useQuery<{ slots: TimeSlot[]; slotMinutes: number }>({
-    queryKey: ['branch-slots', selectedBranchId, selectedDate?.format('YYYY-MM-DD'), selectedDuration, selectedPersons],
-    queryFn: async () => {
-      if (!selectedBranchId || !selectedDate) return { slots: [], slotMinutes: 60 }
-      const dateStr = selectedDate.format('YYYY-MM-DD')
-      const res = await apiGet<{ slots: TimeSlot[]; slotMinutes: number }>(
-        `/content/branches/${selectedBranchId}/slots?date=${dateStr}&durationHours=${selectedDuration}&persons=${selectedPersons}`
-      )
-      return res
-    },
-    enabled: !!selectedBranchId && !!selectedDate,
-  })
-
-  const availableSlots = slotsData?.slots?.filter(slot => slot.available) || []
-
   const userOptions = (users || []).map((u: any) => ({
     label: `${u.name || u.email || 'غير محدد'} ${u.phone ? `(${u.phone})` : ''}`,
     value: u.id,
@@ -100,55 +63,23 @@ export default function CreateFreeTicket() {
   async function handleSubmit(values: any) {
     setLoading(true)
     try {
-      // Validate that time slot is available
-      if (!values.date || !values.branchId || !values.time) {
-        message.error('يرجى اختيار التاريخ والفرع والوقت')
-        setLoading(false)
-        return
-      }
-
-      // Combine date and time
-      const date = dayjs(values.date)
-      const timeStr = values.time // Format: "HH:mm"
-      const [hours, minutes] = timeStr.split(':').map(Number)
-      
-      const startTime = date
-        .hour(hours)
-        .minute(minutes)
-        .second(0)
-        .millisecond(0)
-        .toISOString()
-      
-      // Verify slot is still available
-      const selectedDateTime = date.hour(hours).minute(minutes).second(0).millisecond(0)
-      const isSlotAvailable = availableSlots.some(slot => {
-        const slotStart = dayjs(slot.start)
-        return slotStart.isSame(selectedDateTime, 'minute')
-      })
-      
-      if (!isSlotAvailable) {
-        message.error('الوقت المحدد لم يعد متاحاً. يرجى اختيار وقت آخر.')
-        setLoading(false)
-        return
-      }
-
+      // Free tickets are date-less: only a duration is needed. The ticket is
+      // valid from its first scan for the chosen number of hours.
       const payload = {
         userId: values.userId,
         branchId: values.branchId,
-        startTime: startTime,
         durationHours: values.durationHours,
-        persons: values.persons,
         notes: values.notes || undefined,
       }
 
       const result = await apiPost<{ booking: { id: string }; tickets: Array<{ id: string }> }>('/bookings/admin/free-ticket', payload)
-      
+
       // Get user name for success message
       const selectedUser = users?.find((u: any) => u.id === values.userId)
       const userName = selectedUser?.name || selectedUser?.email || 'العميل'
-      
+
       message.success({
-        content: `تم إنشاء ${result.tickets?.length || values.persons} تذكرة مجانية بنجاح للعميل: ${userName}`,
+        content: `تم إنشاء ${result.tickets?.length || 1} تذكرة مجانية بنجاح للعميل: ${userName}`,
         duration: 5,
       })
       navigate(`/admin/bookings/${result.booking?.id}`)
@@ -193,7 +124,6 @@ export default function CreateFreeTicket() {
               onFinish={handleSubmit}
               initialValues={{
                 durationHours: 2,
-                persons: 1,
               }}
             >
               <Row gutter={[24, 0]}>
@@ -240,133 +170,8 @@ export default function CreateFreeTicket() {
                         (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
                       }
                       notFoundContent={branchesLoading ? 'جاري التحميل...' : 'لا يوجد فروع'}
-                      onChange={() => {
-                        // Reset date and time when branch changes
-                        form.setFieldValue('date', undefined)
-                        form.setFieldValue('time', undefined)
-                      }}
                     />
                   </Form.Item>
-                </Col>
-
-                {/* Date */}
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="date"
-                    label="التاريخ"
-                    rules={[{ required: true, message: 'يرجى اختيار التاريخ' }]}
-                  >
-                    <DatePicker
-                      style={{ width: '100%' }}
-                      format="YYYY-MM-DD"
-                      disabledDate={(current) => current && current < dayjs().startOf('day')}
-                      placeholder="اختر التاريخ"
-                      onChange={() => {
-                        // Reset time when date changes to reload slots
-                        form.setFieldValue('time', undefined)
-                      }}
-                    />
-                  </Form.Item>
-                </Col>
-
-                {/* Time - Available Slots */}
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="time"
-                    label="الوقت"
-                    rules={[
-                      { required: true, message: 'يرجى اختيار الوقت' },
-                      {
-                        validator: (_, value) => {
-                          if (!value) {
-                            return Promise.reject(new Error('يرجى اختيار الوقت'))
-                          }
-                          if (!selectedDate || !selectedBranchId) {
-                            return Promise.reject(new Error('يرجى اختيار التاريخ والفرع أولاً'))
-                          }
-                          
-                          // value is in format "HH:mm"
-                          const [hours, minutes] = value.split(':').map(Number)
-                          const selectedDateTime = selectedDate
-                            .hour(hours)
-                            .minute(minutes)
-                            .second(0)
-                            .millisecond(0)
-                          
-                          const isAvailable = availableSlots.some(slot => {
-                            const slotStart = dayjs(slot.start)
-                            return slotStart.isSame(selectedDateTime, 'minute')
-                          })
-                          
-                          if (!isAvailable) {
-                            return Promise.reject(new Error('هذا الوقت غير متاح، يرجى اختيار وقت من القائمة'))
-                          }
-                          
-                          return Promise.resolve()
-                        },
-                      },
-                    ]}
-                  >
-                    {selectedDate && selectedBranchId ? (
-                      <Select
-                        placeholder={slotsLoading ? 'جاري تحميل الأوقات المتاحة...' : 'اختر الوقت المتاح'}
-                        loading={slotsLoading}
-                        disabled={slotsLoading || availableSlots.length === 0}
-                        notFoundContent={
-                          slotsLoading ? (
-                            <Spin size="small" />
-                          ) : availableSlots.length === 0 ? (
-                            <span>لا توجد أوقات متاحة في هذا التاريخ</span>
-                          ) : (
-                            'لا توجد أوقات متاحة'
-                          )
-                        }
-                      >
-                        {availableSlots.map((slot, index) => {
-                          const slotStart = dayjs(slot.start)
-                          const slotEnd = dayjs(slot.end)
-                          const maxHours = Math.floor((slot.consecutiveSlots * (slotsData?.slotMinutes || 60)) / 60)
-                          
-                          return (
-                            <Select.Option
-                              key={index}
-                              value={slotStart.format('HH:mm')}
-                              disabled={!slot.available}
-                            >
-                              <Space>
-                                <ClockCircleOutlined />
-                                <span>
-                                  {formatTimeAr(slotStart.toDate())} - {formatTimeAr(slotEnd.toDate())}
-                                </span>
-                                {maxHours > 0 && (
-                                  <span style={{ color: '#8c8c8c', fontSize: '12px' }}>
-                                    (متاح حتى {maxHours} ساعة)
-                                  </span>
-                                )}
-                              </Space>
-                            </Select.Option>
-                          )
-                        })}
-                      </Select>
-                    ) : (
-                      <TimePicker
-                        use12Hours
-                        style={{ width: '100%' }}
-                        format="h:mm A"
-                        placeholder="اختر التاريخ والفرع أولاً"
-                        disabled
-                      />
-                    )}
-                  </Form.Item>
-                  {selectedDate && selectedBranchId && availableSlots.length === 0 && !slotsLoading && (
-                    <Alert
-                      message="لا توجد أوقات متاحة"
-                      description="لا توجد فتحات متاحة للفرع المحدد في هذا التاريخ. يرجى اختيار تاريخ آخر."
-                      type="warning"
-                      showIcon
-                      style={{ marginTop: '8px' }}
-                    />
-                  )}
                 </Col>
 
                 {/* Duration */}
@@ -385,33 +190,6 @@ export default function CreateFreeTicket() {
                       max={12}
                       placeholder="عدد الساعات"
                       addonAfter="ساعة"
-                      onChange={() => {
-                        // Reset time when duration changes to reload slots
-                        form.setFieldValue('time', undefined)
-                      }}
-                    />
-                  </Form.Item>
-                </Col>
-
-                {/* Number of Persons */}
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="persons"
-                    label="عدد الأشخاص"
-                    rules={[
-                      { required: true, message: 'يرجى إدخال عدد الأشخاص' },
-                      { type: 'number', min: 1, message: 'يجب أن يكون العدد على الأقل 1' },
-                    ]}
-                  >
-                    <InputNumber
-                      style={{ width: '100%' }}
-                      min={1}
-                      placeholder="عدد الأشخاص"
-                      addonAfter={<TeamOutlined />}
-                      onChange={() => {
-                        // Reset time when persons count changes to reload slots
-                        form.setFieldValue('time', undefined)
-                      }}
                     />
                   </Form.Item>
                 </Col>
@@ -453,4 +231,3 @@ export default function CreateFreeTicket() {
     </div>
   )
 }
-

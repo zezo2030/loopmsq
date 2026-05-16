@@ -1964,11 +1964,19 @@ export class BookingsService {
       throw new NotFoundException('Branch not found');
     }
 
-    const startTime = new Date(dto.startTime);
-    if (startTime.getTime() <= new Date().getTime()) {
-      throw new BadRequestException('Cannot create ticket for past time');
+    // Free tickets are date-less: when no startTime is given, the ticket is
+    // valid from its first scan for `durationHours`. We still store a
+    // startTime (now) to satisfy the booking schema.
+    const startTime = dto.startTime ? new Date(dto.startTime) : new Date();
+    if (dto.startTime) {
+      if (startTime.getTime() <= new Date().getTime()) {
+        throw new BadRequestException('Cannot create ticket for past time');
+      }
+      this.ensureSlotAlignment(startTime);
     }
-    this.ensureSlotAlignment(startTime);
+
+    // Persons is optional for free tickets — defaults to a single ticket.
+    const persons = dto.persons ?? 1;
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -1981,7 +1989,7 @@ export class BookingsService {
         branchId: dto.branchId,
         startTime: startTime,
         durationHours: dto.durationHours,
-        persons: dto.persons,
+        persons: persons,
         totalPrice: 0 as any, // Free ticket
         status: BookingStatus.CONFIRMED, // Directly confirmed for free tickets
         specialRequests: dto.notes || null,
@@ -1993,7 +2001,7 @@ export class BookingsService {
       const tickets = await this.generateTickets(
         queryRunner,
         savedBooking,
-        dto.persons,
+        persons,
         0,
       );
 

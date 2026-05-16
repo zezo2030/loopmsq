@@ -7,6 +7,7 @@ import { ReferralAttribution } from '../../database/entities/referral-attributio
 import { ReferralEarning } from '../../database/entities/referral-earning.entity';
 import { UsersModule } from '../users/users.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { LoyaltyModule } from '../loyalty/loyalty.module';
     ]),
     UsersModule,
     LoyaltyModule,
+    NotificationsModule,
   ],
   providers: [ReferralsService],
   controllers: [ReferralsController],

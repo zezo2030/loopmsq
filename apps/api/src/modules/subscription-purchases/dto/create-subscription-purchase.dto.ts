@@ -1,4 +1,10 @@
-import { IsBoolean, IsString, IsUUID, Length } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateSubscriptionPurchaseDto {
@@ -31,6 +37,15 @@ export class CreateSubscriptionPurchaseDto {
   })
   @IsString()
   holderImageUrl: string;
+
+  @ApiProperty({
+    description: 'Optional discount coupon code',
+    example: 'SAVE20',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }
 
 /**
@@ -39,7 +54,7 @@ export class CreateSubscriptionPurchaseDto {
  */
 export type CreateSubscriptionPurchasePayload = Pick<
   CreateSubscriptionPurchaseDto,
-  'subscriptionPlanId' | 'acceptedTerms'
+  'subscriptionPlanId' | 'acceptedTerms' | 'couponCode'
 > &
   Partial<Pick<CreateSubscriptionPurchaseDto, 'holderImageUrl' | 'holderName'>>;
 

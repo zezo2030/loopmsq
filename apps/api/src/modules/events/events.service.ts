@@ -20,6 +20,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { ContentService } from '../content/content.service';
 import { AdminConfigService } from '../admin-config/admin-config.service';
+import { CouponsService } from '../coupons/coupons.service';
 import { resolveEventTicketWindow } from '../../utils/event-ticket-window.util';
 import * as crypto from 'crypto';
 
@@ -63,7 +64,33 @@ export class EventsService {
     private readonly adminNotifications: AdminNotificationsService,
     private readonly contentService: ContentService,
     private readonly adminConfigService: AdminConfigService,
+    private readonly couponsService: CouponsService,
   ) {}
+
+  /**
+   * Validates a coupon code against [amount] and returns the discount.
+   * Throws if the coupon is provided but invalid/expired.
+   */
+  private async resolveCouponDiscount(
+    couponCode: string | undefined | null,
+    amount: number,
+    branchId?: string | null,
+  ): Promise<{ discount: number; finalAmount: number }> {
+    if (!couponCode || !couponCode.trim() || amount <= 0) {
+      return { discount: 0, finalAmount: amount };
+    }
+    const preview = await this.couponsService.preview(couponCode.trim(), amount, {
+      branchId: branchId || undefined,
+    });
+    if (!preview.valid) {
+      throw new BadRequestException('Invalid or expired coupon code');
+    }
+    const discount = Number(preview.discountAmount ?? 0);
+    return {
+      discount,
+      finalAmount: Number(preview.finalAmount ?? Math.max(0, amount - discount)),
+    };
+  }
 
   async getPublicConfig(branchId?: string, date?: string) {
     const addOns = await this.getEventAddOnCatalog(branchId);
@@ -245,8 +272,13 @@ export class EventsService {
         0,
       ),
     );
-    const totalAmount = this.normalizeMoney(
+    const grossAmount = this.normalizeMoney(
       EventsService.BASE_HALL_RENTAL_PRICE + addOnsSubtotal,
+    );
+    const { finalAmount: totalAmount } = await this.resolveCouponDiscount(
+      dto.couponCode,
+      grossAmount,
+      dto.branchId,
     );
     const depositAmount = this.normalizeMoney(
       totalAmount * (EventsService.DEPOSIT_PERCENTAGE / 100),
@@ -375,6 +407,85 @@ export class EventsService {
       total,
       page,
       totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Branch manager: list event (special booking) requests for their branch,
+   * with full add-on details so the staff app can display them.
+   */
+  async findBranchRequests(
+    branchId: string,
+    page: number = 1,
+    limit: number = 10,
+    filters?: { status?: string; type?: string },
+  ): Promise<{
+    data: ReturnType<EventsService['mapBranchEventRequest']>[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const where: any = { branchId };
+    if (filters?.status) where.status = filters.status as any;
+    if (filters?.type) where.type = filters.type;
+
+    const [requests, total] = await this.eventRepo.findAndCount({
+      where,
+      relations: ['requester'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    let branchName = '';
+    try {
+      const branch = await this.contentService.findBranchById(branchId);
+      branchName = branch.name_en || branch.name_ar || '';
+    } catch (error) {
+      this.logger.error(`Failed to load branch ${branchId}`, error);
+    }
+
+    return {
+      data: requests.map((req) => this.mapBranchEventRequest(req, branchName)),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  private mapBranchEventRequest(req: EventRequest, branchName: string) {
+    const addOns = Array.isArray(req.addOns) ? req.addOns : [];
+    return {
+      id: req.id,
+      type: req.type,
+      status: req.status,
+      branchName,
+      customerName: req.requester?.name ?? 'Unknown',
+      customerPhone: req.requester?.phone ?? null,
+      startTime: req.startTime,
+      durationHours: req.durationHours,
+      selectedTimeSlot: req.selectedTimeSlot,
+      persons: req.persons,
+      decorated: req.decorated,
+      notes: req.notes ?? null,
+      hallRentalPrice: Number(req.hallRentalPrice ?? 0),
+      addOnsSubtotal: Number(req.addOnsSubtotal ?? 0),
+      totalAmount: Number(req.totalAmount ?? req.quotedPrice ?? 0),
+      depositAmount: Number(req.depositAmount ?? 0),
+      amountPaid: Number(req.amountPaid ?? 0),
+      remainingAmount: Number(req.remainingAmount ?? 0),
+      paymentOption: req.paymentOption,
+      paymentMethod: req.paymentMethod ?? null,
+      addOns: addOns.map((a: any) => ({
+        id: a?.id ?? '',
+        name: a?.name ?? '',
+        price: Number(a?.price ?? 0),
+        quantity: Number(a?.quantity ?? 1),
+        category: a?.category ?? null,
+        imageUrl: a?.imageUrl ?? null,
+        selectedColors: a?.selectedColors ?? null,
+      })),
+      createdAt: req.createdAt,
     };
   }
 

@@ -80,4 +80,9 @@ export class CreateGiftOrderDto {
   @ApiProperty({ enum: PaymentMethod })
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;
+
+  @ApiPropertyOptional({ description: 'Optional discount coupon code' })
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }

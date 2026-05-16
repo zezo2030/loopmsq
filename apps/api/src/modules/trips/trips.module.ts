@@ -16,6 +16,7 @@ import { QRCodeService } from '../../utils/qr-code.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { ContentModule } from '../content/content.module';
+import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ContentModule } from '../content/content.module';
     forwardRef(() => NotificationsModule),
     AdminNotificationsModule,
     ContentModule,
+    CouponsModule,
   ],
   controllers: [TripsController, TripsPublicController],
   providers: [TripsService, RedisService, QRCodeService],

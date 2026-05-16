@@ -117,4 +117,9 @@ export class CreateEventRequestDto {
   @ApiPropertyOptional({ enum: PaymentMethod })
   @IsOptional()
   paymentMethod?: PaymentMethod;
+
+  @ApiPropertyOptional({ description: 'Optional discount coupon code' })
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }

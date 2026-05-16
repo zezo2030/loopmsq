@@ -153,6 +153,7 @@ export class CreatePaymentIntentDto {
     }>;
     notes?: string;
     acceptedTerms: boolean;
+    couponCode?: string;
   };
 
   @ApiProperty({ enum: PaymentMethod })

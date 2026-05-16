@@ -107,4 +107,9 @@ export class CreateTripRequestDto {
   @IsString()
   @Length(4, 20)
   paymentOption: string;
+
+  @ApiPropertyOptional({ description: 'Optional discount coupon code' })
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }

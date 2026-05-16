@@ -29,6 +29,7 @@ import {
 import { DeductHoursDto } from './dto/deduct-hours.dto';
 import { User } from '../../database/entities/user.entity';
 import { CloudinaryService } from '../../utils/cloudinary.service';
+import { CouponsService } from '../coupons/coupons.service';
 
 type PurchaseListFilters = {
   status?: SubscriptionPurchaseStatus;
@@ -58,7 +59,33 @@ export class SubscriptionPurchasesService {
     private readonly notificationsService: NotificationsService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly dataSource: DataSource,
+    private readonly couponsService: CouponsService,
   ) {}
+
+  /**
+   * Validates a coupon code against [amount] and returns the discount.
+   * Throws if the coupon is provided but invalid/expired.
+   */
+  private async resolveCouponDiscount(
+    couponCode: string | undefined | null,
+    amount: number,
+    branchId?: string | null,
+  ): Promise<{ discount: number; finalAmount: number }> {
+    if (!couponCode || !couponCode.trim() || amount <= 0) {
+      return { discount: 0, finalAmount: amount };
+    }
+    const preview = await this.couponsService.preview(couponCode.trim(), amount, {
+      branchId: branchId || undefined,
+    });
+    if (!preview.valid) {
+      throw new BadRequestException('Invalid or expired coupon code');
+    }
+    const discount = Number(preview.discountAmount ?? 0);
+    return {
+      discount,
+      finalAmount: Number(preview.finalAmount ?? Math.max(0, amount - discount)),
+    };
+  }
 
   async uploadHolderPhoto(file: Express.Multer.File) {
     if (!file.mimetype?.startsWith('image/')) {
@@ -135,12 +162,18 @@ export class SubscriptionPurchasesService {
       plan.id,
     );
 
+    const grossPrice = loyaltyStatus.isEligibleForFreePurchase
+      ? 0
+      : Number(plan.price);
+    const { discount: couponDiscount, finalAmount: totalPrice } =
+      await this.resolveCouponDiscount(dto.couponCode, grossPrice, plan.branchId);
+
     return {
       subscriptionPlanId: plan.id,
       planTitle: plan.title,
-      totalPrice: loyaltyStatus.isEligibleForFreePurchase
-        ? 0
-        : Number(plan.price),
+      totalPrice,
+      couponCode: dto.couponCode?.trim() || null,
+      couponDiscount,
       currency: plan.currency || 'SAR',
       usageMode: plan.usageMode,
       totalHours: plan.totalHours != null ? Number(plan.totalHours) : null,
@@ -277,9 +310,14 @@ export class SubscriptionPurchasesService {
       plan.branchId,
       plan.id,
     );
-    const totalPrice = loyaltyStatus.isEligibleForFreePurchase
+    const grossPrice = loyaltyStatus.isEligibleForFreePurchase
       ? 0
       : Number(plan.price);
+    const { finalAmount: totalPrice } = await this.resolveCouponDiscount(
+      dto.couponCode,
+      grossPrice,
+      plan.branchId,
+    );
 
     const resumable = await this.findResumablePendingCheckout(
       userId,
@@ -293,6 +331,11 @@ export class SubscriptionPurchasesService {
       if (rp.holderName !== holderName) {
         rp.holderName = holderName;
         await this.purchaseRepo.save(rp);
+      }
+      // Keep the pending payment in sync with the (possibly coupon-discounted) total.
+      if (Number(pay.amount) !== totalPrice) {
+        pay.amount = totalPrice as any;
+        await this.paymentRepo.save(pay);
       }
       if (!allowMissingHolderImage) {
         const nextHolderImageUrl = trimmedHolder!;

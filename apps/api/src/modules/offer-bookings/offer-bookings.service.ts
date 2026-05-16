@@ -37,6 +37,7 @@ import { User } from '../../database/entities/user.entity';
 import { instanceToPlain } from 'class-transformer';
 import { OfferQuoteDto } from './dto/offer-quote.dto';
 import { CreateOfferBookingDto } from './dto/create-offer-booking.dto';
+import { CouponsService } from '../coupons/coupons.service';
 
 type OfferBookingListFilters = {
   status?: OfferBookingStatus;
@@ -66,7 +67,33 @@ export class OfferBookingsService {
     private readonly notificationsService: NotificationsService,
     private readonly adminNotifications: AdminNotificationsService,
     private readonly dataSource: DataSource,
+    private readonly couponsService: CouponsService,
   ) {}
+
+  /**
+   * Validates a coupon code against [amount] and returns the discount.
+   * Throws if the coupon is provided but invalid/expired.
+   */
+  private async resolveCouponDiscount(
+    couponCode: string | undefined | null,
+    amount: number,
+    branchId?: string | null,
+  ): Promise<{ discount: number; finalAmount: number }> {
+    if (!couponCode || !couponCode.trim()) {
+      return { discount: 0, finalAmount: amount };
+    }
+    const preview = await this.couponsService.preview(couponCode.trim(), amount, {
+      branchId: branchId || undefined,
+    });
+    if (!preview.valid) {
+      throw new BadRequestException('Invalid or expired coupon code');
+    }
+    const discount = Number(preview.discountAmount ?? 0);
+    return {
+      discount,
+      finalAmount: Number(preview.finalAmount ?? Math.max(0, amount - discount)),
+    };
+  }
 
   /**
    * Calculate pricing for an offer purchase before payment.
@@ -96,7 +123,12 @@ export class OfferBookingsService {
       (sum, item) => sum + item.price * item.quantity,
       0,
     );
-    const totalPrice = subtotal + addonsTotal;
+    const grossTotal = subtotal + addonsTotal;
+    const { discount, finalAmount } = await this.resolveCouponDiscount(
+      dto.couponCode,
+      grossTotal,
+      offer.branchId,
+    );
 
     return {
       offerProductId: offer.id,
@@ -106,7 +138,9 @@ export class OfferBookingsService {
       subtotal,
       addOns: resolvedAddOns,
       addonsTotal,
-      totalPrice,
+      couponCode: dto.couponCode?.trim() || null,
+      couponDiscount: discount,
+      totalPrice: finalAmount,
       currency: offer.currency || 'SAR',
     };
   }
@@ -146,7 +180,13 @@ export class OfferBookingsService {
       0,
     );
 
-    const totalPrice = subtotal + addonsTotal;
+    const grossTotal = subtotal + addonsTotal;
+    const { discount: couponDiscount, finalAmount: totalPrice } =
+      await this.resolveCouponDiscount(
+        dto.couponCode,
+        grossTotal,
+        offer.branchId,
+      );
 
     // Create offer snapshot
     const offerSnapshot = this.buildOfferSnapshot(offer);
@@ -195,6 +235,7 @@ export class OfferBookingsService {
         paymentId: savedPayment.id,
         paymentUrl: `/pay/${savedPayment.id}`, // Client-side payment URL
         totalPrice,
+        couponDiscount,
         currency: offer.currency || 'SAR',
         paymentRequired: true,
       };

@@ -18,6 +18,7 @@ import { GiftOrdersService } from './gift-orders.service';
 import { GiftOrdersExpiryProcessor } from './gift-orders.expiry.processor';
 import { EncryptionService } from '../../utils/encryption.util';
 import { WalletModule } from '../wallet/wallet.module';
+import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { WalletModule } from '../wallet/wallet.module';
     forwardRef(() => OfferBookingsModule),
     forwardRef(() => SubscriptionPurchasesModule),
     forwardRef(() => WalletModule),
+    CouponsModule,
   ],
   controllers: [GiftOrdersController],
   providers: [GiftOrdersService, GiftOrdersExpiryProcessor, EncryptionService],

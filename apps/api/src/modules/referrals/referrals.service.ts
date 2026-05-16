@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,15 +16,18 @@ import { AttributeReferralDto } from './dto/attribute.dto';
 import { CreateReferralCodeDto } from './dto/create-code.dto';
 import { ListCodesDto } from './dto/list-codes.dto';
 import { ListEarningsDto } from './dto/list-earnings.dto';
-import { ApproveEarningDto } from './dto/approve-earning.dto';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
-// المكافأة الثابتة: 20 ريال لكل دعوة ناجحة
-// يتم منح المكافأة للداعي (referrer) عند موافقة الادمن على أول دفع للمستخدم المدعو (referee)
-const REFERRAL_REWARD = 20; // fixed currency reward (SAR) to referrer upon approval
+// نظام الإحالات: المكافأة عبارة عن نقاط ولاء تُمنح للداعي (referrer)
+// فور قيام المستخدم المدعو (referee) بإدخال كود الإحالة — بدون انتظار دفع
+// وبدون موافقة الادمن. عدد النقاط يُحدَّد من قاعدة الولاء النشطة عبر لوحة الأدمن
+// (LoyaltyRule.referralRewardPoints).
 
 @Injectable()
 export class ReferralsService {
+  private readonly logger = new Logger(ReferralsService.name);
+
   constructor(
     @InjectRepository(ReferralCode)
     private readonly codeRepo: Repository<ReferralCode>,
@@ -32,6 +36,7 @@ export class ReferralsService {
     @InjectRepository(ReferralEarning)
     private readonly earnRepo: Repository<ReferralEarning>,
     private readonly loyalty: LoyaltyService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async createCode(dto: CreateReferralCodeDto) {
@@ -111,7 +116,57 @@ export class ReferralsService {
       code: code.code,
     });
     await this.attrRepo.save(attr);
-    return { attributed: true, referrerId: code.userId };
+
+    // منح نقاط الولاء للداعي فوراً — عدد النقاط من قاعدة الولاء النشطة (لوحة الأدمن)
+    const rule = await this.loyalty.getActiveRule();
+    const rewardPoints = Number(rule.referralRewardPoints) || 0;
+    let awardedPoints = 0;
+
+    if (rewardPoints > 0) {
+      try {
+        const result = await this.loyalty.adjustWallet(code.userId, {
+          pointsDelta: rewardPoints,
+          reason: 'Referral reward',
+        });
+        awardedPoints = rewardPoints;
+
+        // إشعار الداعي بحصوله على نقاط الإحالة
+        try {
+          await this.notifications.enqueue({
+            type: 'REFERRAL_REWARD',
+            to: { userId: code.userId },
+            data: { points: rewardPoints, totalPoints: result.points },
+            channels: ['sms', 'push'],
+          });
+        } catch (e) {
+          this.logger.error(
+            `Failed to notify referrer ${code.userId} of referral reward: ${e}`,
+          );
+        }
+      } catch (e) {
+        // لا نُفشل عملية الإحالة لو تعذّر منح النقاط — يُسجَّل الخطأ فقط
+        this.logger.error(
+          `Failed to credit ${rewardPoints} referral points to referrer ${code.userId}: ${e}`,
+        );
+      }
+    }
+
+    // تسجيل المكافأة كسجل دائم (يظهر في تبويب الأرباح بلوحة الأدمن)
+    if (awardedPoints > 0) {
+      const earning = this.earnRepo.create({
+        referrerId: code.userId,
+        refereeId: userId,
+        amount: awardedPoints,
+        status: ReferralEarningStatus.APPROVED,
+      });
+      await this.earnRepo.save(earning);
+    }
+
+    return {
+      attributed: true,
+      referrerId: code.userId,
+      rewardPoints: awardedPoints,
+    };
   }
 
   async listEarnings(dto: ListEarningsDto) {
@@ -125,45 +180,5 @@ export class ReferralsService {
       take: dto.pageSize || 20,
     });
     return { items, total, page: dto.page || 1, pageSize: dto.pageSize || 20 };
-  }
-
-  async approveEarning(id: string, _: ApproveEarningDto) {
-    const earning = await this.earnRepo.findOne({ where: { id } });
-    if (!earning) throw new NotFoundException('Earning not found');
-    if (earning.status !== ReferralEarningStatus.PENDING)
-      throw new BadRequestException('Not pending');
-    earning.status = ReferralEarningStatus.APPROVED;
-    await this.earnRepo.save(earning);
-    // Credit referrer wallet as BONUS points equivalent (using loyalty adjust)
-    await this.loyalty.adjustWallet(earning.referrerId, {
-      balanceDelta: earning.amount,
-      pointsDelta: 0,
-      reason: 'Referral reward',
-    });
-    return { success: true };
-  }
-
-  async createEarningForFirstPayment(refereeId: string, paymentId: string) {
-    // إنشاء مكافأة للداعي عند أول دفع للمستخدم المدعو
-    // المكافأة: 20 ريال (REFERRAL_REWARD) - يتم منحها بعد موافقة الادمن
-    const attr = await this.attrRepo.findOne({ where: { refereeId } });
-    if (!attr) return { created: false };
-
-    // التأكد من عدم إنشاء earning مكرر لنفس الدفع
-    const existing = await this.earnRepo.findOne({
-      where: { refereeId, sourcePaymentId: paymentId },
-    });
-    if (existing) return { created: false };
-
-    // إنشاء earning جديد بحالة PENDING (يحتاج موافقة الادمن)
-    const earning = this.earnRepo.create({
-      referrerId: attr.referrerId,
-      refereeId,
-      amount: REFERRAL_REWARD, // 20 ريال
-      status: ReferralEarningStatus.PENDING,
-      sourcePaymentId: paymentId,
-    });
-    await this.earnRepo.save(earning);
-    return { created: true, earningId: earning.id };
   }
 }

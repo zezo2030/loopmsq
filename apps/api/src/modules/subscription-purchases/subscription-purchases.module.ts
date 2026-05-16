@@ -11,6 +11,7 @@ import { QRCodeService } from '../../utils/qr-code.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { User } from '../../database/entities/user.entity';
 import { CloudinaryModule } from '../../utils/cloudinary.module';
+import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CloudinaryModule } from '../../utils/cloudinary.module';
     ]),
     forwardRef(() => NotificationsModule),
     CloudinaryModule,
+    CouponsModule,
   ],
   controllers: [SubscriptionPurchasesController, StaffSubscriptionsController],
   providers: [SubscriptionPurchasesService, QRCodeService],

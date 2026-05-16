@@ -15,6 +15,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { ContentModule } from '../content/content.module';
 import { AdminConfigModule } from '../admin-config/admin-config.module';
+import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AdminConfigModule } from '../admin-config/admin-config.module';
     AdminNotificationsModule,
     ContentModule,
     AdminConfigModule,
+    CouponsModule,
   ],
   controllers: [EventsController],
   providers: [EventsService],

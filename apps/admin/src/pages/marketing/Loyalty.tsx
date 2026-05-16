@@ -28,6 +28,7 @@ type LoyaltyRule = {
   id: string
   earnRate: number
   pointsPerTicket: number
+  referralRewardPoints: number
   isActive: boolean
 }
 
@@ -95,6 +96,12 @@ export default function Loyalty() {
       render: (value: number) => `${value} ${t('loyalty.pts')}`,
     },
     {
+      title: t('loyalty.referral_reward_points'),
+      dataIndex: 'referralRewardPoints',
+      key: 'referralRewardPoints',
+      render: (value: number) => `${value ?? 0} ${t('loyalty.pts')}`,
+    },
+    {
       title: t('common.active'),
       dataIndex: 'isActive',
       key: 'isActive',
@@ -132,13 +139,16 @@ export default function Loyalty() {
         {activeRule ? (
           <Card type="inner" title={t('loyalty.current_active_rule')} style={{ marginBottom: 24 }}>
             <Row gutter={16}>
-              <Col span={8}>
+              <Col span={6}>
                 <Statistic title={t('loyalty.earn_rate')} value={Number(activeRule.earnRate)} suffix={t('loyalty.point_per_sar')} />
               </Col>
-              <Col span={8}>
+              <Col span={6}>
                 <Statistic title={t('loyalty.points_per_ticket')} value={activeRule.pointsPerTicket} suffix={t('loyalty.pts')} />
               </Col>
-              <Col span={8}>
+              <Col span={6}>
+                <Statistic title={t('loyalty.referral_reward_points')} value={activeRule.referralRewardPoints ?? 0} suffix={t('loyalty.pts')} />
+              </Col>
+              <Col span={6}>
                 <Statistic title={t('loyalty.example')} value={examplePoints} suffix={t('loyalty.pts_from_sar')} />
               </Col>
             </Row>
@@ -174,11 +184,11 @@ export default function Loyalty() {
           <Form
             form={form}
             layout="vertical"
-            initialValues={{ earnRate: 1, pointsPerTicket: 500, isActive: true }}
+            initialValues={{ earnRate: 1, pointsPerTicket: 500, referralRewardPoints: 100, isActive: true }}
             onFinish={(values) => createRule.mutate(values)}
           >
             <Row gutter={16}>
-              <Col span={8}>
+              <Col span={6}>
                 <Form.Item
                   name="earnRate"
                   label={t('loyalty.earn_rate')}
@@ -187,7 +197,7 @@ export default function Loyalty() {
                   <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col span={6}>
                 <Form.Item
                   name="pointsPerTicket"
                   label={t('loyalty.points_per_ticket')}
@@ -196,7 +206,16 @@ export default function Loyalty() {
                   <InputNumber min={1} step={1} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col span={6}>
+                <Form.Item
+                  name="referralRewardPoints"
+                  label={t('loyalty.referral_reward_points')}
+                  rules={[{ required: true, message: t('loyalty.referral_reward_points_required') }]}
+                >
+                  <InputNumber min={0} step={1} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
                 <Form.Item name="isActive" label={t('marketing.activate_immediately')} valuePropName="checked">
                   <Switch />
                 </Form.Item>
@@ -276,6 +295,13 @@ export default function Loyalty() {
             rules={[{ required: true, message: 'Points per ticket is required' }]}
           >
             <InputNumber min={1} step={1} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="referralRewardPoints"
+            label={t('loyalty.referral_reward_points')}
+            rules={[{ required: true, message: t('loyalty.referral_reward_points_required') }]}
+          >
+            <InputNumber min={0} step={1} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="isActive" label={t('common.active')} valuePropName="checked">
             <Switch />

@@ -691,6 +691,28 @@ export class ContentController {
     return this.contentService.createAddon(dto);
   }
 
+  @Post('admin/addons/upload')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Upload addon image to Cloudinary (admin)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAddonImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+    if (!file.mimetype.startsWith('image/')) {
+      throw new BadRequestException('File must be an image');
+    }
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      throw new BadRequestException('Image file size must be less than 10MB');
+    }
+    const imageUrl = await this.cloudinaryService.uploadImage(file, 'addons');
+    return { imageUrl };
+  }
+
   @Get('admin/addons')
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -787,6 +809,35 @@ export class ContentController {
   @ApiOperation({ summary: 'Create special booking addon (admin)' })
   async createSpecialBookingAddon(@Body() dto: CreateAddonDto) {
     return this.contentService.createSpecialBookingAddon(dto);
+  }
+
+  @Post('admin/special-booking-addons/upload')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Upload special booking addon image to Cloudinary (admin)',
+  })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadSpecialBookingAddonImage(
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+    if (!file.mimetype.startsWith('image/')) {
+      throw new BadRequestException('File must be an image');
+    }
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      throw new BadRequestException('Image file size must be less than 10MB');
+    }
+    const imageUrl = await this.cloudinaryService.uploadImage(
+      file,
+      'special-booking-addons',
+    );
+    return { imageUrl };
   }
 
   @Get('admin/special-booking-addons')

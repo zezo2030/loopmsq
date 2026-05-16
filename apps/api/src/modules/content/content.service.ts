@@ -988,6 +988,7 @@ export class ContentService {
       imageUrl: string | null;
       price: number;
       defaultQuantity: number;
+      colors: { name: string; hex: string }[] | null;
       metadata: Record<string, unknown> | null;
     }[]
   > {
@@ -1011,8 +1012,29 @@ export class ContentService {
       imageUrl: a.imageUrl ?? null,
       price: Number(a.price),
       defaultQuantity: a.defaultQuantity || 1,
+      colors: this.normalizeAddonColors(
+        (a.metadata as Record<string, unknown> | null)?.colors,
+      ),
       metadata: a.metadata ?? null,
     }));
+  }
+
+  /// Normalizes the optional balloon color list stored in addon metadata
+  /// into a clean `{ name, hex }[]` array (or null when none are defined).
+  private normalizeAddonColors(
+    raw: unknown,
+  ): { name: string; hex: string }[] | null {
+    if (!Array.isArray(raw)) return null;
+    const colors: { name: string; hex: string }[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const entry = item as Record<string, unknown>;
+      const name = String(entry.name ?? entry.label ?? '').trim();
+      const hex = String(entry.hex ?? entry.value ?? entry.color ?? '').trim();
+      if (!name) continue;
+      colors.push({ name, hex });
+    }
+    return colors.length ? colors : null;
   }
 
   // Admin: CRUD for Addons

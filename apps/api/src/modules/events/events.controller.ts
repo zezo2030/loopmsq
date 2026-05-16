@@ -107,6 +107,30 @@ export class EventsController {
     });
   }
 
+  // Branch manager: list event requests for their branch (with add-ons)
+  @Get('branch/me')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.BRANCH_MANAGER)
+  @ApiOperation({
+    summary: 'List event requests for the branch (Branch Manager only)',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'type', required: false, type: String })
+  async getBranchRequests(
+    @CurrentUser() user: any,
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+  ) {
+    return this.eventsService.findBranchRequests(user.branchId, page, limit, {
+      status,
+      type,
+    });
+  }
+
   @Get('requests/:id')
   @ApiOperation({ summary: 'Get event request' })
   getRequest(@CurrentUser() user: any, @Param('id', ParseUUIDPipe) id: string) {

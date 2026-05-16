@@ -41,4 +41,13 @@ export class OfferQuoteDto {
   @ValidateNested({ each: true })
   @Type(() => AddOnSelectionDto)
   addOns?: AddOnSelectionDto[];
+
+  @ApiProperty({
+    description: 'Optional discount coupon code',
+    example: 'SAVE20',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }

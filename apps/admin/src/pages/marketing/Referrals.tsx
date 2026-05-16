@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Card, Tabs, Table, Space, Input, Button, Form, Switch, message, Tag, Row, Col, Select } from 'antd'
-import { SearchOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, UserOutlined, DollarOutlined, CodeOutlined } from '@ant-design/icons'
+import { SearchOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, UserOutlined, GiftOutlined, CodeOutlined } from '@ant-design/icons'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../../api'
 import { useTranslation } from 'react-i18next'
@@ -44,14 +44,6 @@ export default function Referrals() {
       params.set('page', String(earnQuery.page))
       params.set('pageSize', String(earnQuery.pageSize))
       return apiGet<any>(`/referrals/earnings?${params.toString()}`)
-    },
-  })
-
-  const approve = useMutation({
-    mutationFn: (id: string) => apiPost(`/referrals/earnings/${id}/approve`, {}),
-    onSuccess: () => { 
-      message.success(t('referrals.approved'))
-      earnings.refetch() 
     },
   })
 
@@ -255,7 +247,7 @@ export default function Referrals() {
               key: 'earnings',
               label: (
                 <Space>
-                  <DollarOutlined />
+                  <GiftOutlined />
                   <span>{t('referrals.earnings')}</span>
                 </Space>
               ),
@@ -334,34 +326,19 @@ export default function Referrals() {
                             </Space>
                           )
                         },
-                        { 
-                          title: t('referrals.amount'), 
+                        {
+                          title: t('referrals.reward_points'),
                           dataIndex: 'amount',
                           render: (amount: number) => (
-                            <Tag color="green" icon={<DollarOutlined />} style={{ fontSize: '14px', fontWeight: 'bold' }}>
-                              {Number(amount).toFixed(2)} {t('common.currency')}
+                            <Tag color="gold" icon={<GiftOutlined />} style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                              {Math.round(Number(amount))} {t('referrals.points')}
                             </Tag>
                           )
                         },
-                        { 
-                          title: t('referrals.status'), 
+                        {
+                          title: t('referrals.status'),
                           dataIndex: 'status',
                           render: (status: string) => getStatusTag(status)
-                        },
-                        { 
-                          title: t('referrals.action'), 
-                          key: 'action', 
-                          render: (_: any, r: any) => 
-                            r.status === 'pending' ? (
-                              <Button 
-                                type="primary" 
-                                icon={<CheckCircleOutlined />}
-                                onClick={() => approve.mutate(r.id)}
-                                loading={approve.isPending}
-                              >
-                                {t('referrals.approve')}
-                              </Button>
-                            ) : null 
                         },
                       ] as any}
                       dataSource={earnings.data?.items || []}

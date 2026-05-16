@@ -32,6 +32,7 @@ import { CancelTripRequestDto } from './dto/cancel-trip-request.dto';
 import { UpdateTripRequestDto } from './dto/update-trip-request.dto';
 import { ContentService } from '../content/content.service';
 import { QRCodeService } from '../../utils/qr-code.service';
+import { CouponsService } from '../coupons/coupons.service';
 
 type ResolvedTripAddOn = {
   id: string;
@@ -64,7 +65,33 @@ export class TripsService {
     private readonly adminNotifications: AdminNotificationsService,
     private readonly contentService: ContentService,
     private readonly qrCodeService: QRCodeService,
+    private readonly couponsService: CouponsService,
   ) {}
+
+  /**
+   * Validates a coupon code against [amount] and returns the discount.
+   * Throws if the coupon is provided but invalid/expired.
+   */
+  private async resolveCouponDiscount(
+    couponCode: string | undefined | null,
+    amount: number,
+    branchId?: string | null,
+  ): Promise<{ discount: number; finalAmount: number }> {
+    if (!couponCode || !couponCode.trim() || amount <= 0) {
+      return { discount: 0, finalAmount: amount };
+    }
+    const preview = await this.couponsService.preview(couponCode.trim(), amount, {
+      branchId: branchId || undefined,
+    });
+    if (!preview.valid) {
+      throw new BadRequestException('Invalid or expired coupon code');
+    }
+    const discount = Number(preview.discountAmount ?? 0);
+    return {
+      discount,
+      finalAmount: Number(preview.finalAmount ?? Math.max(0, amount - discount)),
+    };
+  }
 
   private getMonthlyPrices(
     branch?: Partial<Branch> | null,
@@ -474,6 +501,22 @@ export class TripsService {
       preferredTime: dto.preferredTime!,
     });
 
+    // Apply optional discount coupon to the trip total.
+    const { discount: couponDiscount, finalAmount: discountedTotal } =
+      await this.resolveCouponDiscount(
+        dto.couponCode,
+        pricing.totalAmount,
+        dto.branchId,
+      );
+    const depositPercentage = this.getDepositPercentage(branch);
+    const depositAmount = this.normalizeMoney(
+      discountedTotal * (depositPercentage / 100),
+    );
+    const remainingAmount =
+      paymentOption === 'deposit'
+        ? this.normalizeMoney(discountedTotal - depositAmount)
+        : discountedTotal;
+
     const req = this.tripRepo.create({
       requesterId: userId,
       branchId: dto.branchId,
@@ -490,20 +533,21 @@ export class TripsService {
       specialRequirements: dto.specialRequirements,
       addOns: resolvedAddOns as any,
       status: TripRequestStatus.APPROVED,
-      quotedPrice: pricing.totalAmount,
+      quotedPrice: discountedTotal,
       ticketPricePerStudent: pricing.ticketPricePerStudent,
       ticketsSubtotal: pricing.ticketsSubtotal,
       addonsSubtotal: pricing.addonsSubtotal,
-      totalAmount: pricing.totalAmount,
+      totalAmount: discountedTotal,
       paymentOption,
-      depositAmount: pricing.depositAmount,
+      depositAmount,
       amountPaid: 0,
-      remainingAmount:
-        paymentOption === 'deposit'
-          ? pricing.remainingAmount
-          : pricing.totalAmount,
+      remainingAmount,
       pricingMonth: pricing.pricingMonth,
-      pricingSnapshot: pricing.pricingSnapshot as any,
+      pricingSnapshot: {
+        ...pricing.pricingSnapshot,
+        couponCode: dto.couponCode?.trim() || null,
+        couponDiscount,
+      } as any,
     });
     const saved = await this.tripRepo.save(req);
 

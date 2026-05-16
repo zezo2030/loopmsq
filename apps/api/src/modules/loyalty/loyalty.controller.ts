@@ -66,6 +66,7 @@ export class LoyaltyController {
     body: {
       earnRate?: number;
       pointsPerTicket?: number;
+      referralRewardPoints?: number;
       isActive?: boolean;
     },
   ) {
@@ -94,6 +95,7 @@ export class LoyaltyController {
     body: {
       earnRate?: number;
       pointsPerTicket?: number;
+      referralRewardPoints?: number;
       isActive?: boolean;
     },
   ) {

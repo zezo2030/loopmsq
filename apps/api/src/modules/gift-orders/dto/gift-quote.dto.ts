@@ -60,4 +60,9 @@ export class GiftQuoteDto {
   @ValidateNested({ each: true })
   @Type(() => GiftAddOnDto)
   addOns?: GiftAddOnDto[];
+
+  @ApiPropertyOptional({ description: 'Optional discount coupon code' })
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }

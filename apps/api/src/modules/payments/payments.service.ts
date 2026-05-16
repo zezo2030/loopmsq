@@ -34,7 +34,6 @@ import { RedisService } from '../../utils/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
-import { ReferralsService } from '../referrals/referrals.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { BookingsService } from '../bookings/bookings.service';
 import { MoyasarService } from '../../integrations/moyasar/moyasar.service';
@@ -43,6 +42,7 @@ import { QRCodeService } from '../../utils/qr-code.service';
 import { resolveEventTicketWindow } from '../../utils/event-ticket-window.util';
 import { OfferBookingsService } from '../offer-bookings/offer-bookings.service';
 import { SubscriptionPurchasesService } from '../subscription-purchases/subscription-purchases.service';
+import { CouponsService } from '../coupons/coupons.service';
 import {
   OfferBooking,
   OfferBookingPaymentStatus,
@@ -93,7 +93,6 @@ export class PaymentsService {
     private readonly tripsService: TripsService,
     @Inject(forwardRef(() => GiftOrdersService))
     private readonly giftOrdersService?: GiftOrdersService,
-    private readonly referrals?: ReferralsService,
     private readonly realtime?: RealtimeGateway,
     private readonly bookings?: BookingsService,
     private readonly moyasarService?: MoyasarService,
@@ -101,6 +100,7 @@ export class PaymentsService {
     private readonly qrCodeService?: QRCodeService,
     private readonly offerBookingsService?: OfferBookingsService,
     private readonly subscriptionPurchasesService?: SubscriptionPurchasesService,
+    private readonly couponsService?: CouponsService,
   ) {}
 
   private normalizePaymentJson(value: unknown): Record<string, any> | null {
@@ -951,8 +951,24 @@ export class PaymentsService {
         (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
         0,
       );
-      const totalAmount =
+      const grossAmount =
         Math.round((BASE_HALL_PRICE + addOnsSubtotal) * 100) / 100;
+      // Apply optional discount coupon to the event total.
+      let totalAmount = grossAmount;
+      if (payload.couponCode && this.couponsService) {
+        const preview = await this.couponsService.preview(
+          String(payload.couponCode).trim(),
+          grossAmount,
+          { branchId: payload.branchId },
+        );
+        if (!preview.valid) {
+          throw new BadRequestException('Invalid or expired coupon code');
+        }
+        totalAmount =
+          Math.round(
+            Number(preview.finalAmount ?? grossAmount) * 100,
+          ) / 100;
+      }
       const depositAmount =
         Math.round((totalAmount * DEPOSIT_PCT) / 100 * 100) / 100;
 
@@ -2061,12 +2077,6 @@ export class PaymentsService {
       // this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: booking.status });
       // TODO: Emit for events?
 
-      // Create referral earning if eligible (fire-and-forget)
-      if (this.referrals) {
-        try {
-          await this.referrals.createEarningForFirstPayment(userId, payment.id);
-        } catch (_) {}
-      }
       return {
         success: true,
         paymentId: payment.id,

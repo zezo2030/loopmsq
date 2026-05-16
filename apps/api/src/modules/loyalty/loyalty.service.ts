@@ -50,6 +50,7 @@ export class LoyaltyService {
       rule = this.ruleRepo.create({
         earnRate: 1,
         pointsPerTicket: 500,
+        referralRewardPoints: 100,
         isActive: true,
       });
       rule = await this.ruleRepo.save(rule);
@@ -232,6 +233,7 @@ export class LoyaltyService {
     const rule = this.ruleRepo.create({
       earnRate: input.earnRate ?? 1,
       pointsPerTicket: input.pointsPerTicket ?? 500,
+      referralRewardPoints: input.referralRewardPoints ?? 100,
       isActive: input.isActive ?? true,
     });
     if (rule.isActive) {
@@ -264,6 +266,9 @@ export class LoyaltyService {
     if (input.earnRate !== undefined) rule.earnRate = input.earnRate;
     if (input.pointsPerTicket !== undefined) {
       rule.pointsPerTicket = input.pointsPerTicket;
+    }
+    if (input.referralRewardPoints !== undefined) {
+      rule.referralRewardPoints = input.referralRewardPoints;
     }
     if (input.isActive !== undefined) {
       if (input.isActive && !rule.isActive) {

@@ -29,6 +29,7 @@ export interface EnqueueNotification {
     | 'LOYALTY_EARN'
     | 'LOYALTY_REDEEM'
     | 'LOYALTY_TICKET_REDEEMED'
+    | 'REFERRAL_REWARD'
     | 'RATING_REQUEST'
     | 'WALLET_RECHARGED'
     | 'WALLET_REWARD_CREDITED'
@@ -377,6 +378,10 @@ export class NotificationsService {
         return lang === 'ar'
           ? 'تذكرة من نقاط الولاء'
           : 'Free ticket from loyalty points';
+      case 'REFERRAL_REWARD':
+        return lang === 'ar'
+          ? 'مكافأة إحالة جديدة'
+          : 'New referral reward';
       case 'RATING_REQUEST':
         return lang === 'ar' ? 'تقييم تجربتك' : 'Rate Your Experience';
       case 'BOOKING_CANCELLED':
@@ -495,6 +500,10 @@ export class NotificationsService {
         return lang === 'ar'
           ? `تم استبدال ${d.pointsRedeemed} نقطة مقابل تذكرة مجانية في ${d.branchName || d.branchId}. رصيد النقاط المتبقي: ${d.totalPoints}.`
           : `Redeemed ${d.pointsRedeemed} points for a free ticket at ${d.branchName || d.branchId}. Remaining points: ${d.totalPoints}.`;
+      case 'REFERRAL_REWARD':
+        return lang === 'ar'
+          ? `حصلت على ${d.points} نقطة كمكافأة إحالة لانضمام صديق عبر كودك. إجمالي نقاطك: ${d.totalPoints}.`
+          : `You earned ${d.points} points as a referral reward for a friend who joined with your code. Total points: ${d.totalPoints}.`;
       case 'RATING_REQUEST':
         return lang === 'ar'
           ? `نود معرفة رأيك بخدمتنا لحجزك رقم ${d.bookingId}. شاركنا تقييمك وملاحظاتك.`
