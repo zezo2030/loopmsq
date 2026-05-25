@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, Row, Col, Statistic, DatePicker, Select, Space, Button, message } from 'antd'
-import { apiGet } from '../../api'
+import { apiGet, getApiBase } from '../../api'
 import { useTranslation } from 'react-i18next'
 
 type Overview = {
@@ -83,12 +83,28 @@ export default function ReportsOverview() {
       <Button onClick={async () => {
         try {
           const params = new URLSearchParams()
+          params.set('type', 'overview')
           if (from) params.set('from', from)
           if (to) params.set('to', to)
           if (branchId) params.set('branchId', branchId)
-          const url = `/api/v1/reports/export?type=overview&${params.toString()}`
-          window.open(url, '_blank')
-        } catch {}
+          const token = localStorage.getItem('accessToken')
+          const resp = await fetch(`${getApiBase()}/reports/export?${params.toString()}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          if (!resp.ok) throw new Error(await resp.text() || 'Export failed')
+          const blob = await resp.blob()
+          const url = window.URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `overview-${new Date().toISOString().split('T')[0]}.csv`
+          document.body.appendChild(a)
+          a.click()
+          window.URL.revokeObjectURL(url)
+          document.body.removeChild(a)
+          message.success(t('reports.exported') || 'Report exported successfully')
+        } catch (e: any) {
+          message.error(e?.message || (t('reports.export_failed') || 'Failed to export report'))
+        }
       }}>{t('reports.export_csv') || 'Export CSV'}</Button>
     </Space>}>
       <Row gutter={[24, 24]}>

@@ -1,10 +1,15 @@
 import { useState } from 'react'
-import { Form, Input, Button, message, Row, Col, Space } from 'antd'
+import { Form, Input, Button, message, Row, Col, Space, Alert } from 'antd'
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiPost } from '../../api'
 import { useBranchAuth } from '../../auth'
+import {
+  buildSaudiPhone,
+  parseApiErrorMessage,
+  saudiPhoneFormRules,
+} from '../../utils/phone'
 
 interface CreateStaffProps {
   onSuccess: () => void
@@ -16,17 +21,18 @@ export default function CreateStaff({ onSuccess, onCancel }: CreateStaffProps) {
   const { me } = useBranchAuth()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const handleSubmit = async (values: any) => {
     if (!me?.branchId) return
     
     setLoading(true)
+    setFormError(null)
     try {
-      // أرسل الحقول المسموحة فقط لتفادي 400 من ValidationPipe
       const staffData = {
         name: values.name,
         email: values.email,
-        phone: values.phone,
+        phone: buildSaudiPhone(values.phone),
         password: values.password,
         roles: ['staff'],
         branchId: me.branchId,
@@ -36,10 +42,9 @@ export default function CreateStaff({ onSuccess, onCancel }: CreateStaffProps) {
       message.success(t('staff.created') || 'Staff member created successfully')
       onSuccess()
     } catch (error: any) {
-      const msg = (await (async () => {
-        try { return error?.message || '' } catch { return '' }
-      })()) || ''
-      message.error(msg || (t('staff.create_failed') || 'Failed to create staff member'))
+      const errorMessage = parseApiErrorMessage(error, t)
+      setFormError(errorMessage)
+      message.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -52,7 +57,17 @@ export default function CreateStaff({ onSuccess, onCancel }: CreateStaffProps) {
       onFinish={handleSubmit}
       className="custom-form"
     >
-      {/* Basic Information */}
+      {formError && (
+        <Alert
+          type="error"
+          message={formError}
+          showIcon
+          closable
+          onClose={() => setFormError(null)}
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12}>
           <Form.Item
@@ -82,9 +97,20 @@ export default function CreateStaff({ onSuccess, onCancel }: CreateStaffProps) {
           <Form.Item
             label={t('staff.phone') || 'Phone'}
             name="phone"
-            rules={[{ required: true, message: t('staff.phone_required') || 'Please enter phone number' }]}
+            rules={saudiPhoneFormRules(t, true)}
           >
-            <Input placeholder={t('staff.phone_ph') || 'Enter phone number'} />
+            <Input
+              addonBefore="+966"
+              maxLength={9}
+              inputMode="numeric"
+              placeholder={t('staff.phone_ph') || '501234567'}
+              onChange={(event) => {
+                const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 9)
+                if (digitsOnly !== event.target.value) {
+                  form.setFieldValue('phone', digitsOnly)
+                }
+              }}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
@@ -101,7 +127,6 @@ export default function CreateStaff({ onSuccess, onCancel }: CreateStaffProps) {
         </Col>
       </Row>
 
-      {/* Additional Information */}
       <Row gutter={[16, 16]}>
         <Col xs={24}>
           <Form.Item
@@ -116,7 +141,6 @@ export default function CreateStaff({ onSuccess, onCancel }: CreateStaffProps) {
         </Col>
       </Row>
 
-      {/* Form Actions */}
       <div style={{ textAlign: 'right', marginTop: '24px' }}>
         <Space>
           <Button onClick={onCancel} icon={<CloseOutlined />}>

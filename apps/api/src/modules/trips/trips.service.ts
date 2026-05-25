@@ -971,6 +971,37 @@ export class TripsService {
     };
   }
 
+  async findBranchRequests(
+    branchId: string,
+    page: number = 1,
+    limit: number = 10,
+    filters?: { status?: string; from?: string; to?: string },
+  ) {
+    const where: any = { branchId };
+    if (filters?.status) where.status = filters.status as any;
+    if (filters?.from && filters?.to) {
+      where.preferredDate = Between(
+        new Date(filters.from),
+        new Date(filters.to),
+      ) as any;
+    }
+
+    const [requests, total] = await this.tripRepo.findAndCount({
+      where,
+      relations: ['requester'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    } as any);
+
+    return {
+      requests,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async findAllRequests(
     page: number = 1,
     limit: number = 10,

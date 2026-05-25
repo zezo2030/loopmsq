@@ -49,6 +49,12 @@ export default function BranchOffers() {
     mutationFn: (id: string) => apiDelete(`/admin/offers/${id}`),
     onSuccess: () => { message.success(t('offers.deleted')); qc.invalidateQueries({ queryKey: ['branch:offers'] }) },
   })
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      apiPatch(`/admin/offers/${id}`, { isActive }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['branch:offers'] }) },
+    onError: (e: any) => { message.error(e?.message || t('common.error')) },
+  })
 
   // Auto-set hall when modal opens (each branch has one hall)
   useEffect(() => {
@@ -73,7 +79,13 @@ export default function BranchOffers() {
     { title: t('branch.images'), dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={v} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: t('offers.discount_type'), dataIndex: 'discountType' },
     { title: t('offers.discount_value'), dataIndex: 'discountValue' },
-    { title: t('offers.active'), dataIndex: 'isActive', render: (v: boolean) => (v ? t('common.yes') : t('common.no')) },
+    { title: t('offers.active'), dataIndex: 'isActive', render: (v: boolean, r: Offer) => (
+      <Switch
+        checked={v}
+        loading={toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === r.id}
+        onChange={(checked) => toggleActiveMutation.mutate({ id: r.id, isActive: checked })}
+      />
+    ) },
     { title: t('offers.schedule'), render: (_: any, r: Offer) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
     { title: t('common.actions'), render: (_: any, r: Offer) => (
       <span style={{ display: 'flex', gap: 8 }}>

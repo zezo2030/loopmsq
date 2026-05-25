@@ -7,8 +7,11 @@ import {
   IsEnum,
   IsUUID,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '../../../common/decorators/roles.decorator';
+import { IsSaudiPhone } from '../../../common/validators/is-saudi-phone.validator';
+import { toSaudiE164 } from '../../../utils/phone.util';
 
 export class CreateStaffDto {
   @ApiProperty({
@@ -44,12 +47,17 @@ export class CreateStaffDto {
   roles: UserRole[];
 
   @ApiProperty({
-    description: 'Phone number (optional)',
+    description: 'Saudi phone number (optional)',
     example: '+966501234567',
     required: false,
   })
   @IsOptional()
   @IsString()
+  @Transform(({ value }) => {
+    if (typeof value !== 'string' || !value.trim()) return value;
+    return toSaudiE164(value) ?? value;
+  })
+  @IsSaudiPhone()
   phone?: string;
 
   @ApiProperty({

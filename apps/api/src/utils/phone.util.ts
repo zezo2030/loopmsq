@@ -1,5 +1,47 @@
+const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+const EXT_DIGITS = '0123456789';
+const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+
+export function toAsciiDigits(input: string): string {
+  return input.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (char) => {
+    let index = ARABIC_DIGITS.indexOf(char);
+    if (index >= 0) return EXT_DIGITS[index];
+    index = PERSIAN_DIGITS.indexOf(char);
+    if (index >= 0) return EXT_DIGITS[index];
+    return char;
+  });
+}
+
+/** Extract 9-digit Saudi mobile local part (5XXXXXXXX) or return null. */
+export function extractSaudiMobileDigits(phone: string): string | null {
+  if (!phone?.trim()) return null;
+
+  let cleaned = toAsciiDigits(phone.trim()).replace(/[\s\-().]/g, '');
+
+  if (cleaned.startsWith('+966')) cleaned = cleaned.slice(4);
+  else if (cleaned.startsWith('00966')) cleaned = cleaned.slice(5);
+  else if (cleaned.startsWith('966')) cleaned = cleaned.slice(3);
+  else if (cleaned.startsWith('00')) cleaned = cleaned.slice(2);
+  else if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
+
+  if (/^5\d{8}$/.test(cleaned)) return cleaned;
+  return null;
+}
+
+export function toSaudiE164(phone: string): string | null {
+  const digits = extractSaudiMobileDigits(phone);
+  return digits ? `+966${digits}` : null;
+}
+
+export function isValidSaudiPhone(phone: string): boolean {
+  return toSaudiE164(phone) !== null;
+}
+
 export function normalizePhone(phone: string): string {
-  let cleaned = phone.replace(/[\s\-()]/g, '');
+  const saudi = toSaudiE164(phone);
+  if (saudi) return saudi;
+
+  let cleaned = toAsciiDigits(phone).replace(/[\s\-()]/g, '');
 
   if (cleaned.startsWith('00')) {
     cleaned = '+' + cleaned.slice(2);

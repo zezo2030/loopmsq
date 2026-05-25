@@ -17,6 +17,20 @@ export default function Overview() {
   const [overview, setOverview] = useState<any>(null)
   const [recentBookings, setRecentBookings] = useState<any[]>([])
 
+  useEffect(() => {
+    if (!showRevenue) return
+    // Initialize default date range to last 30 days for better visibility
+    if (!dateRange) {
+      const to = new Date()
+      const from = new Date()
+      from.setDate(from.getDate() - 30)
+      setDateRange([from, to])
+      return
+    }
+    loadOverview()
+    loadRecentBookings()
+  }, [dateRange, showRevenue])
+
   if (!showRevenue) {
     return (
       <div className="page-container">
@@ -34,19 +48,6 @@ export default function Overview() {
       </div>
     )
   }
-
-  useEffect(() => {
-    // Initialize default date range to last 30 days for better visibility
-    if (!dateRange) {
-      const to = new Date()
-      const from = new Date()
-      from.setDate(from.getDate() - 30)
-      setDateRange([from, to])
-      return
-    }
-    loadOverview()
-    loadRecentBookings()
-  }, [dateRange])
 
   const loadOverview = async () => {
     if (!me?.branchId) return
@@ -144,7 +145,10 @@ export default function Overview() {
       ? [{
           title: t('bookings.amount') || 'Amount',
           key: 'amount',
-          render: (record: any) => `${record.amount || 0} SAR`,
+          render: (record: any) => {
+            const amount = Number(record.totalPrice ?? record.amount ?? 0)
+            return `${new Intl.NumberFormat('ar-SA').format(amount)} SAR`
+          },
         }]
       : []),
     {

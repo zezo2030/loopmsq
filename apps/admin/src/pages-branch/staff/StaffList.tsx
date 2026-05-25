@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Tag, message, Modal, Row, Col, Statistic, Switch, Popconfirm } from 'antd'
-import { PlusOutlined, EditOutlined, CheckOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, CheckOutlined, CloseOutlined, DeleteOutlined, KeyOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiGet, apiPatch } from '../../shared/api'
 import { useAuth } from '../../shared/auth'
 import CreateStaff from './CreateStaff'
+import ResetStaffPasswordModal from '../../components/ResetStaffPasswordModal'
 
 export default function StaffList() {
   const { t } = useTranslation()
@@ -13,6 +14,7 @@ export default function StaffList() {
   const [staff, setStaff] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [isCreateVisible, setIsCreateVisible] = useState(false)
+  const [resetPasswordStaff, setResetPasswordStaff] = useState<any | null>(null)
 
   useEffect(() => {
     loadStaff()
@@ -151,12 +153,10 @@ export default function StaffList() {
         <Space>
           <Button 
             size="small" 
-            icon={<EditOutlined />}
-            onClick={() => {
-              message.info(t('common.not_implemented') || 'This feature is not available yet')
-            }}
+            icon={<KeyOutlined />}
+            onClick={() => setResetPasswordStaff(record)}
           >
-            {t('common.edit') || 'Edit'}
+            {t('staff.reset_password') || 'Reset Password'}
           </Button>
           <Popconfirm
             title={t('staff.delete_confirm') || 'Are you sure you want to delete this staff member?'}
@@ -270,6 +270,13 @@ export default function StaffList() {
           onCancel={handleCreateClose}
         />
       </Modal>
+
+      <ResetStaffPasswordModal
+        userId={resetPasswordStaff?.id || ''}
+        userName={resetPasswordStaff?.name || resetPasswordStaff?.email}
+        open={!!resetPasswordStaff}
+        onClose={() => setResetPasswordStaff(null)}
+      />
     </div>
   )
 }

@@ -24,6 +24,7 @@ import { UsersService } from './users.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ResetStaffPasswordDto } from './dto/reset-staff-password.dto';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -269,6 +270,23 @@ export class UsersController {
   ) {
     await this.usersService.activate(id, requester);
     return { message: 'User activated successfully' };
+  }
+
+  @Patch(':id/reset-password')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Reset staff password (Admin/Branch Manager)' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async resetPassword(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ResetStaffPasswordDto,
+    @CurrentUser() requester: User,
+  ) {
+    return this.usersService.resetPassword(id, body.newPassword, requester);
   }
 
   @Patch(':id/delete')

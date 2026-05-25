@@ -21,6 +21,7 @@ import { EventsService } from './events.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateEventRequestDto } from './dto/create-event-request.dto';
 import { QuoteEventRequestDto } from './dto/quote-event-request.dto';
+import { CancelEventRequestDto } from './dto/cancel-event-request.dto';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 
@@ -166,6 +167,18 @@ export class EventsController {
   @ApiOperation({ summary: 'Confirm event after payment' })
   confirm(@Param('id', ParseUUIDPipe) id: string) {
     return this.eventsService.confirm(id);
+  }
+
+  @Post('requests/:id/cancel')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.STAFF, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Cancel private event request (staff/admin/branch)' })
+  cancel(
+    @CurrentUser() user: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CancelEventRequestDto,
+  ) {
+    return this.eventsService.cancel(id, user, dto);
   }
 
   @Get('requests/:id/tickets')

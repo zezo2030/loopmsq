@@ -27,6 +27,7 @@ import {
   EnvironmentOutlined,
   DollarOutlined,
   CheckOutlined,
+  CloseCircleOutlined,
   FileTextOutlined,
   WarningOutlined,
   PhoneOutlined,
@@ -84,7 +85,18 @@ type EventRequest = {
     | 'paid'
     | 'confirmed'
     | 'rejected'
+    | 'cancelled'
   quotedPrice?: number
+  totalAmount?: number
+  hallRentalPrice?: number
+  addOnsSubtotal?: number
+  paymentOption?: string | null
+  depositAmount?: number | null
+  amountPaid?: number | null
+  remainingAmount?: number | null
+  refundDueAmount?: number | null
+  cancelledAt?: string | null
+  cancellationReason?: string | null
   paymentMethod?: string
   createdAt: string
   updatedAt: string
@@ -109,9 +121,11 @@ export default function EventDetail() {
   // Modal states
   const [quoteModalVisible, setQuoteModalVisible] = useState(false)
   const [confirmModalVisible, setConfirmModalVisible] = useState(false)
+  const [cancelModalVisible, setCancelModalVisible] = useState(false)
   
   // Forms
   const [quoteForm] = Form.useForm()
+  const [cancelForm] = Form.useForm()
   
   // Loading states
   const [actionLoading, setActionLoading] = useState(false)
@@ -195,6 +209,47 @@ export default function EventDetail() {
     }
   }
 
+  function getRefundPreviewAmount(): number {
+    if (!event) return 0
+    const paid = Number(event.amountPaid ?? 0)
+    if (paid > 0) return paid
+    if (event.paymentOption === 'deposit' && Number(event.depositAmount ?? 0) > 0) {
+      return Number(event.depositAmount)
+    }
+    return 0
+  }
+
+  async function handleCancel(values: { reason?: string }) {
+    if (!event) return
+
+    setActionLoading(true)
+    try {
+      const result = await apiPost<{
+        refundDueAmount?: number
+        amountPaid?: number
+      }>(`/events/requests/${event.id}/cancel`, {
+        reason: values.reason,
+      })
+      const refund = Number(result?.refundDueAmount ?? result?.amountPaid ?? 0)
+      if (refund > 0) {
+        message.success(`تم إلغاء الحجز. مبلغ مستحق الاسترداد: ${refund.toLocaleString('ar-SA')} ر.س`)
+      } else {
+        message.success('تم إلغاء الحجز بنجاح')
+      }
+      setCancelModalVisible(false)
+      cancelForm.resetFields()
+      await loadEventData()
+    } catch (error: any) {
+      message.error(error?.message || 'فشل في إلغاء الحجز')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const canCancel =
+    event &&
+    !['cancelled', 'rejected'].includes(event.status)
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'success'
@@ -205,6 +260,7 @@ export default function EventDetail() {
       case 'deposit_paid': return 'blue'
       case 'paid': return 'cyan'
       case 'rejected': return 'error'
+      case 'cancelled': return 'error'
       case 'draft': return 'default'
       default: return 'default'
     }
@@ -221,6 +277,7 @@ export default function EventDetail() {
       case 'paid': return 'تم الدفع'
       case 'confirmed': return 'مؤكد'
       case 'rejected': return 'مرفوض'
+      case 'cancelled': return 'ملغي'
       default: return status
     }
   }
@@ -262,6 +319,7 @@ export default function EventDetail() {
       case 'confirmed':
         return 3
       case 'rejected':
+      case 'cancelled':
         return -1
       default:
         return 0
@@ -393,6 +451,15 @@ export default function EventDetail() {
                 تأكيد الحدث
               </Button>
             )}
+            {canCancel && (
+              <Button
+                danger
+                icon={<CloseCircleOutlined />}
+                onClick={() => setCancelModalVisible(true)}
+              >
+                إلغاء الحجز
+              </Button>
+            )}
           </Space>
         </div>
       </div>
@@ -400,7 +467,7 @@ export default function EventDetail() {
       <div className="page-content">
         <div className="page-content-inner">
           {/* Workflow Steps */}
-          {event.status !== 'rejected' && (
+          {event.status !== 'rejected' && event.status !== 'cancelled' && (
             <Card className="custom-card" style={{ marginBottom: '24px' }}>
               <Steps
                 current={getCurrentStep(event.status)}
@@ -420,6 +487,26 @@ export default function EventDetail() {
             <Alert
               message="تم رفض الطلب"
               type="error"
+              showIcon
+              style={{ marginBottom: '24px' }}
+            />
+          )}
+
+          {event.status === 'cancelled' && (
+            <Alert
+              message="تم إلغاء الحجز"
+              description={
+                Number(event.refundDueAmount ?? 0) > 0 ? (
+                  <span>
+                    مبلغ مستحق الاسترداد للعميل:{' '}
+                    <strong>{Number(event.refundDueAmount).toLocaleString('ar-SA')} ر.س</strong>
+                    {event.cancellationReason ? ` — السبب: ${event.cancellationReason}` : ''}
+                  </span>
+                ) : (
+                  event.cancellationReason || 'لا يوجد مبلغ مدفوع يستحق الاسترداد.'
+                )
+              }
+              type="warning"
               showIcon
               style={{ marginBottom: '24px' }}
             />
@@ -612,6 +699,44 @@ export default function EventDetail() {
               </Col>
             )}
 
+            {/* Payment summary */}
+            {(event.totalAmount || event.quotedPrice || event.depositAmount || event.amountPaid) && (
+              <Col xs={24} lg={event.quotedPrice ? 16 : 24}>
+                <Card className="custom-card" title="الدفع والعربون" extra={<DollarOutlined />}>
+                  <Descriptions column={{ xs: 1, sm: 2 }} size="small">
+                    <Descriptions.Item label="إجمالي المبلغ">
+                      {(event.totalAmount ?? event.quotedPrice ?? 0).toLocaleString('ar-SA')} ر.س
+                    </Descriptions.Item>
+                    <Descriptions.Item label="خيار الدفع">
+                      {event.paymentOption === 'deposit' ? 'عربون + باقي لاحقاً' : 'دفع كامل'}
+                    </Descriptions.Item>
+                    {event.depositAmount != null && (
+                      <Descriptions.Item label="قيمة العربون">
+                        {Number(event.depositAmount).toLocaleString('ar-SA')} ر.س
+                      </Descriptions.Item>
+                    )}
+                    {event.amountPaid != null && Number(event.amountPaid) > 0 && (
+                      <Descriptions.Item label="المبلغ المدفوع">
+                        <Tag color="green">{Number(event.amountPaid).toLocaleString('ar-SA')} ر.س</Tag>
+                      </Descriptions.Item>
+                    )}
+                    {event.remainingAmount != null && Number(event.remainingAmount) > 0 && (
+                      <Descriptions.Item label="المتبقي">
+                        {Number(event.remainingAmount).toLocaleString('ar-SA')} ر.س
+                      </Descriptions.Item>
+                    )}
+                    {event.status === 'cancelled' && Number(event.refundDueAmount ?? 0) > 0 && (
+                      <Descriptions.Item label="مستحق الاسترداد">
+                        <Tag color="orange" style={{ fontSize: '14px' }}>
+                          {Number(event.refundDueAmount).toLocaleString('ar-SA')} ر.س
+                        </Tag>
+                      </Descriptions.Item>
+                    )}
+                  </Descriptions>
+                </Card>
+              </Col>
+            )}
+
             {/* Status Information */}
             {event.quotedPrice && (
               <Col xs={24} lg={8}>
@@ -743,6 +868,37 @@ export default function EventDetail() {
         confirmLoading={actionLoading}
       >
         <p>هل أنت متأكد من تأكيد هذا الحدث؟ سيتم إرسال تأكيد نهائي للعميل.</p>
+      </Modal>
+
+      <Modal
+        title="إلغاء الحجز"
+        open={cancelModalVisible}
+        onCancel={() => setCancelModalVisible(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Form form={cancelForm} layout="vertical" onFinish={handleCancel}>
+          {getRefundPreviewAmount() > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="مبلغ مستحق الاسترداد"
+              description={`سيتم تسجيل مبلغ ${getRefundPreviewAmount().toLocaleString('ar-SA')} ر.س للاسترداد لاحقاً للعميل.`}
+            />
+          )}
+          <Form.Item label="سبب الإلغاء (اختياري)" name="reason">
+            <Input.TextArea rows={3} placeholder="مثال: طلب العميل، تعارض موعد..." />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0, textAlign: 'left' }}>
+            <Space>
+              <Button onClick={() => setCancelModalVisible(false)}>تراجع</Button>
+              <Button type="primary" danger htmlType="submit" loading={actionLoading}>
+                تأكيد الإلغاء
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   )

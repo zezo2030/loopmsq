@@ -15,6 +15,7 @@ import { CreateStaffDto } from './dto/create-staff.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { EncryptionService } from '../../utils/encryption.util';
+import { toSaudiE164 } from '../../utils/phone.util';
 import { UserRole } from '../../common/decorators/roles.decorator';
 
 @Injectable()
@@ -48,9 +49,16 @@ export class UsersService {
       throw new ConflictException('Email already exists');
     }
 
+    const normalizedPhone = phone ? (toSaudiE164(phone) ?? undefined) : undefined;
+    if (phone && !normalizedPhone) {
+      throw new BadRequestException(
+        'Invalid Saudi phone number. Enter 9 digits starting with 5',
+      );
+    }
+
     // Check if phone already exists (if provided)
-    if (phone) {
-      const encryptedPhone = this.encryptionService.encrypt(phone);
+    if (normalizedPhone) {
+      const encryptedPhone = this.encryptionService.encrypt(normalizedPhone);
       const existingPhoneUser = await this.userRepository.findOne({
         where: { phone: encryptedPhone },
       });
@@ -77,7 +85,9 @@ export class UsersService {
       name,
       passwordHash,
       roles,
-      phone: phone ? this.encryptionService.encrypt(phone) : undefined,
+      phone: normalizedPhone
+        ? this.encryptionService.encrypt(normalizedPhone)
+        : undefined,
       language,
       isActive: true,
       branchId,
@@ -125,7 +135,7 @@ export class UsersService {
       email: savedUser.email,
       name: savedUser.name,
       roles: savedUser.roles,
-      phone: phone,
+      phone: normalizedPhone,
       language: savedUser.language,
       isActive: savedUser.isActive,
       createdAt: savedUser.createdAt,
@@ -487,6 +497,50 @@ export class UsersService {
     await this.userRepository.save(user);
 
     this.logger.log(`User activated: ${id}`);
+  }
+
+  async resetPassword(
+    id: string,
+    newPassword: string,
+    requester: User,
+  ): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isStaff = user.roles?.includes(UserRole.STAFF);
+    const isBranchManager = user.roles?.includes(UserRole.BRANCH_MANAGER);
+    const isAdmin = user.roles?.includes(UserRole.ADMIN);
+
+    if (isAdmin) {
+      throw new BadRequestException('Cannot reset admin password');
+    }
+
+    if (!isStaff && !isBranchManager) {
+      throw new BadRequestException(
+        'Password reset is only available for staff and branch managers',
+      );
+    }
+
+    if (requester.roles?.includes(UserRole.BRANCH_MANAGER)) {
+      if (!requester.branchId || user.branchId !== requester.branchId) {
+        throw new ForbiddenException(
+          'You can only reset passwords for staff in your branch',
+        );
+      }
+      if (!isStaff) {
+        throw new ForbiddenException(
+          'You can only reset passwords for staff members',
+        );
+      }
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.userRepository.save(user);
+
+    this.logger.log(`Password reset for user ${id} by ${requester.id}`);
+    return { message: 'Password reset successfully' };
   }
 
   async getStats(): Promise<{

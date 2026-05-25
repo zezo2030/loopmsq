@@ -21,6 +21,7 @@ export enum EventRequestStatus {
   PAID = 'paid',
   CONFIRMED = 'confirmed',
   REJECTED = 'rejected',
+  CANCELLED = 'cancelled',
 }
 
 @Entity('event_requests')
@@ -116,6 +117,15 @@ export class EventRequest {
     nullable: true,
   })
   paymentMethod?: PaymentMethod;
+
+  @Column({ type: 'timestamp', nullable: true })
+  cancelledAt: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  cancellationReason: string | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  refundDueAmount: number | null;
 
   @CreateDateColumn()
   createdAt: Date;

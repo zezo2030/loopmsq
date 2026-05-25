@@ -16,6 +16,7 @@ import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { Payment, PaymentStatus } from '../../database/entities/payment.entity';
 import { CreateEventRequestDto } from './dto/create-event-request.dto';
 import { QuoteEventRequestDto } from './dto/quote-event-request.dto';
+import { CancelEventRequestDto } from './dto/cancel-event-request.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { ContentService } from '../content/content.service';
@@ -476,6 +477,9 @@ export class EventsService {
       remainingAmount: Number(req.remainingAmount ?? 0),
       paymentOption: req.paymentOption,
       paymentMethod: req.paymentMethod ?? null,
+      refundDueAmount: Number(req.refundDueAmount ?? 0),
+      cancelledAt: req.cancelledAt ?? null,
+      cancellationReason: req.cancellationReason ?? null,
       addOns: addOns.map((a: any) => ({
         id: a?.id ?? '',
         name: a?.name ?? '',
@@ -606,6 +610,126 @@ export class EventsService {
     } catch (e) {
       await queryRunner.rollbackTransaction();
       this.logger.error(`Failed to confirm event ${id}`, e);
+      throw e;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async cancel(
+    id: string,
+    user: { id: string; roles?: string[]; branchId?: string },
+    dto: CancelEventRequestDto,
+  ) {
+    const req = await this.eventRepo.findOne({ where: { id } });
+    if (!req) throw new NotFoundException('Request not found');
+
+    const roles: string[] = user.roles || [];
+    const isAdmin = roles.includes('admin');
+    const isStaff = roles.includes('staff');
+    const isBranchManager = roles.includes('branch_manager');
+    if (!isAdmin && !isStaff && !isBranchManager) {
+      throw new ForbiddenException('Not allowed to cancel this request');
+    }
+    if (isBranchManager && user.branchId && req.branchId !== user.branchId) {
+      throw new ForbiddenException('Not allowed to cancel requests for other branches');
+    }
+
+    if (req.status === EventRequestStatus.CANCELLED) {
+      throw new BadRequestException('Request is already cancelled');
+    }
+    if (req.status === EventRequestStatus.REJECTED) {
+      throw new BadRequestException('Rejected requests cannot be cancelled');
+    }
+
+    const paidAmount = this.normalizeMoney(Number(req.amountPaid ?? 0));
+    const refundDueAmount =
+      paidAmount > 0
+        ? paidAmount
+        : req.paymentOption === 'deposit' && Number(req.depositAmount ?? 0) > 0
+          ? this.normalizeMoney(Number(req.depositAmount ?? 0))
+          : 0;
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      let bookingId = req.bookingId;
+      if (!bookingId) {
+        const payment = await queryRunner.manager.findOne(Payment, {
+          where: {
+            eventRequestId: req.id,
+            status: PaymentStatus.COMPLETED,
+          },
+          order: { createdAt: 'DESC' },
+        });
+        bookingId = payment?.bookingId ?? null;
+      }
+
+      if (bookingId) {
+        const booking = await queryRunner.manager.findOne(Booking, {
+          where: { id: bookingId },
+        });
+        if (booking && booking.status !== BookingStatus.CANCELLED) {
+          booking.status = BookingStatus.CANCELLED;
+          booking.cancelledAt = new Date();
+          if (dto.reason) booking.cancellationReason = dto.reason;
+          await queryRunner.manager.save(booking);
+          await queryRunner.manager.update(
+            Ticket,
+            { bookingId: booking.id },
+            { status: TicketStatus.CANCELLED },
+          );
+        }
+      }
+
+      req.status = EventRequestStatus.CANCELLED;
+      req.cancelledAt = new Date();
+      req.cancellationReason = dto.reason?.trim() || null;
+      req.refundDueAmount = refundDueAmount > 0 ? refundDueAmount : null;
+      await queryRunner.manager.save(req);
+      await queryRunner.commitTransaction();
+
+      await this.notifications.enqueue({
+        type: 'EVENT_STATUS',
+        to: { userId: req.requesterId },
+        data: { status: 'CANCELLED' },
+        channels: ['sms', 'push'],
+      });
+
+      await this.adminNotifications.notify({
+        type: 'BOOKING_CANCELLED',
+        severity: 'warning',
+        title: 'تم إلغاء حجز مناسبة خاصة',
+        body:
+          refundDueAmount > 0
+            ? `طلب #${String(req.id).slice(0, 8)} — مبلغ مستحق الاسترداد: ${refundDueAmount} ر.س`
+            : `طلب #${String(req.id).slice(0, 8)}${dto.reason ? ` — ${dto.reason}` : ''}`,
+        branchId: req.branchId || null,
+        resourceType: 'event_request',
+        resourceId: req.id,
+        data: {
+          refundDueAmount,
+          amountPaid: paidAmount,
+          paymentOption: req.paymentOption,
+          reason: dto.reason ?? null,
+        },
+      });
+
+      return {
+        success: true,
+        status: req.status,
+        refundDueAmount,
+        amountPaid: paidAmount,
+        depositAmount: Number(req.depositAmount ?? 0),
+        paymentOption: req.paymentOption,
+        cancellationReason: req.cancellationReason,
+        cancelledAt: req.cancelledAt,
+      };
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(`Failed to cancel event request ${id}`, e);
       throw e;
     } finally {
       await queryRunner.release();

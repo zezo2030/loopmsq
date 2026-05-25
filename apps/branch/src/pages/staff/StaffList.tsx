@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Card, Table, Button, Space, Tag, message, Modal, Row, Col, Statistic, Switch } from 'antd'
-import { PlusOutlined, EditOutlined, UserOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
+import { PlusOutlined, UserOutlined, CheckOutlined, CloseOutlined, KeyOutlined } from '@ant-design/icons'
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiGet, apiPatch } from '../../api'
 import { useBranchAuth } from '../../auth'
 import CreateStaff from './CreateStaff'
+import ResetStaffPasswordModal from '../../components/ResetStaffPasswordModal'
 
 export default function StaffList() {
   const { t } = useTranslation()
@@ -13,6 +14,7 @@ export default function StaffList() {
   const [staff, setStaff] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [isCreateVisible, setIsCreateVisible] = useState(false)
+  const [resetPasswordStaff, setResetPasswordStaff] = useState<any | null>(null)
 
   useEffect(() => {
     loadStaff()
@@ -117,13 +119,10 @@ export default function StaffList() {
         <Space>
           <Button 
             size="small" 
-            icon={<EditOutlined />}
-            onClick={() => {
-              // TODO: Implement edit staff
-              message.info('Edit staff not implemented yet')
-            }}
+            icon={<KeyOutlined />}
+            onClick={() => setResetPasswordStaff(record)}
           >
-            {t('common.edit') || 'Edit'}
+            {t('staff.reset_password') || 'Reset Password'}
           </Button>
         </Space>
       ),
@@ -221,6 +220,13 @@ export default function StaffList() {
           onCancel={handleCreateClose}
         />
       </Modal>
+
+      <ResetStaffPasswordModal
+        userId={resetPasswordStaff?.id || ''}
+        userName={resetPasswordStaff?.name || resetPasswordStaff?.email}
+        open={!!resetPasswordStaff}
+        onClose={() => setResetPasswordStaff(null)}
+      />
     </div>
   )
 }

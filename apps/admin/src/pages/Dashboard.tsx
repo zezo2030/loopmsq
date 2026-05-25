@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Calendar, DollarSign, CheckCircle, XCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState } from 'react'
 import { apiGet } from '../api'
@@ -56,9 +58,21 @@ export default function Dashboard() {
         setWeekRevenue(revTotal)
       } catch {}
       try {
-        const resPending = await apiGet<any>('/bookings/admin/all?status=pending&limit=200')
-        const itemsPending = Array.isArray(resPending?.bookings) ? resPending.bookings : resPending?.items || []
-        setPendingApprovals(itemsPending.length || 0)
+        const [bookingsRes, tripsRes, eventsRes] = await Promise.all([
+          apiGet<any>('/bookings/admin/all?status=pending&limit=200').catch(() => null),
+          apiGet<any>('/trips/admin/all?limit=200').catch(() => null),
+          apiGet<any>('/events/admin/all?limit=200').catch(() => null),
+        ])
+        const bookingPending = Array.isArray(bookingsRes?.bookings)
+          ? bookingsRes.bookings.length
+          : bookingsRes?.items?.length || 0
+        const tripPending = (tripsRes?.requests || []).filter((t: { status?: string }) =>
+          ['pending', 'under_review', 'approved'].includes(String(t.status || '').toLowerCase()),
+        ).length
+        const eventPending = (eventsRes?.requests || []).filter((e: { status?: string }) =>
+          ['submitted', 'under_review', 'quoted'].includes(String(e.status || '').toLowerCase()),
+        ).length
+        setPendingApprovals(bookingPending + tripPending + eventPending)
       } catch {}
     })()
   }, [])
@@ -302,6 +316,14 @@ export default function Dashboard() {
                     </div>
                     <div className="text-xs text-slate-600">
                       {t('dashboard.school_trips_events') || 'الرحلات المدرسية والفعاليات'}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button variant="link" className="h-auto p-0 text-xs text-amber-800" asChild>
+                        <Link to="/admin/events">{t('menu.privateBookings')}</Link>
+                      </Button>
+                      <Button variant="link" className="h-auto p-0 text-xs text-amber-800" asChild>
+                        <Link to="/admin/trips">{t('menu.schoolTrips')}</Link>
+                      </Button>
                     </div>
                   </div>
                   <div className="text-2xl font-bold text-amber-700">{pendingApprovals}</div>

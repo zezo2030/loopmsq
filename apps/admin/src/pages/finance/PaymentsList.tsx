@@ -8,7 +8,13 @@ import { useTranslation } from 'react-i18next'
 
 interface PaymentItem {
   id: string
-  bookingId: string
+  bookingId?: string | null
+  eventRequestId?: string | null
+  tripRequestId?: string | null
+  offerBookingId?: string | null
+  subscriptionPurchaseId?: string | null
+  giftOrderId?: string | null
+  branchId?: string | null
   amount: number
   currency: string
   status: string
@@ -39,13 +45,15 @@ export default function PaymentsList() {
   const [method, setMethod] = useState<string | undefined>()
   const [userId, setUserId] = useState<string>('')
   const [bookingId, setBookingId] = useState<string>('')
+  const [branchId, setBranchId] = useState<string | undefined>()
+  const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([])
   const [from, setFrom] = useState<string | undefined>()
   const [to, setTo] = useState<string | undefined>()
   const [page, setPage] = useState<number>(1)
   const [pageSize, setPageSize] = useState<number>(20)
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const queryKey = useMemo(() => ['payments', { status, method, userId, bookingId, from, to, page, pageSize }], [status, method, userId, bookingId, from, to, page, pageSize])
+  const queryKey = useMemo(() => ['payments', { status, method, userId, bookingId, branchId, from, to, page, pageSize }], [status, method, userId, bookingId, branchId, from, to, page, pageSize])
   const { data, isLoading, refetch } = useQuery<PaymentsResponse>({
     queryKey,
     queryFn: async () => {
@@ -54,6 +62,7 @@ export default function PaymentsList() {
       if (method) params.set('method', method)
       if (userId) params.set('userId', userId)
       if (bookingId) params.set('bookingId', bookingId)
+      if (branchId) params.set('branchId', branchId)
       if (from) params.set('from', from)
       if (to) params.set('to', to)
       params.set('page', String(page))
@@ -69,6 +78,7 @@ export default function PaymentsList() {
     setMethod(sp('method'))
     setUserId(searchParams.get('userId') || '')
     setBookingId(searchParams.get('bookingId') || '')
+    setBranchId(sp('branchId'))
     const f = sp('from'); const t = sp('to')
     setFrom(f); setTo(t)
     const p = Number(searchParams.get('page') || '1')
@@ -78,6 +88,16 @@ export default function PaymentsList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Load branches list once
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await apiGet<Array<{ id: string; name_en?: string; name_ar?: string }>>('/content/branches')
+        setBranches((resp || []).map(b => ({ id: b.id, name: (b as any).name_ar || (b as any).name_en || 'Branch' })))
+      } catch {}
+    })()
+  }, [])
+
   // Sync to URL
   useEffect(() => {
     const next = new URLSearchParams()
@@ -85,25 +105,54 @@ export default function PaymentsList() {
     if (method) next.set('method', method)
     if (userId) next.set('userId', userId)
     if (bookingId) next.set('bookingId', bookingId)
+    if (branchId) next.set('branchId', branchId)
     if (from) next.set('from', from)
     if (to) next.set('to', to)
     next.set('page', String(page))
     next.set('pageSize', String(pageSize))
     setSearchParams(next, { replace: true })
-  }, [status, method, userId, bookingId, from, to, page, pageSize, setSearchParams])
+  }, [status, method, userId, bookingId, branchId, from, to, page, pageSize, setSearchParams])
 
   const columns = [
     {
       title: t('payments.id') || 'Payment ID',
       dataIndex: 'id',
       key: 'id',
-      render: (id: string) => id ? <Link to={`/finance/payments/${id}`}>{id.slice(0, 8)}...</Link> : '-',
+      render: (id: string) => id ? <Link to={`/admin/finance/payments/${id}`}>{id.slice(0, 8)}...</Link> : '-',
     },
     {
-      title: t('payments.booking') || 'Booking',
-      dataIndex: 'bookingId',
-      key: 'bookingId',
-      render: (bid: string) => bid ? <span>{bid.slice(0, 8)}...</span> : '-',
+      title: t('payments.reference') || 'Reference',
+      key: 'reference',
+      render: (_: any, r: PaymentItem) => {
+        const refs: Array<{ label: string; id: string }> = []
+        if (r.bookingId) refs.push({ label: t('payments.ref_booking') || 'Booking', id: r.bookingId })
+        if (r.eventRequestId) refs.push({ label: t('payments.ref_event') || 'Event', id: r.eventRequestId })
+        if (r.tripRequestId) refs.push({ label: t('payments.ref_trip') || 'Trip', id: r.tripRequestId })
+        if (r.offerBookingId) refs.push({ label: t('payments.ref_offer') || 'Offer', id: r.offerBookingId })
+        if (r.subscriptionPurchaseId) refs.push({ label: t('payments.ref_subscription') || 'Subscription', id: r.subscriptionPurchaseId })
+        if (r.giftOrderId) refs.push({ label: t('payments.ref_gift') || 'Gift', id: r.giftOrderId })
+        if (refs.length === 0) return '-'
+        return (
+          <span>
+            {refs.map((x, i) => (
+              <span key={i}>
+                <Tag>{x.label}</Tag>
+                <span style={{ marginInlineEnd: 8 }}>{x.id.slice(0, 8)}...</span>
+              </span>
+            ))}
+          </span>
+        )
+      },
+    },
+    {
+      title: t('payments.branch') || 'Branch',
+      dataIndex: 'branchId',
+      key: 'branchId',
+      render: (bid?: string | null) => {
+        if (!bid) return '-'
+        const b = branches.find(x => x.id === bid)
+        return b?.name || bid.slice(0, 8) + '...'
+      },
     },
     {
       title: t('payments.amount') || 'Amount',
@@ -133,6 +182,16 @@ export default function PaymentsList() {
     <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
       <Card title={t('payments.title') || 'Payments'} extra={<Button onClick={() => refetch()}>{t('common.refresh') || 'Refresh'}</Button>}>
       <Space style={{ marginBottom: 16 }} wrap>
+        <Select
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          placeholder={t('payments.select_branch') || 'اختر الفرع'}
+          style={{ width: 220 }}
+          value={branchId}
+          onChange={(v) => { setPage(1); setBranchId(v) }}
+          options={branches.map(b => ({ label: b.name, value: b.id }))}
+        />
         <Select
           allowClear
           placeholder={t('payments.status') || 'Status'}

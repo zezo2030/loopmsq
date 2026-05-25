@@ -184,4 +184,13 @@ export class CreateOfferProductDto {
   @IsOptional()
   @IsDateString()
   endsAt?: string;
+
+  @ApiProperty({
+    description: 'Whether the offer is active and visible to customers',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

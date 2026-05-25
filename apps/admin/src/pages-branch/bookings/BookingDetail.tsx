@@ -147,7 +147,7 @@ export default function BookingDetail({ booking, onClose, onCancel }: BookingDet
               <Descriptions.Item label={t('bookings.branch_name') || 'Branch'}>
                 {displayName(booking.branch || booking.hall?.branch) || '-'}
               </Descriptions.Item>
-              <Descriptions.Item label=              {t('bookings.address') || 'Address'}>
+              <Descriptions.Item label={t('bookings.address') || 'Address'}>
                 {(booking.branch as any)?.address || (booking.branch as any)?.location || '-'}
               </Descriptions.Item>
             </Descriptions>

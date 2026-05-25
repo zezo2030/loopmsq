@@ -122,6 +122,18 @@ export default function OfferProducts() {
     },
   })
 
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      apiPatch(`/admin/offer-products/${id}`, { isActive }),
+    onSuccess: (_data, { isActive }) => {
+      message.success(isActive ? t('offerProducts.activated') : t('offerProducts.deactivated'))
+      qc.invalidateQueries({ queryKey: ['offer-products'] })
+    },
+    onError: (e: any) => {
+      message.error(e?.message || t('offerProducts.toggle_failed'))
+    },
+  })
+
   const getBranchName = (branchId: string) => {
     return branches?.find((b: any) => b.id === branchId)?.name_en || branchId
   }
@@ -174,7 +186,14 @@ export default function OfferProducts() {
     {
       title: t('offerProducts.active'),
       dataIndex: 'isActive',
-      render: (v: boolean) => (v ? t('offerProducts.yes') : t('offerProducts.no')),
+      width: 90,
+      render: (v: boolean, r: OfferProduct) => (
+        <Switch
+          checked={v}
+          loading={toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === r.id}
+          onChange={(checked) => toggleActiveMutation.mutate({ id: r.id, isActive: checked })}
+        />
+      ),
     },
     {
       title: t('offerProducts.giftable'),

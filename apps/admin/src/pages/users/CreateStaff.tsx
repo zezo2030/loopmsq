@@ -1,14 +1,20 @@
 import { useState } from 'react'
-import { Button, Form, Input, Select, message, Space, Row, Col } from 'antd'
+import { Button, Form, Input, Select, message, Space, Row, Col, Alert } from 'antd'
 import { UserAddOutlined, SaveOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../../api'
 import { useTranslation } from 'react-i18next'
+import {
+  buildSaudiPhone,
+  parseApiErrorMessage,
+  saudiPhoneFormRules,
+} from '../../shared/phone'
 import '../../theme.css'
 
 export default function CreateStaff() {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const [form] = Form.useForm()
 
   // Load branches for dropdown
@@ -26,20 +32,23 @@ export default function CreateStaff() {
 
   async function onFinish(values: any) {
     setLoading(true)
+    setFormError(null)
     try {
       await apiPost('/users/staff', {
         email: values.email,
         name: values.name,
         password: values.password,
         roles: values.roles,
-        phone: values.phone || undefined,
+        phone: values.phone ? buildSaudiPhone(values.phone) : undefined,
         language: values.language || 'ar',
         branchId: values.branchId || undefined,
       })
       message.success(t('staff.created') || 'Staff member created successfully!')
       form.resetFields()
     } catch (e: any) {
-      message.error(e?.message || t('staff.create_failed') || 'Failed to create staff member')
+      const errorMessage = parseApiErrorMessage(e, t)
+      setFormError(errorMessage)
+      message.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -62,6 +71,16 @@ export default function CreateStaff() {
       <div className="page-content">
         <div className="page-content-inner">
           <div className="custom-form">
+            {formError && (
+              <Alert
+                type="error"
+                message={formError}
+                showIcon
+                closable
+                onClose={() => setFormError(null)}
+                style={{ marginBottom: 24 }}
+              />
+            )}
             <Form 
               form={form}
               layout="vertical" 
@@ -111,8 +130,21 @@ export default function CreateStaff() {
                   <Form.Item 
                     label={t('users.phone_number') || 'Phone Number'} 
                     name="phone"
+                    rules={saudiPhoneFormRules(t, false)}
                   >
-                    <Input placeholder={t('users.enter_phone') || '+966 50 123 4567'} size="large" />
+                    <Input
+                      addonBefore="+966"
+                      maxLength={9}
+                      inputMode="numeric"
+                      placeholder={t('staff.phone_ph') || '501234567'}
+                      size="large"
+                      onChange={(event) => {
+                        const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 9)
+                        if (digitsOnly !== event.target.value) {
+                          form.setFieldValue('phone', digitsOnly)
+                        }
+                      }}
+                    />
                   </Form.Item>
                 </Col>
               </Row>
@@ -188,5 +220,3 @@ export default function CreateStaff() {
     </div>
   )
 }
-
-

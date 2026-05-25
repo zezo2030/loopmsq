@@ -45,6 +45,11 @@ export class ListPaymentsDto {
   @IsUUID()
   bookingId?: string;
 
+  @ApiPropertyOptional({ format: 'uuid', description: 'Filter by branch' })
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
+
   @ApiPropertyOptional({ default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)

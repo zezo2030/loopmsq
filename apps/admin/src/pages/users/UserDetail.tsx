@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button, Card, Form, Input, Switch, Select, Tag, message, Row, Col, Descriptions } from 'antd'
-import { UserOutlined, MailOutlined, PhoneOutlined, CalendarOutlined, BranchesOutlined, SaveOutlined } from '@ant-design/icons'
+import { UserOutlined, MailOutlined, PhoneOutlined, CalendarOutlined, BranchesOutlined, SaveOutlined, KeyOutlined } from '@ant-design/icons'
 import { apiGet, apiPut } from '../../api'
 import { formatDateTimeAr } from '../../utils/formatDateTimeDisplay'
 import { useTranslation } from 'react-i18next'
+import ResetStaffPasswordModal from '../../components/ResetStaffPasswordModal'
 
 type User = {
   id: string
@@ -32,6 +33,7 @@ export default function UserDetail() {
   const [form] = Form.useForm<User>()
   const [saving, setSaving] = useState(false)
   const [userData, setUserData] = useState<User | null>(null)
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -96,6 +98,10 @@ export default function UserDetail() {
 
   const getRoleLabel = (role: string) =>
     t(`roles.${role}`, { defaultValue: role.replace('_', ' ') })
+
+  const canResetPassword = userData?.roles?.some(
+    (role) => role === 'staff' || role === 'branch_manager',
+  )
 
   return (
     <div className="page-container">
@@ -252,6 +258,27 @@ export default function UserDetail() {
                 )}
               </Card>
 
+              {canResetPassword && (
+                <Card
+                  title={t('users.security', { defaultValue: 'Security' })}
+                  style={{ marginBottom: '24px' }}
+                >
+                  <p style={{ marginBottom: 16, color: '#666' }}>
+                    {t('users.reset_password_hint', {
+                      defaultValue:
+                        'Set a new password for this staff member. They will use it to log in.',
+                    })}
+                  </p>
+                  <Button
+                    type="primary"
+                    icon={<KeyOutlined />}
+                    onClick={() => setResetPasswordOpen(true)}
+                  >
+                    {t('users.reset_password', { defaultValue: 'Reset Password' })}
+                  </Button>
+                </Card>
+              )}
+
               {/* Account Information Card */}
               <Card title={t('users.account_information', { defaultValue: 'Account Information' })}>
                 <Descriptions bordered column={2}>
@@ -274,6 +301,14 @@ export default function UserDetail() {
                 </Descriptions>
               </Card>
             </>
+          )}
+          {userData && canResetPassword && (
+            <ResetStaffPasswordModal
+              userId={userData.id}
+              userName={userData.name || userData.email}
+              open={resetPasswordOpen}
+              onClose={() => setResetPasswordOpen(false)}
+            />
           )}
         </div>
       </div>

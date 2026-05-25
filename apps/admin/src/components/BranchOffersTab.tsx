@@ -50,6 +50,12 @@ export default function BranchOffersTab({ branchId }: BranchOffersTabProps) {
     mutationFn: (id: string) => apiDelete(`/admin/offers/${id}`),
     onSuccess: () => { message.success(t('offers.removed')); qc.invalidateQueries({ queryKey: ['offers'] }) },
   })
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      apiPatch(`/admin/offers/${id}`, { isActive }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['offers'] }) },
+    onError: (e: any) => { message.error(e?.message || t('offers.upload_failed')) },
+  })
 
   const formatTypeLabel = (dt: string) => {
     if (dt === 'bogo') return t('offers.bogo')
@@ -72,7 +78,13 @@ export default function BranchOffersTab({ branchId }: BranchOffersTabProps) {
     { title: t('offers.image'), dataIndex: 'imageUrl', render: (v: string) => v ? <Image src={resolveFileUrl(v)} width={80} height={50} style={{ objectFit: 'cover' }} /> : '-' },
     { title: t('offers.type'), dataIndex: 'discountType', render: (v: string) => formatTypeLabel(v) },
     { title: t('offers.value'), render: (_: unknown, r: Offer) => formatValueCell(r) },
-    { title: t('offers.active'), dataIndex: 'isActive', render: (v: boolean) => (v ? t('offers.yes') : t('offers.no')) },
+    { title: t('offers.active'), dataIndex: 'isActive', render: (v: boolean, r: Offer) => (
+      <Switch
+        checked={v}
+        loading={toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === r.id}
+        onChange={(checked) => toggleActiveMutation.mutate({ id: r.id, isActive: checked })}
+      />
+    ) },
     { title: t('offers.schedule'), render: (_: any, r: Offer) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
     { title: t('offers.actions'), render: (_: any, r: Offer) => (
       <span style={{ display: 'flex', gap: 8 }}>

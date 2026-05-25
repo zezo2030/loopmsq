@@ -89,7 +89,15 @@ export default function BookingsList() {
     { title: t('bookings.end_time'), dataIndex: 'endTime', key: 'endTime', render: (v: string) => v ? formatDateTimeAr(v) : '-' },
     { title: t('bookings.status'), dataIndex: 'status', key: 'status', render: (v: string) => <Tag color={getStatusColor(v)}>{getStatusText(v)}</Tag> },
     ...(showAmounts
-      ? [{ title: t('bookings.amount'), dataIndex: 'totalAmount', key: 'totalAmount', render: (v: number) => v ? `${v} ${t('common.currency')}` : '-' }]
+      ? [{
+          title: t('bookings.amount'),
+          dataIndex: 'totalPrice',
+          key: 'totalPrice',
+          render: (v: number | null | undefined) =>
+            v != null
+              ? `${new Intl.NumberFormat('ar-SA').format(Number(v))} ${t('common.currency')}`
+              : '-',
+        }]
       : []),
     {
       title: t('common.actions'),

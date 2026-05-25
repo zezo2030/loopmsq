@@ -62,6 +62,9 @@ import NotFound from './pages/NotFound'
 import BranchDashboard from './pages-branch/Dashboard'
 import BranchInfo from './pages-branch/branch/BranchInfo'
 import BranchBookings from './pages-branch/bookings/BookingsList'
+import BranchBookingDetailPage from './pages-branch/bookings/BookingDetailPage'
+import BranchEvents from './pages-branch/events/EventsList'
+import BranchTrips from './pages-branch/trips/TripsList'
 import BranchOfferBookings from './pages-branch/offer-bookings/OfferBookingsList'
 import BranchOfferBookingDetail from './pages-branch/offer-bookings/OfferBookingDetail'
 import BranchStaff from './pages-branch/staff/StaffList'
@@ -179,6 +182,9 @@ const router = createBrowserRouter([
           { path: 'offers', element: <Offers /> },
           { path: 'coupons', element: <Coupons /> },
           { path: 'bookings', element: <BranchBookings /> },
+          { path: 'bookings/:id', element: <BranchBookingDetailPage /> },
+          { path: 'events', element: <BranchEvents /> },
+          { path: 'trips', element: <BranchTrips /> },
           { path: 'offer-bookings', element: <BranchOfferBookings /> },
           { path: 'offer-bookings/:id', element: <BranchOfferBookingDetail /> },
           { path: 'subscriptions', element: <BranchSubscriptions /> },

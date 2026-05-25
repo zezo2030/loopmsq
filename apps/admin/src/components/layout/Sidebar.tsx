@@ -5,8 +5,6 @@ import {
   LayoutDashboard,
   Search,
   Users,
-  Gift,
-  BookOpen,
   Bell,
   LayoutGrid,
   Folder,
@@ -46,8 +44,6 @@ const navItems: Array<{
     ],
   },
 
-  { key: 'trips', href: '/admin/trips', labelKey: 'menu.trips', icon: BookOpen },
-  { key: 'events', href: '/admin/events', labelKey: 'menu.events', icon: Gift },
   { key: 'notifications', href: '/admin/notifications', labelKey: 'menu.notifications', icon: Bell },
   {
     key: 'cms',
@@ -80,6 +76,9 @@ const navItems: Array<{
     labelKey: 'menu.bookingsSection',
     icon: Ticket,
     children: [
+      { key: 'bookings-all', href: '/admin/bookings', labelKey: 'menu.hallBookings' },
+      { key: 'bookings-private', href: '/admin/events', labelKey: 'menu.privateBookings' },
+      { key: 'bookings-school-trips', href: '/admin/trips', labelKey: 'menu.schoolTrips' },
       { key: 'bookings-free-ticket', href: '/admin/bookings/free-ticket', labelKey: 'dashboard.free_ticket' },
       { key: 'bookings-offer-bookings', href: '/admin/finance/offer-bookings', labelKey: 'finance.offerBookings' },
       { key: 'bookings-subscriptions', href: '/admin/finance/subscriptions', labelKey: 'finance.subscriptions' },

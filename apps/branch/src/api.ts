@@ -8,7 +8,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   const resp = await fetch(`${getApiBase()}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (!resp.ok) throw new Error(await safeText(resp) || 'Request failed')
+  if (!resp.ok) throw new Error(await parseErrorResponse(resp) || 'Request failed')
   return resp.json()
 }
 
@@ -29,7 +29,7 @@ export async function apiPost<T>(path: string, body: any, options?: { headers?: 
     headers,
     body: body instanceof FormData ? body : JSON.stringify(body),
   })
-  if (!resp.ok) throw new Error(await safeText(resp) || 'Request failed')
+  if (!resp.ok) throw new Error(await parseErrorResponse(resp) || 'Request failed')
   return resp.json()
 }
 
@@ -43,7 +43,7 @@ export async function apiPut<T>(path: string, body: any): Promise<T> {
     },
     body: JSON.stringify(body),
   })
-  if (!resp.ok) throw new Error(await safeText(resp) || 'Request failed')
+  if (!resp.ok) throw new Error(await parseErrorResponse(resp) || 'Request failed')
   return resp.json()
 }
 
@@ -57,7 +57,7 @@ export async function apiPatch<T>(path: string, body: any): Promise<T> {
     },
     body: JSON.stringify(body),
   })
-  if (!resp.ok) throw new Error(await safeText(resp) || 'Request failed')
+  if (!resp.ok) throw new Error(await parseErrorResponse(resp) || 'Request failed')
   return resp.json()
 }
 
@@ -69,10 +69,23 @@ export async function apiDelete<T>(path: string): Promise<T> {
       Authorization: `Bearer ${token}`,
     },
   })
-  if (!resp.ok) throw new Error(await safeText(resp) || 'Request failed')
+  if (!resp.ok) throw new Error(await parseErrorResponse(resp) || 'Request failed')
   try { return await resp.json() } catch { return undefined as unknown as T }
 }
 
 async function safeText(resp: Response): Promise<string | null> {
   try { return await resp.text() } catch { return null }
+}
+
+async function parseErrorResponse(resp: Response): Promise<string> {
+  const text = await safeText(resp);
+  if (!text) return 'Request failed';
+  try {
+    const json = JSON.parse(text) as { message?: string | string[] };
+    if (Array.isArray(json.message)) return json.message.join(' — ');
+    if (typeof json.message === 'string') return json.message;
+  } catch {
+    // not JSON
+  }
+  return text;
 }

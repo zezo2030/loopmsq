@@ -1145,7 +1145,7 @@ export class SubscriptionPurchasesService {
           LOWER(COALESCE(purchase."holderName", '')) LIKE :search OR
           LOWER(COALESCE(user.phone, '')) LIKE :search OR
           LOWER(COALESCE(branch.name_ar, branch.name_en, '')) LIKE :search OR
-          LOWER(COALESCE(subscriptionPlan.title, purchase.planSnapshot->>'title', '')) LIKE :search OR
+          LOWER(COALESCE(subscriptionPlan.title, purchase."planSnapshot"->>'title', '')) LIKE :search OR
           LOWER(COALESCE(purchase.id::text, '')) LIKE :search
         )`,
         { search },
@@ -1179,7 +1179,7 @@ export class SubscriptionPurchasesService {
         'paid',
       )
       .addSelect(
-        `COALESCE(SUM(CASE WHEN purchase.paymentStatus = :completedPaymentStatus THEN (purchase.planSnapshot->>'price')::numeric ELSE 0 END), 0)`,
+        `COALESCE(SUM(CASE WHEN purchase."paymentStatus" = :completedPaymentStatus THEN (purchase."planSnapshot"->>'price')::numeric ELSE 0 END), 0)`,
         'revenue',
       )
       .setParameters({

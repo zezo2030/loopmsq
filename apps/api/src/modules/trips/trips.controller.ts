@@ -68,6 +68,32 @@ export class TripsController {
     return this.tripsService.createRequest(user.id, dto);
   }
 
+  @Get('branch/me')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.BRANCH_MANAGER)
+  @ApiOperation({
+    summary: 'List school trip requests for the branch (Branch Manager only)',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'from', required: false, type: String })
+  @ApiQuery({ name: 'to', required: false, type: String })
+  async getBranchRequests(
+    @CurrentUser() user: any,
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 20,
+    @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.tripsService.findBranchRequests(user.branchId, page, limit, {
+      status,
+      from,
+      to,
+    });
+  }
+
   // Admin: list all trip requests with basic stats
   @Get('admin/all')
   @UseGuards(RolesGuard)

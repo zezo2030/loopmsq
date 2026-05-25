@@ -2096,19 +2096,77 @@ export class PaymentsService {
   }
 
   async handleWebhook(dto: WebhookEventDto) {
-    // Signature verification (mock but enforced via shared secret)
+    // Signature verification (Moyasar sends `secret_token` matching the
+    // shared secret configured in the dashboard).
     const expectedSecret =
       this.configService.get<string>('PAYMENT_WEBHOOK_SECRET') ||
       'dev-webhook-secret';
-    // In real gateway, you would compute signature from raw body + header secret
-    const providedSecret = (dto as any).secret || dto.data?.secret;
+    const providedSecret =
+      (dto as any).secret_token ||
+      (dto as any).secret ||
+      dto.data?.secret_token ||
+      dto.data?.secret;
     if (expectedSecret && providedSecret !== expectedSecret) {
       throw new UnauthorizedException('Invalid webhook signature');
     }
 
-    if (!dto.eventType || !dto.data?.paymentId) {
+    // Normalize Moyasar event payload to internal shape.
+    // Moyasar uses `type` ("payment_paid", "payment_failed", ...) and
+    // `data.id` for the gateway payment id. Older code paths used
+    // `eventType` ("payment.succeeded"/"payment.failed") and `data.paymentId`.
+    const rawType = (dto.type || dto.eventType || '').toString();
+    const moyasarEventMap: Record<string, string> = {
+      payment_paid: 'payment.succeeded',
+      payment_captured: 'payment.succeeded',
+      payment_authorized: 'payment.succeeded',
+      payment_failed: 'payment.failed',
+      payment_voided: 'payment.failed',
+      payment_expired: 'payment.failed',
+      payment_refunded: 'payment.refunded',
+    };
+    const eventType = moyasarEventMap[rawType] || rawType;
+
+    // Try to resolve our internal payment id from (in order):
+    //  1) data.metadata.paymentId (set by client when creating Moyasar payment)
+    //  2) data.paymentId (legacy)
+    //  3) lookup via gatewayRef = data.id (Moyasar's payment id)
+    const metadataPaymentId = (dto.data?.metadata as any)?.paymentId;
+    const moyasarPaymentId = dto.data?.id;
+    const candidateInternalId = metadataPaymentId || dto.data?.paymentId;
+
+    if (!eventType || (!candidateInternalId && !moyasarPaymentId)) {
       throw new BadRequestException('Invalid webhook');
     }
+
+    let payment: Payment | null = null;
+    if (candidateInternalId) {
+      payment = await this.paymentRepository.findOne({
+        where: { id: candidateInternalId },
+        relations: ['booking'],
+      });
+    }
+    if (!payment && moyasarPaymentId) {
+      payment = await this.paymentRepository.findOne({
+        where: { gatewayRef: moyasarPaymentId },
+        relations: ['booking'],
+      });
+    }
+    if (!payment) {
+      this.logger.warn(
+        `Webhook payment not found. moyasarId=${moyasarPaymentId} metaId=${metadataPaymentId}`,
+      );
+      throw new NotFoundException('Payment not found');
+    }
+
+    // Persist Moyasar's id on first webhook so later lookups work.
+    if (moyasarPaymentId && !payment.gatewayRef) {
+      payment.gatewayRef = moyasarPaymentId;
+      await this.paymentRepository.save(payment);
+    }
+
+    // Reshape dto so downstream code keeps working unchanged.
+    dto.eventType = eventType;
+    dto.data = { ...dto.data, paymentId: payment.id };
 
     // Idempotency for webhook processing
     const idempotencyKey = `pay:webhook:${dto.eventType}:${dto.data.paymentId}`;
@@ -2116,12 +2174,6 @@ export class PaymentsService {
     if (processed) {
       return { received: true, idempotent: true };
     }
-
-    const payment = await this.paymentRepository.findOne({
-      where: { id: dto.data.paymentId },
-      relations: ['booking'],
-    });
-    if (!payment) throw new NotFoundException('Payment not found');
 
     if (dto.eventType === 'payment.failed') {
       if (
@@ -2349,6 +2401,7 @@ export class PaymentsService {
     to?: string;
     userId?: string;
     bookingId?: string;
+    branchId?: string;
     page?: number;
     pageSize?: number;
   }) {
@@ -2359,6 +2412,7 @@ export class PaymentsService {
       to,
       userId,
       bookingId,
+      branchId,
       page = 1,
       pageSize = 20,
     } = params;
@@ -2366,6 +2420,23 @@ export class PaymentsService {
     const qb = this.paymentRepository
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.booking', 'b')
+      .leftJoin('p.eventRequest', 'er')
+      .leftJoin('p.tripRequest', 'tr')
+      .leftJoin('p.offerBooking', 'ob')
+      .leftJoin('p.subscriptionPurchase', 'sp')
+      .leftJoin('p.giftOrder', 'go')
+      .addSelect([
+        'er.id',
+        'er.branchId',
+        'tr.id',
+        'tr.branchId',
+        'ob.id',
+        'ob.branchId',
+        'sp.id',
+        'sp.branchId',
+        'go.id',
+        'go.branchId',
+      ])
       .orderBy('p.paidAt', 'DESC', 'NULLS LAST')
       .addOrderBy('p.createdAt', 'DESC');
 
@@ -2373,6 +2444,12 @@ export class PaymentsService {
     if (method) qb.andWhere('p.method = :method', { method });
     if (bookingId) qb.andWhere('p.bookingId = :bookingId', { bookingId });
     if (userId) qb.andWhere('b.userId = :userId', { userId });
+    if (branchId) {
+      qb.andWhere(
+        '(b.branchId = :branchId OR er.branchId = :branchId OR tr.branchId = :branchId OR ob.branchId = :branchId OR sp.branchId = :branchId OR go.branchId = :branchId)',
+        { branchId },
+      );
+    }
     if (from)
       qb.andWhere('(p.paidAt IS NOT NULL AND p.paidAt >= :from)', { from });
     if (to) qb.andWhere('(p.paidAt IS NOT NULL AND p.paidAt <= :to)', { to });
@@ -2382,6 +2459,18 @@ export class PaymentsService {
       .take(pageSize)
       .getManyAndCount();
 
-    return { items, total, page, pageSize };
+    const mapped = items.map((p: any) => {
+      const resolvedBranchId =
+        p.booking?.branchId ||
+        p.eventRequest?.branchId ||
+        p.tripRequest?.branchId ||
+        p.offerBooking?.branchId ||
+        p.subscriptionPurchase?.branchId ||
+        p.giftOrder?.branchId ||
+        null;
+      return { ...p, branchId: resolvedBranchId };
+    });
+
+    return { items: mapped, total, page, pageSize };
   }
 }

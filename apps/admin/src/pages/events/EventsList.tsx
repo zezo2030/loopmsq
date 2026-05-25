@@ -62,7 +62,10 @@ type EventRequest = {
     | 'paid'
     | 'confirmed'
     | 'rejected'
+    | 'cancelled'
   quotedPrice?: number
+  amountPaid?: number | null
+  refundDueAmount?: number | null
   createdAt: string
   updatedAt: string
 }
@@ -227,6 +230,7 @@ export default function EventsList() {
       case 'deposit_paid': return 'blue'
       case 'paid': return 'cyan'
       case 'rejected': return 'error'
+      case 'cancelled': return 'error'
       case 'draft': return 'default'
       default: return 'default'
     }
@@ -243,6 +247,7 @@ export default function EventsList() {
       case 'paid': return 'تم الدفع'
       case 'confirmed': return 'مؤكد'
       case 'rejected': return 'مرفوض'
+      case 'cancelled': return 'ملغي'
       default: return status
     }
   }
@@ -537,6 +542,7 @@ export default function EventsList() {
                   { label: 'تم الدفع', value: 'paid' },
                   { label: 'مؤكد', value: 'confirmed' },
                   { label: 'مرفوض', value: 'rejected' },
+                  { label: 'ملغي', value: 'cancelled' },
                 ]}
               />
 

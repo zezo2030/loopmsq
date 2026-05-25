@@ -11,6 +11,8 @@ import {
   Users,
   BarChart3,
   Wallet,
+  Gift,
+  BookOpen,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth, canViewRevenue, canManageWallets } from '../../shared/auth'
@@ -21,6 +23,8 @@ const navItems = [
   { key: 'offers', href: '/branch/offers', labelKey: 'cms.offers', icon: Tags },
   { key: 'coupons', href: '/branch/coupons', labelKey: 'cms.coupons', icon: Percent },
   { key: 'bookings', href: '/branch/bookings', labelKey: 'menu.bookings', icon: Calendar },
+  { key: 'private-events', href: '/branch/events', labelKey: 'menu.privateBookings', icon: Gift },
+  { key: 'school-trips', href: '/branch/trips', labelKey: 'menu.schoolTrips', icon: BookOpen },
   { key: 'offer-bookings', href: '/branch/offer-bookings', labelKey: 'menu.offerBookings', icon: Ticket },
   { key: 'subscriptions', href: '/branch/subscriptions', labelKey: 'menu.subscriptions', icon: BadgeCheck },
   { key: 'staff', href: '/branch/staff', labelKey: 'menu.staff', icon: Users },
