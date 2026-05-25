@@ -4,11 +4,13 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import { SupportTicket } from '../../database/entities/support-ticket.entity';
 import { EncryptionService } from '../../utils/encryption.util';
 import { AdminSeeder } from './admin.seeder';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Wallet])],
+  imports: [TypeOrmModule.forFeature([User, Wallet, Booking, SupportTicket])],
   controllers: [UsersController],
   providers: [UsersService, EncryptionService, AdminSeeder],
   exports: [UsersService],

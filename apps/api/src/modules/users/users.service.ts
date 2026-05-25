@@ -7,10 +7,18 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
+import {
+  Booking,
+  BookingStatus,
+} from '../../database/entities/booking.entity';
+import {
+  SupportTicket,
+  TicketStatus,
+} from '../../database/entities/support-ticket.entity';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -27,6 +35,10 @@ export class UsersService {
     private userRepository: Repository<User>,
     @InjectRepository(Wallet)
     private walletRepository: Repository<Wallet>,
+    @InjectRepository(Booking)
+    private bookingRepository: Repository<Booking>,
+    @InjectRepository(SupportTicket)
+    private supportTicketRepository: Repository<SupportTicket>,
     private encryptionService: EncryptionService,
   ) {}
 
@@ -772,26 +784,46 @@ export class UsersService {
   }
 
   async deleteMyAccount(userId: string): Promise<void> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['bookings', 'supportTickets'],
-    });
+    const user = await this.userRepository.findOne({ where: { id: userId } });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    // Check if user has active bookings or support tickets
-    if (
-      (user.bookings && user.bookings.length > 0) ||
-      (user.supportTickets && user.supportTickets.length > 0)
-    ) {
-      throw new BadRequestException(
-        'Cannot delete account with active bookings or support tickets. Please cancel bookings and close tickets first.',
-      );
+    const activeBookings = await this.bookingRepository.count({
+      where: {
+        userId,
+        status: In([BookingStatus.PENDING, BookingStatus.CONFIRMED]),
+      },
+    });
+
+    if (activeBookings > 0) {
+      throw new BadRequestException({
+        code: 'delete_account_active_bookings',
+        message:
+          'Cannot delete account with active bookings. Please cancel them first.',
+      });
     }
 
-    // Check if wallet has transactions
+    const openTickets = await this.supportTicketRepository.count({
+      where: {
+        userId,
+        status: In([
+          TicketStatus.OPEN,
+          TicketStatus.IN_PROGRESS,
+          TicketStatus.WAITING_FOR_CUSTOMER,
+        ]),
+      },
+    });
+
+    if (openTickets > 0) {
+      throw new BadRequestException({
+        code: 'delete_account_open_tickets',
+        message:
+          'Cannot delete account with open support tickets. Please close them first.',
+      });
+    }
+
     const wallet = await this.walletRepository.findOne({
       where: { userId },
       relations: ['transactions'] as any,
@@ -802,17 +834,17 @@ export class UsersService {
       (wallet as any).transactions &&
       (wallet as any).transactions.length > 0
     ) {
-      throw new BadRequestException(
-        'Cannot delete account with wallet transactions. Please contact support.',
-      );
+      throw new BadRequestException({
+        code: 'delete_account_wallet_transactions',
+        message:
+          'Cannot delete account with wallet transactions. Please contact support.',
+      });
     }
 
-    // Delete wallet if exists
     if (wallet) {
       await this.walletRepository.delete(wallet.id);
     }
 
-    // Delete user account
     await this.userRepository.delete(userId);
     this.logger.log(`User account deleted by user: ${userId}`);
   }
