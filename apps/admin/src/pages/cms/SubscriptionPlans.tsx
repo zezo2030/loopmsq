@@ -16,7 +16,7 @@ import {
 } from 'antd'
 import { useState } from 'react'
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../api'
-import { resolveFileUrl } from '../../shared/url'
+import { resolveFileUrl, resolveFileUrlWithBust } from '../../shared/url'
 import dayjs from 'dayjs'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../shared/auth'
@@ -105,25 +105,28 @@ export default function SubscriptionPlans() {
   const [form] = Form.useForm()
   const durationType = Form.useWatch('durationType', form)
   const usageMode = Form.useWatch('usageMode', form)
+  const coverImageUrl = Form.useWatch('imageUrl', form)
 
   const handleCoverImageUpload: UploadProps['beforeUpload'] = async (file) => {
-    if (!editing?.id) {
-      message.error(t('subscriptionPlans.save_first') || 'Save the plan first before uploading an image')
-      return Upload.LIST_IGNORE
-    }
-
     const formData = new FormData()
     formData.append('file', file)
 
     try {
-      const updated = await apiPost<SubscriptionPlan>(
-        `/admin/subscription-plans/${editing.id}/upload-cover`,
-        formData
-      )
+      if (editing?.id) {
+        const updated = await apiPost<SubscriptionPlan>(
+          `/admin/subscription-plans/${editing.id}/upload-cover`,
+          formData,
+        )
+        const url = updated.imageUrl || null
+        form.setFieldsValue({ imageUrl: url })
+        setEditing((prev) => (prev ? { ...prev, imageUrl: url ?? prev.imageUrl } : prev))
+      } else {
+        const res = await apiPost<{ imageUrl: string }>('/admin/offers/upload', formData)
+        form.setFieldsValue({ imageUrl: res.imageUrl })
+      }
       message.success(t('subscriptionPlans.image_uploaded') || 'Image uploaded successfully')
-      setEditing((prev) => prev ? { ...prev, imageUrl: updated.imageUrl || prev.imageUrl } : prev)
       qc.invalidateQueries({ queryKey: ['subscription-plans'] })
-    } catch (error) {
+    } catch {
       message.error(t('subscriptionPlans.image_upload_failed') || 'Failed to upload image')
     }
 
@@ -156,6 +159,20 @@ export default function SubscriptionPlans() {
     onSuccess: () => {
       message.success(t('subscriptionPlans.deactivated'))
       qc.invalidateQueries({ queryKey: ['subscription-plans'] })
+    },
+  })
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      apiPatch(`/admin/subscription-plans/${id}`, { isActive }),
+    onSuccess: (_data, { isActive }) => {
+      message.success(
+        isActive ? t('subscriptionPlans.activated') : t('subscriptionPlans.deactivated'),
+      )
+      qc.invalidateQueries({ queryKey: ['subscription-plans'] })
+    },
+    onError: (e: any) => {
+      message.error(e?.message || t('subscriptionPlans.toggle_failed'))
     },
   })
 
@@ -249,7 +266,14 @@ export default function SubscriptionPlans() {
     {
       title: t('subscriptionPlans.active'),
       dataIndex: 'isActive',
-      render: (v: boolean) => (v ? t('subscriptionPlans.yes') : t('subscriptionPlans.no')),
+      width: 90,
+      render: (v: boolean, r: SubscriptionPlan) => (
+        <Switch
+          checked={v}
+          loading={toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === r.id}
+          onChange={(checked) => toggleActiveMutation.mutate({ id: r.id, isActive: checked })}
+        />
+      ),
     },
     {
       title: t('subscriptionPlans.schedule'),
@@ -413,31 +437,27 @@ export default function SubscriptionPlans() {
           </Form.Item>
           <Form.Item label={t('subscriptionPlans.cover_image')}>
             <Space direction="vertical" style={{ width: '100%' }}>
-              {editing?.imageUrl ? (
-                <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <Image
-                    src={resolveFileUrl(editing.imageUrl)}
-                    alt="Cover"
-                    style={{ width: 200, height: 150, objectFit: 'cover', borderRadius: 8 }}
-                  />
-                </div>
-              ) : (
-                <Upload
-                  disabled={!editing?.id}
-                  beforeUpload={handleCoverImageUpload}
-                  showUploadList={false}
-                  accept="image/*"
-                >
-                  <Button icon={<UploadOutlined />} disabled={!editing?.id}>
-                    {t('subscriptionPlans.upload_cover') || 'Upload Cover Image'}
-                  </Button>
-                </Upload>
-              )}
-              {!editing?.id && (
-                <div style={{ color: '#6b7280', fontSize: 12 }}>
-                  {t('subscriptionPlans.save_first') || 'Save the plan first before uploading an image'}
-                </div>
-              )}
+              {coverImageUrl ? (
+                <Image
+                  src={resolveFileUrlWithBust(coverImageUrl)}
+                  alt="Cover"
+                  style={{ width: 200, height: 150, objectFit: 'cover', borderRadius: 8 }}
+                />
+              ) : null}
+              <Upload
+                beforeUpload={handleCoverImageUpload}
+                showUploadList={false}
+                accept="image/*"
+              >
+                <Button icon={<UploadOutlined />}>
+                  {coverImageUrl
+                    ? t('subscriptionPlans.change_cover')
+                    : t('subscriptionPlans.upload_cover')}
+                </Button>
+              </Upload>
+              <Form.Item name="imageUrl" hidden>
+                <Input />
+              </Form.Item>
             </Space>
           </Form.Item>
           <Form.Item name="price" label={t('subscriptionPlans.price')} rules={[{ required: true }]}>

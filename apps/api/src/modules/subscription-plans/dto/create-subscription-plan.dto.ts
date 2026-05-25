@@ -142,4 +142,13 @@ export class CreateSubscriptionPlanDto {
   @IsOptional()
   @IsBoolean()
   isGiftable?: boolean;
+
+  @ApiProperty({
+    description: 'Whether the plan is active and visible to customers',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
