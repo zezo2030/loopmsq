@@ -100,6 +100,7 @@ export class OfferBookingsService {
    */
   async getQuote(userId: string, dto: OfferQuoteDto) {
     const offer = await this.findActiveOffer(dto.offerProductId);
+    const quantity = this.resolveQuantity(dto.quantity, offer);
 
     if (!offer.canRepeatInSameOrder) {
       const existingBooking = await this.bookingRepo.findOne({
@@ -117,7 +118,7 @@ export class OfferBookingsService {
       }
     }
 
-    const subtotal = Number(offer.price);
+    const subtotal = Number(offer.price) * quantity;
     const resolvedAddOns = this.resolveSelectedAddOns(offer, dto.addOns);
     const addonsTotal = resolvedAddOns.reduce(
       (sum, item) => sum + item.price * item.quantity,
@@ -135,6 +136,7 @@ export class OfferBookingsService {
       offerTitle: offer.title,
       ticketMode: 'single_ticket',
       offerType: this.buildOfferTypeSummary(offer),
+      quantity,
       subtotal,
       addOns: resolvedAddOns,
       addonsTotal,
@@ -146,10 +148,31 @@ export class OfferBookingsService {
   }
 
   /**
+   * Normalize requested quantity. Enforces `canRepeatInSameOrder == false → 1`.
+   */
+  private resolveQuantity(
+    requested: number | undefined | null,
+    offer: OfferProduct,
+  ): number {
+    const raw = Number(requested ?? 1);
+    if (!Number.isFinite(raw) || raw < 1) {
+      return 1;
+    }
+    const clamped = Math.min(Math.floor(raw), 20);
+    if (!offer.canRepeatInSameOrder && clamped > 1) {
+      throw new BadRequestException(
+        'This offer cannot be purchased in multiple copies in the same order',
+      );
+    }
+    return clamped;
+  }
+
+  /**
    * Create an offer booking and initiate payment.
    */
   async createBooking(userId: string, dto: CreateOfferBookingDto) {
     const offer = await this.findActiveOffer(dto.offerProductId);
+    const quantity = this.resolveQuantity(dto.quantity, offer);
 
     if (!dto.acceptedTerms) {
       throw new BadRequestException(
@@ -173,7 +196,7 @@ export class OfferBookingsService {
       }
     }
 
-    const subtotal = Number(offer.price);
+    const subtotal = Number(offer.price) * quantity;
     const selectedAddOns = this.resolveSelectedAddOns(offer, dto.addOns);
     const addonsTotal = selectedAddOns.reduce(
       (sum, item) => sum + item.price * item.quantity,
@@ -189,7 +212,7 @@ export class OfferBookingsService {
       );
 
     // Create offer snapshot
-    const offerSnapshot = this.buildOfferSnapshot(offer);
+    const offerSnapshot = this.buildOfferSnapshot(offer, quantity);
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -201,6 +224,7 @@ export class OfferBookingsService {
         userId,
         branchId: offer.branchId,
         offerProductId: offer.id,
+        quantity,
         offerSnapshot,
         selectedAddOns: selectedAddOns.length > 0 ? selectedAddOns : null,
         subtotal,
@@ -234,6 +258,7 @@ export class OfferBookingsService {
         id: savedBooking.id,
         paymentId: savedPayment.id,
         paymentUrl: `/pay/${savedPayment.id}`, // Client-side payment URL
+        quantity,
         totalPrice,
         couponDiscount,
         currency: offer.currency || 'SAR',
@@ -300,21 +325,25 @@ export class OfferBookingsService {
       await queryRunner.manager.save(OfferBooking, booking);
 
       const tickets: OfferTicket[] = [];
+      const ticketKind = offer.offerCategory === OfferCategory.HOUR_BASED
+        ? OfferTicketKind.TIMED
+        : OfferTicketKind.STANDARD;
+      const ticketsToCreate = Math.max(1, Number(booking.quantity ?? 1));
 
-      const ticket = await this.createOfferTicket(
-        queryRunner,
-        booking,
-        offer,
-        offer.offerCategory === OfferCategory.HOUR_BASED
-          ? OfferTicketKind.TIMED
-          : OfferTicketKind.STANDARD,
-      );
-      tickets.push(ticket);
+      for (let i = 0; i < ticketsToCreate; i++) {
+        const ticket = await this.createOfferTicket(
+          queryRunner,
+          booking,
+          offer,
+          ticketKind,
+        );
+        tickets.push(ticket);
+      }
 
       await queryRunner.commitTransaction();
 
       this.logger.log(
-        `Offer booking ${offerBookingId} confirmed with ${tickets.length} ticket generated`,
+        `Offer booking ${offerBookingId} confirmed with ${tickets.length} ticket(s) generated`,
       );
 
       await this.notificationsService.enqueue({
@@ -323,7 +352,7 @@ export class OfferBookingsService {
         data: {
           bookingId: offerBookingId,
           offerTitle: offer.title,
-          ticketCount: 1,
+          ticketCount: tickets.length,
         },
         channels: ['push'],
         lang: 'ar',
@@ -882,6 +911,7 @@ export class OfferBookingsService {
         id: booking.id,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
+        quantity: Number(booking.quantity ?? 1),
         subtotal: Number(booking.subtotal || 0),
         addonsTotal: Number(booking.addonsTotal || 0),
         totalPrice: Number(booking.totalPrice || 0),
@@ -963,7 +993,7 @@ export class OfferBookingsService {
     return 'single_entry';
   }
 
-  private buildOfferSnapshot(offer: OfferProduct) {
+  private buildOfferSnapshot(offer: OfferProduct, quantity: number = 1) {
     return {
       id: offer.id,
       title: offer.title,
@@ -978,8 +1008,9 @@ export class OfferBookingsService {
       ticketConfig: offer.ticketConfig,
       hoursConfig: offer.hoursConfig,
       includedAddOns: offer.includedAddOns,
-      ticketCount: 1,
-      paidTicketsCount: 1,
+      quantity,
+      ticketCount: quantity,
+      paidTicketsCount: quantity,
       freeTicketsCount: 0,
       durationHours: offer.hoursConfig?.durationHours ?? null,
       bonusHours: offer.hoursConfig?.bonusHours ?? 0,
@@ -1053,6 +1084,7 @@ export class OfferBookingsService {
       id: booking.id,
       status: booking.status,
       paymentStatus: booking.paymentStatus,
+      quantity: Number(booking.quantity ?? 1),
       subtotal: Number(booking.subtotal || 0),
       addonsTotal: Number(booking.addonsTotal || 0),
       totalPrice: Number(booking.totalPrice || 0),

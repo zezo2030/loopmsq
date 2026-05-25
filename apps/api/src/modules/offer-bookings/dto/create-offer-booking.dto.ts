@@ -4,6 +4,7 @@ import {
   ValidateNested,
   IsInt,
   Min,
+  Max,
   IsString,
   IsBoolean,
   IsNotEmpty,
@@ -31,6 +32,18 @@ export class CreateOfferBookingDto {
   @ApiProperty({ description: 'Offer product ID', example: 'offer-uuid' })
   @IsUUID()
   offerProductId: string;
+
+  @ApiProperty({
+    description: 'Number of offer copies to purchase',
+    example: 1,
+    default: 1,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  quantity?: number;
 
   @ApiProperty({
     description: 'Selected add-ons with quantities',

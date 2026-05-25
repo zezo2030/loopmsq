@@ -43,6 +43,9 @@ export class OfferBooking {
   @Column({ type: 'uuid' })
   offerProductId: string;
 
+  @Column({ type: 'int', default: 1 })
+  quantity: number;
+
   @Column({ type: 'jsonb' })
   offerSnapshot: any;
 
