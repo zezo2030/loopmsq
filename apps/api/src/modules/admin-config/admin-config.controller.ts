@@ -6,6 +6,7 @@ import { AdminConfigService } from './admin-config.service';
 import { UpdateSmsConfigDto } from './dto/update-sms-config.dto';
 import { UpdateOtpConfigDto } from './dto/update-otp-config.dto';
 import { UpdatePrivateEventTermsDto } from './dto/update-private-event-terms.dto';
+import { UpdateAppVersionConfigDto } from './dto/update-app-version-config.dto';
 
 @ApiTags('admin-config')
 @ApiBearerAuth()
@@ -87,5 +88,17 @@ export class AdminConfigController {
   @ApiOperation({ summary: 'Update private event terms configuration' })
   async updatePrivateEventTerms(@Body() dto: UpdatePrivateEventTermsDto) {
     return this.service.updatePrivateEventTermsConfig(dto);
+  }
+
+  @Get('app-version')
+  @ApiOperation({ summary: 'Get forced-update / app version configuration' })
+  async getAppVersion() {
+    return this.service.getAppVersionConfig();
+  }
+
+  @Put('app-version')
+  @ApiOperation({ summary: 'Update forced-update / app version configuration' })
+  async updateAppVersion(@Body() dto: UpdateAppVersionConfigDto) {
+    return this.service.updateAppVersionConfig(dto);
   }
 }

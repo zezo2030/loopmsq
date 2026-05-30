@@ -104,6 +104,15 @@ export type PrivateEventTermsConfig = {
   terms: string[]
 }
 
+export type AppVersionConfig = {
+  enabled: boolean
+  minRequiredVersionAndroid: string
+  minRequiredVersionIos: string
+  androidStoreUrl: string
+  iosStoreUrl: string
+  message: string
+}
+
 export async function getWhatsAppConfig(): Promise<WhatsAppConfigMasked> {
   return apiGet('/admin/config/whatsapp')
 }
@@ -140,6 +149,14 @@ export async function getPrivateEventTermsConfig(): Promise<PrivateEventTermsCon
 
 export async function updatePrivateEventTermsConfig(body: PrivateEventTermsConfig): Promise<PrivateEventTermsConfig> {
   return apiPut('/admin/config/private-event-terms', body)
+}
+
+export async function getAppVersionConfig(): Promise<AppVersionConfig> {
+  return apiGet('/admin/config/app-version')
+}
+
+export async function updateAppVersionConfig(body: Partial<AppVersionConfig>): Promise<AppVersionConfig> {
+  return apiPut('/admin/config/app-version', body)
 }
 
 

@@ -25,6 +25,21 @@ type PrivateEventTermsConfig = {
   terms: string[];
 };
 
+type AppVersionConfig = {
+  enabled: boolean;
+  minRequiredVersionAndroid: string;
+  minRequiredVersionIos: string;
+  androidStoreUrl: string;
+  iosStoreUrl: string;
+  message: string;
+};
+
+type PublicAppVersion = {
+  minRequiredVersion: string;
+  storeUrl: string;
+  message: string;
+};
+
 type TestGiftTemplatePayload = {
   to: string;
   senderName: string;
@@ -39,6 +54,16 @@ export class AdminConfigService {
   private readonly smsKey = 'config:sms';
   private readonly otpKey = 'config:otp';
   private readonly privateEventTermsKey = 'config:private-event-terms';
+  private readonly appVersionKey = 'config:app-version';
+
+  static readonly DEFAULT_APP_VERSION_CONFIG: AppVersionConfig = {
+    enabled: false,
+    minRequiredVersionAndroid: '0.0.0',
+    minRequiredVersionIos: '0.0.0',
+    androidStoreUrl: '',
+    iosStoreUrl: '',
+    message: '',
+  };
 
   static readonly DEFAULT_PRIVATE_EVENT_TERMS = [
     '\u0639\u062f\u062f \u0627\u0644\u0623\u0641\u0631\u0627\u062f \u0644\u0627 \u064a\u0632\u064a\u062f \u0639\u0646 15 \u0634\u062e\u0635\u0627\u064b.',
@@ -207,6 +232,55 @@ export class AdminConfigService {
     const next: PrivateEventTermsConfig = { terms };
     await this.redis.set(this.privateEventTermsKey, next);
     return next;
+  }
+
+  async getAppVersionConfig(): Promise<AppVersionConfig> {
+    const cfg = (await this.redis.get(
+      this.appVersionKey,
+    )) as AppVersionConfig | null;
+    return { ...AdminConfigService.DEFAULT_APP_VERSION_CONFIG, ...(cfg || {}) };
+  }
+
+  async updateAppVersionConfig(
+    dto: Partial<AppVersionConfig>,
+  ): Promise<AppVersionConfig> {
+    const current = await this.getAppVersionConfig();
+    const next: AppVersionConfig = { ...current };
+
+    if (dto.enabled !== undefined) next.enabled = dto.enabled;
+    if (dto.minRequiredVersionAndroid !== undefined) {
+      next.minRequiredVersionAndroid = dto.minRequiredVersionAndroid;
+    }
+    if (dto.minRequiredVersionIos !== undefined) {
+      next.minRequiredVersionIos = dto.minRequiredVersionIos;
+    }
+    if (dto.androidStoreUrl !== undefined) {
+      next.androidStoreUrl = dto.androidStoreUrl;
+    }
+    if (dto.iosStoreUrl !== undefined) next.iosStoreUrl = dto.iosStoreUrl;
+    if (dto.message !== undefined) next.message = dto.message;
+
+    await this.redis.set(this.appVersionKey, next);
+    return next;
+  }
+
+  // Public payload consumed by the mobile app's force-update check.
+  async getPublicAppVersion(platform?: string): Promise<PublicAppVersion> {
+    const cfg = await this.getAppVersionConfig();
+    const isIos = String(platform || '').toLowerCase() === 'ios';
+
+    // When the gate is disabled, report "0.0.0" so no client is ever blocked.
+    const minRequiredVersion = cfg.enabled
+      ? isIos
+        ? cfg.minRequiredVersionIos
+        : cfg.minRequiredVersionAndroid
+      : '0.0.0';
+
+    return {
+      minRequiredVersion: minRequiredVersion || '0.0.0',
+      storeUrl: isIos ? cfg.iosStoreUrl : cfg.androidStoreUrl,
+      message: cfg.message || '',
+    };
   }
 
   private sanitizeTerms(terms?: string[] | null): string[] {

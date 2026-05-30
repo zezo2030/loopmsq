@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminConfigController } from './admin-config.controller';
+import { AppVersionController } from './app-version.controller';
 import { AdminConfigService } from './admin-config.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { EncryptionService } from '../../utils/encryption.util';
@@ -13,7 +14,7 @@ import { DeviceToken } from '../../database/entities/device-token.entity';
     forwardRef(() => NotificationsModule),
     TypeOrmModule.forFeature([User, DeviceToken]),
   ],
-  controllers: [AdminConfigController],
+  controllers: [AdminConfigController, AppVersionController],
   providers: [AdminConfigService, EncryptionService, RedisService],
   exports: [AdminConfigService],
 })

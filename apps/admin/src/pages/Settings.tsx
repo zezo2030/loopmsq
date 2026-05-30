@@ -6,6 +6,7 @@ import {
   BarChartOutlined,
   MessageOutlined,
   FileTextOutlined,
+  MobileOutlined,
 } from '@ant-design/icons'
 import { Card, Form, Switch, Input, Button, message, Tabs, Space, Row, Col, Typography } from 'antd'
 import { useTranslation } from 'react-i18next'
@@ -18,6 +19,8 @@ import {
   testGiftTemplate,
   getPrivateEventTermsConfig,
   updatePrivateEventTermsConfig,
+  getAppVersionConfig,
+  updateAppVersionConfig,
   type OtpConfig,
 } from '../shared/api'
 
@@ -58,8 +61,10 @@ export default function Settings() {
   const { t } = useTranslation()
   const [form] = Form.useForm()
   const [privateEventTermsForm] = Form.useForm()
+  const [appVersionForm] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [privateEventTermsLoading, setPrivateEventTermsLoading] = useState(false)
+  const [appVersionLoading, setAppVersionLoading] = useState(false)
 
   useEffect(() => {
     try {
@@ -109,7 +114,28 @@ export default function Settings() {
         setPrivateEventTermsLoading(false)
       }
     })()
-  }, [form, privateEventTermsForm])
+
+    ;(async () => {
+      setAppVersionLoading(true)
+      try {
+        const appVersion = await getAppVersionConfig().catch(() => null)
+        if (appVersion) {
+          appVersionForm.setFieldsValue({
+            enabled: appVersion.enabled,
+            minRequiredVersionAndroid: appVersion.minRequiredVersionAndroid,
+            minRequiredVersionIos: appVersion.minRequiredVersionIos,
+            androidStoreUrl: appVersion.androidStoreUrl,
+            iosStoreUrl: appVersion.iosStoreUrl,
+            message: appVersion.message,
+          })
+        }
+      } catch {
+        /* keep defaults */
+      } finally {
+        setAppVersionLoading(false)
+      }
+    })()
+  }, [form, privateEventTermsForm, appVersionForm])
 
   const onSave = async (values: any) => {
     setLoading(true)
@@ -418,6 +444,113 @@ export default function Settings() {
     </div>
   )
 
+  const appVersionTab = (
+    <div style={tabPaneWrap}>
+      <Form
+        form={appVersionForm}
+        layout="vertical"
+        requiredMark="optional"
+        onFinish={async (values: any) => {
+          setAppVersionLoading(true)
+          try {
+            await updateAppVersionConfig({
+              enabled: !!values.enabled,
+              minRequiredVersionAndroid: (values.minRequiredVersionAndroid || '0.0.0').trim(),
+              minRequiredVersionIos: (values.minRequiredVersionIos || '0.0.0').trim(),
+              androidStoreUrl: (values.androidStoreUrl || '').trim(),
+              iosStoreUrl: (values.iosStoreUrl || '').trim(),
+              message: (values.message || '').trim(),
+            })
+            message.success('تم حفظ إعدادات التحديث الإجباري')
+          } catch (e: any) {
+            message.error(e?.message || 'فشل في حفظ إعدادات التحديث الإجباري')
+          } finally {
+            setAppVersionLoading(false)
+          }
+        }}
+      >
+        <div style={sectionBox}>
+          <Title level={5} style={{ marginTop: 0, marginBottom: 4 }}>
+            التحديث الإجباري للتطبيق
+          </Title>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            عند التفعيل، أي مستخدم نسخته أقل من الحد الأدنى لن يستطيع فتح التطبيق حتى يُحدّثه من المتجر.
+          </Text>
+          <Form.Item
+            name="enabled"
+            label="تفعيل التحديث الإجباري"
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+          <Row gutter={[16, 0]}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="minRequiredVersionAndroid"
+                label="أقل نسخة مطلوبة (Android)"
+                rules={[
+                  {
+                    pattern: /^\d+(\.\d+){0,2}$/,
+                    message: 'الصيغة يجب أن تكون مثل 2.1.0',
+                  },
+                ]}
+              >
+                <Input placeholder="2.1.0" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="minRequiredVersionIos"
+                label="أقل نسخة مطلوبة (iOS)"
+                rules={[
+                  {
+                    pattern: /^\d+(\.\d+){0,2}$/,
+                    message: 'الصيغة يجب أن تكون مثل 2.1.0',
+                  },
+                ]}
+              >
+                <Input placeholder="2.1.0" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </div>
+
+        <div style={sectionBox}>
+          <Title level={5} style={{ marginTop: 0, marginBottom: 4 }}>
+            روابط المتاجر
+          </Title>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            الرابط الذي يُفتح عند الضغط على زر "تحديث الآن" داخل التطبيق.
+          </Text>
+          <Form.Item name="androidStoreUrl" label="رابط Google Play">
+            <Input placeholder="https://play.google.com/store/apps/details?id=..." />
+          </Form.Item>
+          <Form.Item name="iosStoreUrl" label="رابط App Store" style={{ marginBottom: 0 }}>
+            <Input placeholder="https://apps.apple.com/app/id..." />
+          </Form.Item>
+        </div>
+
+        <div style={{ ...sectionBox, marginBottom: 0 }}>
+          <Title level={5} style={{ marginTop: 0, marginBottom: 4 }}>
+            رسالة مخصصة (اختياري)
+          </Title>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            تُعرض بدل النص الافتراضي في شاشة التحديث. اترُكها فارغة لاستخدام النص الافتراضي.
+          </Text>
+          <Form.Item name="message" style={{ marginBottom: 0 }}>
+            <Input.TextArea rows={3} placeholder="مثال: أصدرنا تحديثًا مهمًا، يرجى التحديث للمتابعة." />
+          </Form.Item>
+        </div>
+
+        <FormActions>
+          <Button type="primary" htmlType="submit" loading={appVersionLoading} size="large">
+            حفظ الإعدادات
+          </Button>
+        </FormActions>
+      </Form>
+    </div>
+  )
+
   const tabLabel = (icon: ReactNode, text: string) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
       {icon}
@@ -464,6 +597,11 @@ export default function Settings() {
                   key: 'private-events',
                   label: tabLabel(<FileTextOutlined />, 'المناسبات الخاصة'),
                   children: privateEventsTab,
+                },
+                {
+                  key: 'app-version',
+                  label: tabLabel(<MobileOutlined />, 'التحديث الإجباري'),
+                  children: appVersionTab,
                 },
               ]}
             />
