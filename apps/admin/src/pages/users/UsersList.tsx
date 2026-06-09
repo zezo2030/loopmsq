@@ -31,8 +31,10 @@ function getApiBase(): string {
 export default function UsersList() {
   const { t } = useTranslation()
   const [rows, setRows] = useState<UserRow[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('')
   const [page, setPage] = useState<number>(1)
   const [pageSize, setPageSize] = useState<number>(20)
@@ -40,28 +42,45 @@ export default function UsersList() {
   const navigate = useNavigate()
 
   useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchText.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [searchText])
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchQuery])
+
+  useEffect(() => {
     let mounted = true
     ;(async () => {
       setLoading(true)
       try {
         const token = localStorage.getItem('accessToken')
-        const resp = await fetch(`${getApiBase()}/users?page=1&limit=50`, {
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(pageSize),
+        })
+        if (roleFilter) params.set('role', roleFilter)
+        if (searchQuery) params.set('q', searchQuery)
+        const resp = await fetch(`${getApiBase()}/users?${params.toString()}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!resp.ok) throw new Error(t('users.load_failed') || 'Failed to load users')
         const data = await resp.json()
         if (!mounted) return
         setRows(data.users || [])
+        setTotal(typeof data.total === 'number' ? data.total : (data.users || []).length)
       } catch {
         if (!mounted) return
         setRows([])
+        setTotal(0)
       } finally {
         if (!mounted) return
         setLoading(false)
       }
     })()
     return () => { mounted = false }
-  }, [])
+  }, [page, pageSize, roleFilter, searchQuery, t])
 
   // Initialize filters from URL on mount
   useEffect(() => {
@@ -85,17 +104,6 @@ export default function UsersList() {
     next.set('pageSize', String(pageSize))
     setSearchParams(next, { replace: true })
   }, [searchText, roleFilter, page, pageSize, setSearchParams])
-
-  const filteredData = rows.filter(user => {
-    const matchesSearch = !searchText || 
-      user.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchText.toLowerCase()) ||
-      user.phone?.includes(searchText)
-    
-    const matchesRole = !roleFilter || user.roles?.includes(roleFilter)
-    
-    return matchesSearch && matchesRole
-  })
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -337,7 +345,10 @@ export default function UsersList() {
               <Select
                 placeholder={t('users.filter_by_role') || 'Filter by role'}
                 value={roleFilter}
-                onChange={setRoleFilter}
+                onChange={(value) => {
+                  setRoleFilter(value)
+                  setPage(1)
+                }}
                 style={{ width: 180 }}
                 size="large"
                 allowClear
@@ -356,16 +367,19 @@ export default function UsersList() {
           <div className="custom-table">
             <Table<UserRow>
               rowKey="id"
-              dataSource={filteredData}
+              dataSource={rows}
               columns={columns}
               loading={loading}
               pagination={{
-                total: filteredData.length,
+                total,
                 current: page,
                 pageSize,
                 showSizeChanger: true,
                 showQuickJumper: true,
-                onChange: (p, ps) => { setPage(p); setPageSize(ps) },
+                onChange: (p, ps) => {
+                  setPage(p)
+                  if (ps !== pageSize) setPageSize(ps)
+                },
                 showTotal: (total, range) => `${range[0]}-${range[1]} ${t('common.of') || 'of'} ${total} ${t('users.users') || 'users'}`,
               }}
               scroll={{ x: 800 }}

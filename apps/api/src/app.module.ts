@@ -43,6 +43,7 @@ import { SubscriptionPlansModule } from './modules/subscription-plans/subscripti
 import { SubscriptionPurchasesModule } from './modules/subscription-purchases/subscription-purchases.module';
 import { GiftOrdersModule } from './modules/gift-orders/gift-orders.module';
 import { AdminNotificationsModule } from './modules/admin-notifications/admin-notifications.module';
+import { InvoicingModule } from './modules/invoicing/invoicing.module';
 
 // Resolve uploads root dynamically to support local and Docker paths, with env override
 const defaultUploadsCandidates = [
@@ -163,6 +164,7 @@ function resolveUploadsRootFromEnvOrDefault(config?: ConfigService): string {
     ReferralsModule,
     SearchModule,
     AdminConfigModule,
+    InvoicingModule,
     RealtimeModule,
     OfferProductsModule,
     OfferBookingsModule,

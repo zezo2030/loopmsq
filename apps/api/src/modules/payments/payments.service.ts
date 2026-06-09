@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   UnauthorizedException,
   forwardRef,
 } from '@nestjs/common';
@@ -43,6 +44,7 @@ import { resolveEventTicketWindow } from '../../utils/event-ticket-window.util';
 import { OfferBookingsService } from '../offer-bookings/offer-bookings.service';
 import { SubscriptionPurchasesService } from '../subscription-purchases/subscription-purchases.service';
 import { CouponsService } from '../coupons/coupons.service';
+import { InvoiceQueueService } from '../invoicing/invoice-queue.service';
 import {
   OfferBooking,
   OfferBookingPaymentStatus,
@@ -101,7 +103,25 @@ export class PaymentsService {
     private readonly offerBookingsService?: OfferBookingsService,
     private readonly subscriptionPurchasesService?: SubscriptionPurchasesService,
     private readonly couponsService?: CouponsService,
+    @Optional()
+    private readonly invoiceQueue?: InvoiceQueueService,
   ) {}
+
+  /**
+   * Fire-and-forget: queue ZATCA e-invoice issuance for a completed payment.
+   * Never throws — invoicing must not affect the payment flow. The invoicing
+   * service itself decides whether the payment is an invoiceable supply.
+   */
+  private queueEInvoice(paymentId?: string | null): void {
+    if (!paymentId || !this.invoiceQueue) return;
+    this.invoiceQueue.enqueue(paymentId).catch((e) => {
+      this.logger.warn(
+        `Failed to enqueue e-invoice for payment ${paymentId}: ${
+          e?.message || e
+        }`,
+      );
+    });
+  }
 
   private normalizePaymentJson(value: unknown): Record<string, any> | null {
     if (!value) return null;
@@ -1972,6 +1992,9 @@ export class PaymentsService {
         };
       }
 
+      // Queue ZATCA e-invoice issuance (non-blocking, post-commit).
+      this.queueEInvoice(payment.id);
+
       // Post-confirmation actions (tickets, notifications) - outside transaction
       // Use savedBooking if it was created, otherwise use booking.id, or null if neither exists
       const bookingIdForLoyalty = savedBooking
@@ -2305,6 +2328,9 @@ export class PaymentsService {
             );
           }
         }
+
+        // Queue ZATCA e-invoice issuance (non-blocking) now that it's completed.
+        this.queueEInvoice(payment.id);
       }
     }
 

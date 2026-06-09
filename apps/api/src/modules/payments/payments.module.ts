@@ -22,6 +22,7 @@ import { GiftOrdersModule } from '../gift-orders/gift-orders.module';
 import { TripsModule } from '../trips/trips.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { CouponsModule } from '../coupons/coupons.module';
+import { InvoicingModule } from '../invoicing/invoicing.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { CouponsModule } from '../coupons/coupons.module';
     forwardRef(() => GiftOrdersModule),
     forwardRef(() => TripsModule),
     CouponsModule,
+    InvoicingModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, RedisService, MoyasarService, QRCodeService],

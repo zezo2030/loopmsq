@@ -39,6 +39,8 @@ import OrganizingBranches from './pages/cms/OrganizingBranches'
 import IntroVideo from './pages/cms/IntroVideo'
 import PaymentsList from './pages/finance/PaymentsList'
 import PaymentDetail from './pages/finance/PaymentDetail'
+import EInvoicesList from './pages/finance/EInvoicesList'
+import EInvoiceDetail from './pages/finance/EInvoiceDetail'
 import GiftRefundRequests from './pages/finance/GiftRefundRequests'
 import SubscriptionsList from './pages/transactions/SubscriptionsList'
 import OfferBookingsList from './pages/transactions/OfferBookingsList'
@@ -153,6 +155,8 @@ const router = createBrowserRouter([
           // Finance
           { path: 'finance/payments', element: <PaymentsList /> },
           { path: 'finance/payments/:id', element: <PaymentDetail /> },
+          { path: 'finance/einvoices', element: <EInvoicesList /> },
+          { path: 'finance/einvoices/:id', element: <EInvoiceDetail /> },
           { path: 'finance/wallets', element: <WalletsList /> },
           { path: 'finance/gift-refunds', element: <GiftRefundRequests /> },
           { path: 'finance/subscriptions', element: <SubscriptionsList /> },

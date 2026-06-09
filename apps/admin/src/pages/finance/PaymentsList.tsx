@@ -1,6 +1,8 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Card, Table, Tag, Input, Select, DatePicker, Space, Button } from 'antd'
+import { Card, Table, Tag, Input, Select, DatePicker, Space, Button, message } from 'antd'
+import { DownloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
+import * as XLSX from 'xlsx'
 import { apiGet } from '../../api'
 import { formatDayjsDisplayAr } from '../../utils/formatDateTimeDisplay'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -51,6 +53,7 @@ export default function PaymentsList() {
   const [to, setTo] = useState<string | undefined>()
   const [page, setPage] = useState<number>(1)
   const [pageSize, setPageSize] = useState<number>(20)
+  const [exporting, setExporting] = useState<boolean>(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const queryKey = useMemo(() => ['payments', { status, method, userId, bookingId, branchId, from, to, page, pageSize }], [status, method, userId, bookingId, branchId, from, to, page, pageSize])
@@ -178,9 +181,96 @@ export default function PaymentsList() {
     },
   ]
 
+  const referenceText = (r: PaymentItem) => {
+    const refs: string[] = []
+    if (r.bookingId) refs.push(`${t('payments.ref_booking') || 'Booking'}: ${r.bookingId}`)
+    if (r.eventRequestId) refs.push(`${t('payments.ref_event') || 'Event'}: ${r.eventRequestId}`)
+    if (r.tripRequestId) refs.push(`${t('payments.ref_trip') || 'Trip'}: ${r.tripRequestId}`)
+    if (r.offerBookingId) refs.push(`${t('payments.ref_offer') || 'Offer'}: ${r.offerBookingId}`)
+    if (r.subscriptionPurchaseId) refs.push(`${t('payments.ref_subscription') || 'Subscription'}: ${r.subscriptionPurchaseId}`)
+    if (r.giftOrderId) refs.push(`${t('payments.ref_gift') || 'Gift'}: ${r.giftOrderId}`)
+    return refs.length ? refs.join(' | ') : '-'
+  }
+
+  const exportToExcel = async () => {
+    setExporting(true)
+    try {
+      // Fetch all pages matching the current filters (API caps pageSize at 100)
+      const all: PaymentItem[] = []
+      let p = 1
+      const ps = 100
+      for (;;) {
+        const params = new URLSearchParams()
+        if (status) params.set('status', status)
+        if (method) params.set('method', method)
+        if (userId) params.set('userId', userId)
+        if (bookingId) params.set('bookingId', bookingId)
+        if (branchId) params.set('branchId', branchId)
+        if (from) params.set('from', from)
+        if (to) params.set('to', to)
+        params.set('page', String(p))
+        params.set('pageSize', String(ps))
+        const resp = await apiGet<PaymentsResponse>(`/payments?${params.toString()}`)
+        all.push(...(resp.items || []))
+        if (all.length >= resp.total || (resp.items || []).length === 0 || p >= 200) break
+        p += 1
+      }
+
+      const headers = {
+        id: t('payments.id') || 'Payment ID',
+        reference: t('payments.reference') || 'Reference',
+        branch: t('payments.branch') || 'Branch',
+        amount: t('payments.amount') || 'Amount',
+        status: t('payments.status') || 'Status',
+        method: t('payments.method') || 'Method',
+        paidAt: t('payments.paid_at') || 'Paid At',
+      }
+      const rows = all.map(r => ({
+        [headers.id]: r.id,
+        [headers.reference]: referenceText(r),
+        [headers.branch]: r.branchId ? (branches.find(x => x.id === r.branchId)?.name || r.branchId) : '-',
+        [headers.amount]: `${r.amount} ${r.currency}`,
+        [headers.status]: t(`payments.status_${r.status}`) || r.status,
+        [headers.method]: t(`payments.method_${r.method}`) || r.method,
+        [headers.paidAt]: r.paidAt ? formatDayjsDisplayAr(r.paidAt) : '-',
+      }))
+
+      const ws = XLSX.utils.json_to_sheet(rows, { header: Object.values(headers) })
+      ws['!cols'] = [
+        { wch: 38 }, // id
+        { wch: 50 }, // reference
+        { wch: 22 }, // branch
+        { wch: 14 }, // amount
+        { wch: 14 }, // status
+        { wch: 16 }, // method
+        { wch: 22 }, // paidAt
+      ]
+      const wb = XLSX.utils.book_new()
+      wb.Workbook = { Views: [{ RTL: true }] }
+      XLSX.utils.book_append_sheet(wb, ws, t('payments.payments') || 'Payments')
+      const today = new Date().toISOString().slice(0, 10)
+      XLSX.writeFile(wb, `payments_${today}.xlsx`)
+      message.success(t('payments.export_done') || 'تم التصدير بنجاح')
+    } catch {
+      message.error(t('payments.export_failed') || 'تعذّر التصدير')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="page-container" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
-      <Card title={t('payments.title') || 'Payments'} extra={<Button onClick={() => refetch()}>{t('common.refresh') || 'Refresh'}</Button>}>
+      <Card
+        title={t('payments.title') || 'Payments'}
+        extra={
+          <Space>
+            <Button icon={<DownloadOutlined />} loading={exporting} onClick={exportToExcel}>
+              {t('payments.export_excel') || 'تصدير إكسل'}
+            </Button>
+            <Button onClick={() => refetch()}>{t('common.refresh') || 'Refresh'}</Button>
+          </Space>
+        }
+      >
       <Space style={{ marginBottom: 16 }} wrap>
         <Select
           allowClear

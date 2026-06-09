@@ -30,11 +30,22 @@ function getApiBase(): string {
 export default function ClientsList() {
   const { t } = useTranslation()
   const [rows, setRows] = useState<UserRow[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [page, setPage] = useState<number>(1)
   const [pageSize, setPageSize] = useState<number>(20)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchText.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [searchText])
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchQuery])
 
   useEffect(() => {
     let mounted = true
@@ -42,35 +53,31 @@ export default function ClientsList() {
       setLoading(true)
       try {
         const token = localStorage.getItem('accessToken')
-        const resp = await fetch(`${getApiBase()}/users?page=1&limit=100`, {
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(pageSize),
+          role: 'user',
+        })
+        if (searchQuery) params.set('q', searchQuery)
+        const resp = await fetch(`${getApiBase()}/users?${params.toString()}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!resp.ok) throw new Error(t('users.load_failed') || 'Failed to load users')
         const data = await resp.json()
         if (!mounted) return
         setRows(data.users || [])
+        setTotal(typeof data.total === 'number' ? data.total : (data.users || []).length)
       } catch {
         if (!mounted) return
         setRows([])
+        setTotal(0)
       } finally {
         if (!mounted) return
         setLoading(false)
       }
     })()
     return () => { mounted = false }
-  }, [])
-
-  // Filter clients (users with role 'user')
-  const clients = rows.filter(user => 
-    user.roles?.includes('user') || user.roles?.includes('USER')
-  )
-
-  const filteredClients = clients.filter(client => {
-    return !searchText || 
-      client.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      client.email?.toLowerCase().includes(searchText.toLowerCase()) ||
-      client.phone?.includes(searchText)
-  })
+  }, [page, pageSize, searchQuery, t])
 
   const clientColumns = [
     {
@@ -170,7 +177,7 @@ export default function ClientsList() {
               {t('users.add_client') || 'إضافة عميل'}
             </Button>
             <Tag color="green" style={{ fontSize: '16px', padding: '8px 16px', fontWeight: '600' }}>
-              {filteredClients.length} {t('users.clients.total') || 'عميل'}
+              {total} {t('users.clients.total') || 'عميل'}
             </Tag>
           </Space>
         </div>
@@ -202,16 +209,19 @@ export default function ClientsList() {
           <div className="custom-table">
             <Table<UserRow>
               rowKey="id"
-              dataSource={filteredClients}
+              dataSource={rows}
               columns={clientColumns}
               loading={loading}
               pagination={{
-                total: filteredClients.length,
+                total,
                 current: page,
                 pageSize,
                 showSizeChanger: true,
                 showQuickJumper: true,
-                onChange: (p, ps) => { setPage(p); setPageSize(ps) },
+                onChange: (p, ps) => {
+                  setPage(p)
+                  if (ps !== pageSize) setPageSize(ps)
+                },
                 showTotal: (total, range) => `${range[0]}-${range[1]} ${t('common.of') || 'من'} ${total} ${t('users.clients.client') || 'عميل'}`,
               }}
               scroll={{ x: 800 }}

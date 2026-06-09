@@ -57,6 +57,13 @@ export {
 } from './gift-order.entity';
 export { GiftOrderEvent } from './gift-order-event.entity';
 export {
+  EInvoice,
+  EInvoiceType,
+  EInvoiceDocumentType,
+  EInvoiceStatus,
+} from './einvoice.entity';
+export { ZatcaCredential } from './zatca-credential.entity';
+export {
   AdminNotification,
   type AdminNotificationType,
   type AdminNotificationSeverity,

@@ -64,6 +64,25 @@ export class User {
     canManageWallets?: boolean;
   } | null;
 
+  // Optional tax/billing profile. When `vatNumber` is set, the buyer is treated
+  // as a business and their purchases are issued as STANDARD (B2B) e-invoices
+  // with full buyer details; otherwise invoices are SIMPLIFIED (B2C).
+  @Column({ type: 'jsonb', nullable: true })
+  billingProfile?: {
+    vatNumber?: string; // 15-digit buyer VAT
+    companyName?: string;
+    idScheme?: string; // CRN | MOM | MLS | 700 | SAG | NAT ...
+    idValue?: string;
+    street?: string;
+    buildingNumber?: string;
+    plotIdentification?: string; // additional number (KSA-19), 4 digits
+    citySubdivision?: string; // neighborhood (KSA-3)
+    city?: string;
+    postalZone?: string;
+    countrySubentity?: string;
+    countryCode?: string; // default SA
+  } | null;
+
   @Column({ type: 'timestamp', nullable: true })
   lastLoginAt: Date;
 

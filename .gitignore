@@ -7,3 +7,7 @@ QUICK_START.md
 FIXES_BRANCHES_HALLS.md
 response.md
 .env
+
+# ZATCA SDK jar is licensed by ZATCA — keep it out of git
+apps/api/zatca-sdk/*.jar
+apps/api/zatca-sdk/zatca-envoice-sdk-*/

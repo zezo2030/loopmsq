@@ -90,6 +90,7 @@ const navItems: Array<{
     icon: DollarSign,
     children: [
       { key: 'finance-payments', href: '/admin/finance/payments', labelKey: 'finance.payments' },
+      { key: 'finance-einvoices', href: '/admin/finance/einvoices', labelKey: 'finance.einvoices' },
       { key: 'finance-wallets', href: '/admin/finance/wallets', labelKey: 'finance.wallets' },
     ],
   },

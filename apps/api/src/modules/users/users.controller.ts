@@ -113,6 +113,18 @@ export class UsersController {
     type: Number,
     description: 'Items per page',
   })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    type: String,
+    description: 'Filter by role',
+  })
+  @ApiQuery({
+    name: 'q',
+    required: false,
+    type: String,
+    description: 'Search by name or email',
+  })
   @ApiResponse({ status: 200, description: 'Users retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -120,8 +132,10 @@ export class UsersController {
     @CurrentUser() requester: User,
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+    @Query('role') role?: string,
+    @Query('q') q?: string,
   ) {
-    return this.usersService.findAll(page, limit, requester);
+    return this.usersService.findAll(page, limit, requester, { role, q });
   }
 
   @Get('stats')

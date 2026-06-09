@@ -225,18 +225,20 @@ export class UsersService {
     page: number = 1,
     limit: number = 10,
     requester?: User,
+    options?: { role?: string; q?: string },
   ): Promise<{
     users: Partial<User>[];
     total: number;
     page: number;
     totalPages: number;
   }> {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safePage = Math.max(page, 1);
+
     const qb = this.userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.wallet', 'wallet')
-      .orderBy('user.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
+      .orderBy('user.createdAt', 'DESC');
 
     // Branch Manager can only see users in their branch
     if (
@@ -248,7 +250,22 @@ export class UsersService {
       });
     }
 
-    const [users, total] = await qb.getManyAndCount();
+    if (options?.role) {
+      qb.andWhere(':role = ANY(user.roles)', { role: options.role });
+    }
+
+    const q = options?.q?.trim();
+    if (q) {
+      qb.andWhere(
+        '(LOWER(user.name) LIKE LOWER(:q) OR LOWER(user.email) LIKE LOWER(:q))',
+        { q: `%${q}%` },
+      );
+    }
+
+    const [users, total] = await qb
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
+      .getManyAndCount();
 
     const decryptedUsers = users.map((user) => ({
       id: user.id,
@@ -268,8 +285,8 @@ export class UsersService {
     return {
       users: decryptedUsers,
       total,
-      page,
-      totalPages: Math.ceil(total / limit),
+      page: safePage,
+      totalPages: Math.ceil(total / safeLimit),
     };
   }
 

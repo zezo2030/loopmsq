@@ -1,6 +1,15 @@
 # API (NestJS) Dockerfile for Development with Hot Reload
 FROM node:20
 
+# ZATCA e-invoicing toolchain: JDK 11 (secp256k1; ZATCA requires >=11 and <15)
+# + openssl for CSR/key generation.
+COPY --from=eclipse-temurin:11-jre /opt/java/openjdk /opt/java/openjdk
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH="/opt/java/openjdk/bin:${PATH}"
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+ENV ZATCA_JAVA_BIN=java ZATCA_OPENSSL_BIN=openssl
+
 WORKDIR /app/apps/api
 
 # Copy package files
