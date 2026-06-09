@@ -11,6 +11,7 @@ import { SubscriptionPurchase } from '../../database/entities/subscription-purch
 import { User } from '../../database/entities/user.entity';
 import { InvoicingService } from './invoicing.service';
 import { InvoicingController } from './invoicing.controller';
+import { CustomerInvoicingController } from './customer-invoicing.controller';
 import { InvoiceQueueService, EINVOICE_QUEUE } from './invoice-queue.service';
 import { InvoiceProcessor } from './invoice.processor';
 import { InvoiceCompositionService } from './invoice-composition.service';
@@ -32,7 +33,7 @@ import { ZatcaSignerService } from '../../integrations/zatca/zatca-signer.servic
     ]),
     BullModule.registerQueue({ name: EINVOICE_QUEUE }),
   ],
-  controllers: [InvoicingController],
+  controllers: [InvoicingController, CustomerInvoicingController],
   providers: [
     InvoicingService,
     InvoiceQueueService,

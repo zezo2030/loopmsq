@@ -40,6 +40,45 @@ import { InvoiceCompositionService } from './invoice-composition.service';
  */
 const INITIAL_PIH = 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
 
+/** Purchase types the customer app can request an e-invoice for. */
+export const CUSTOMER_INVOICE_SOURCES = [
+  'booking',
+  'offer-booking',
+  'trip',
+  'subscription',
+  'gift-order',
+  'event',
+] as const;
+export type CustomerInvoiceSource = (typeof CUSTOMER_INVOICE_SOURCES)[number];
+
+/** Maps each source to the Payment relation and its owner column. */
+const SOURCE_OWNERSHIP: Record<
+  CustomerInvoiceSource,
+  { relation: string; ownerColumn: string }
+> = {
+  booking: { relation: 'booking', ownerColumn: 'userId' },
+  'offer-booking': { relation: 'offerBooking', ownerColumn: 'userId' },
+  trip: { relation: 'tripRequest', ownerColumn: 'requesterId' },
+  subscription: { relation: 'subscriptionPurchase', ownerColumn: 'userId' },
+  'gift-order': { relation: 'giftOrder', ownerColumn: 'senderUserId' },
+  event: { relation: 'eventRequest', ownerColumn: 'requesterId' },
+};
+
+/** Display-safe e-invoice projection returned to the customer app. */
+export interface CustomerInvoiceView {
+  id: string;
+  invoiceNumber: string;
+  uuid: string;
+  type: EInvoiceType;
+  status: EInvoiceStatus;
+  totalExclVat: number;
+  totalVat: number;
+  totalInclVat: number;
+  currency: string;
+  qrCode: string | null;
+  issuedAt: Date;
+}
+
 @Injectable()
 export class InvoicingService {
   private readonly logger = new Logger(InvoicingService.name);
@@ -501,6 +540,49 @@ export class InvoicingService {
     const inv = await this.invoiceRepo.findOne({ where: { id } });
     if (!inv) throw new NotFoundException('Invoice not found');
     return inv;
+  }
+
+  /**
+   * Customer-facing: latest ZATCA-accepted e-invoice for a purchase owned by
+   * the given user. Returns only display-safe fields (no XML / internals).
+   */
+  async findForCustomer(
+    userId: string,
+    source: CustomerInvoiceSource,
+    recordId: string,
+  ): Promise<{ found: boolean; invoice: CustomerInvoiceView | null }> {
+    const { relation, ownerColumn } = SOURCE_OWNERSHIP[source];
+
+    const inv = await this.invoiceRepo
+      .createQueryBuilder('inv')
+      .innerJoin('inv.payment', 'p')
+      .innerJoin(`p.${relation}`, 'src')
+      .where('src.id = :recordId', { recordId })
+      .andWhere(`src.${ownerColumn} = :userId`, { userId })
+      .andWhere('inv.status IN (:...statuses)', {
+        statuses: [EInvoiceStatus.REPORTED, EInvoiceStatus.CLEARED],
+      })
+      .orderBy('inv.icv', 'DESC')
+      .getOne();
+
+    if (!inv) return { found: false, invoice: null };
+
+    return {
+      found: true,
+      invoice: {
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        uuid: inv.uuid,
+        type: inv.type,
+        status: inv.status,
+        totalExclVat: Number(inv.totalExclVat),
+        totalVat: Number(inv.totalVat),
+        totalInclVat: Number(inv.totalInclVat),
+        currency: inv.currency,
+        qrCode: inv.qrCode,
+        issuedAt: inv.createdAt,
+      },
+    };
   }
 
   async list(limit = 50, offset = 0): Promise<{ items: EInvoice[]; total: number }> {
