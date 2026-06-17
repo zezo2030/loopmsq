@@ -25,6 +25,12 @@ export default function BranchInfo() {
     loadBranchData()
   }, [])
 
+  useEffect(() => {
+    if (branchData?.hasEventBookings === false && activeTab === 'hall') {
+      setActiveTab('details')
+    }
+  }, [branchData?.hasEventBookings, activeTab])
+
   const loadBranchData = async () => {
     if (!me?.branchId) return
     
@@ -41,6 +47,8 @@ export default function BranchInfo() {
         workingHours: data.workingHours,
         descriptionAr: data.descriptionAr,
         descriptionEn: data.descriptionEn,
+        hasEventBookings: data.hasEventBookings !== false,
+        hasSchoolTrips: data.hasSchoolTrips !== false,
       })
     } catch (error) {
       message.error(t('branch.load_failed') || 'Failed to load branch data')
@@ -52,7 +60,11 @@ export default function BranchInfo() {
     
     setLoading(true)
     try {
-      await apiPut(`/content/branches/${me.branchId}`, values)
+      await apiPut(`/content/branches/${me.branchId}`, {
+        ...values,
+        hasEventBookings: values.hasEventBookings !== false,
+        hasSchoolTrips: values.hasSchoolTrips !== false,
+      })
       message.success(t('branch.updated') || 'Branch updated successfully')
       setIsEditing(false)
       loadBranchData()
@@ -268,6 +280,39 @@ export default function BranchInfo() {
                       </Form.Item>
                     </Col>
                   </Row>
+
+                  <Divider />
+
+                  <Typography.Title level={5} style={{ marginTop: 0 }}>
+                    {t('branch.booking_options') || 'خيارات الحجز'}
+                  </Typography.Title>
+                  <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
+                    {t('branch.booking_options_hint') || 'يمكنك تفعيل أو إيقاف كل نوع حجز بشكل مستقل لهذا الفرع.'}
+                  </Typography.Paragraph>
+
+                  <Form.Item
+                    name="hasEventBookings"
+                    label={t('branch.allow_special_event_bookings') || 'قبول حجوزات المناسبات الخاصة'}
+                    valuePropName="checked"
+                    initialValue={true}
+                  >
+                    <Switch
+                      checkedChildren={t('common.yes') || 'نعم'}
+                      unCheckedChildren={t('common.no') || 'لا'}
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="hasSchoolTrips"
+                    label={t('branch.allow_school_trip_requests') || 'قبول طلبات الرحلات المدرسية'}
+                    valuePropName="checked"
+                    initialValue={true}
+                  >
+                    <Switch
+                      checkedChildren={t('common.yes') || 'نعم'}
+                      unCheckedChildren={t('common.no') || 'لا'}
+                    />
+                  </Form.Item>
                 </Form>
               </Card>
             </Col>
@@ -380,6 +425,30 @@ export default function BranchInfo() {
                   <Divider />
 
                   <div>
+                    <Typography.Text strong>{t('branch.booking_options') || 'خيارات الحجز'}:</Typography.Text>
+                    <div style={{ marginTop: 8, fontSize: 13 }}>
+                      <div style={{ marginBottom: 6 }}>
+                        {t('branch.allow_special_event_bookings') || 'حجوزات المناسبات'}:{' '}
+                        <Typography.Text type={branchData?.hasEventBookings !== false ? 'success' : 'secondary'}>
+                          {branchData?.hasEventBookings !== false
+                            ? (t('common.yes') || 'نعم')
+                            : (t('common.no') || 'لا')}
+                        </Typography.Text>
+                      </div>
+                      <div>
+                        {t('branch.allow_school_trip_requests') || 'الرحلات المدرسية'}:{' '}
+                        <Typography.Text type={branchData?.hasSchoolTrips !== false ? 'success' : 'secondary'}>
+                          {branchData?.hasSchoolTrips !== false
+                            ? (t('common.yes') || 'نعم')
+                            : (t('common.no') || 'لا')}
+                        </Typography.Text>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Divider />
+
+                  <div>
                     <Typography.Text strong>{t('branch.branch_id') || 'Branch ID'}:</Typography.Text>
                     <div style={{ marginTop: '8px', fontFamily: 'monospace', fontSize: '12px', color: '#666' }}>
                       {me?.branchId || 'N/A'}
@@ -399,9 +468,11 @@ export default function BranchInfo() {
             </Col>
           </Row>
         </Tabs.TabPane>
-        <Tabs.TabPane key="hall" tab={t('halls.title') || 'Hall'}>
-          {me?.branchId && <BranchHallTab branchId={me.branchId} />}
-        </Tabs.TabPane>
+        {branchData?.hasEventBookings !== false && (
+          <Tabs.TabPane key="hall" tab={t('halls.title') || 'Hall'}>
+            {me?.branchId && <BranchHallTab branchId={me.branchId} />}
+          </Tabs.TabPane>
+        )}
       </Tabs>
         </div>
       </div>
