@@ -70,12 +70,14 @@ export class SubscriptionPurchasesService {
     couponCode: string | undefined | null,
     amount: number,
     branchId?: string | null,
+    userId?: string,
   ): Promise<{ discount: number; finalAmount: number }> {
     if (!couponCode || !couponCode.trim() || amount <= 0) {
       return { discount: 0, finalAmount: amount };
     }
     const preview = await this.couponsService.preview(couponCode.trim(), amount, {
       branchId: branchId || undefined,
+      userId,
     });
     if (!preview.valid) {
       throw new BadRequestException('Invalid or expired coupon code');
@@ -166,7 +168,12 @@ export class SubscriptionPurchasesService {
       ? 0
       : Number(plan.price);
     const { discount: couponDiscount, finalAmount: totalPrice } =
-      await this.resolveCouponDiscount(dto.couponCode, grossPrice, plan.branchId);
+      await this.resolveCouponDiscount(
+        dto.couponCode,
+        grossPrice,
+        plan.branchId,
+        userId,
+      );
 
     return {
       subscriptionPlanId: plan.id,
@@ -317,6 +324,7 @@ export class SubscriptionPurchasesService {
       dto.couponCode,
       grossPrice,
       plan.branchId,
+      userId,
     );
 
     const resumable = await this.findResumablePendingCheckout(
@@ -449,6 +457,15 @@ export class SubscriptionPurchasesService {
       const savedPayment = await queryRunner.manager.save(Payment, payment);
 
       await queryRunner.commitTransaction();
+
+      // Record coupon redemption (best-effort, idempotent on purchase id).
+      await this.couponsService.tryRedeem({
+        code: dto.couponCode,
+        userId,
+        amount: grossPrice,
+        reference: savedPurchase.id,
+        branchId: plan.branchId || undefined,
+      });
 
       if (totalPrice === 0) {
         savedPayment.status = PaymentStatus.COMPLETED;

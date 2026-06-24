@@ -27,6 +27,7 @@ import { existsSync, mkdirSync } from 'fs';
 import { SubscriptionPlansService } from './subscription-plans.service';
 import { CreateSubscriptionPlanDto } from './dto/create-subscription-plan.dto';
 import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto';
+import { AdminGuard } from '../../common/guards/admin.guard';
 
 @ApiTags('subscription-plans')
 @Controller()
@@ -47,6 +48,7 @@ export class SubscriptionPlansController {
   }
 
   @Get('admin/subscription-plans')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'List all subscription plans (admin)' })
   @ApiResponse({ status: 200, description: 'Plans retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -72,6 +74,7 @@ export class SubscriptionPlansController {
   }
 
   @Post('admin/subscription-plans')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Create a new subscription plan (admin)' })
   @ApiResponse({ status: 201, description: 'Plan created successfully' })
   @ApiResponse({ status: 400, description: 'Validation failure' })
@@ -82,6 +85,7 @@ export class SubscriptionPlansController {
   }
 
   @Patch('admin/subscription-plans/:id')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Update a subscription plan (admin)' })
   @ApiResponse({ status: 200, description: 'Plan updated successfully' })
   @ApiResponse({ status: 400, description: 'Validation failure' })
@@ -96,6 +100,7 @@ export class SubscriptionPlansController {
   }
 
   @Delete('admin/subscription-plans/:id')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Soft-delete a subscription plan (admin)' })
   @ApiResponse({ status: 200, description: 'Plan deactivated successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -110,6 +115,7 @@ export class SubscriptionPlansController {
   }
 
   @Post('admin/subscription-plans/:id/upload-cover')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Upload subscription plan cover image' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({

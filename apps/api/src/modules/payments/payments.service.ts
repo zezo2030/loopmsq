@@ -75,6 +75,7 @@ import {
 } from '../../database/entities/gift-order.entity';
 import { TripsService } from '../trips/trips.service';
 import { GiftOrdersService } from '../gift-orders/gift-orders.service';
+import { ReferralsService } from '../referrals/referrals.service';
 
 @Injectable()
 export class PaymentsService {
@@ -105,6 +106,8 @@ export class PaymentsService {
     private readonly couponsService?: CouponsService,
     @Optional()
     private readonly invoiceQueue?: InvoiceQueueService,
+    @Optional()
+    private readonly referralsService?: ReferralsService,
   ) {}
 
   /**
@@ -121,6 +124,28 @@ export class PaymentsService {
         }`,
       );
     });
+  }
+
+  /**
+   * Whether to skip real payment-gateway verification.
+   *
+   * Bypass is a DEV-ONLY convenience (no Moyasar keys locally). It is
+   * force-disabled in production regardless of env flags, so a misconfigured
+   * deployment (e.g. PAYMENTS_BYPASS=true or a missing secret key) can never
+   * accept an unverified payment and hand out free bookings/subscriptions.
+   */
+  private isPaymentBypassEnabled(): boolean {
+    const nodeEnv = (
+      this.configService.get<string>('NODE_ENV') || ''
+    ).toLowerCase();
+    if (nodeEnv === 'production') {
+      return false;
+    }
+    return (
+      !this.configService.get<string>('MOYASAR_SECRET_KEY') ||
+      (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() ===
+        'true'
+    );
   }
 
   private normalizePaymentJson(value: unknown): Record<string, any> | null {
@@ -979,7 +1004,7 @@ export class PaymentsService {
         const preview = await this.couponsService.preview(
           String(payload.couponCode).trim(),
           grossAmount,
-          { branchId: payload.branchId },
+          { branchId: payload.branchId, userId },
         );
         if (!preview.valid) {
           throw new BadRequestException('Invalid or expired coupon code');
@@ -1136,12 +1161,9 @@ export class PaymentsService {
         savedPayment.status = PaymentStatus.PROCESSING;
         await queryRunner.manager.save(savedPayment);
       } else {
-        // Bypass payments if keys are missing or explicitly enabled
-        const bypass =
-          !this.configService.get<string>('MOYASAR_SECRET_KEY') ||
-          (
-            this.configService.get<string>('PAYMENTS_BYPASS') || ''
-          ).toString() === 'true';
+        // Bypass payments only in non-production when keys are missing or
+        // PAYMENTS_BYPASS=true. Always false in production (fail-closed).
+        const bypass = this.isPaymentBypassEnabled();
         if (bypass) {
           savedPayment.gatewayRef = `bypass_${savedPayment.id}`;
           savedPayment.status = PaymentStatus.PROCESSING;
@@ -1316,11 +1338,21 @@ export class PaymentsService {
             );
           }
           payment = loadedPayment;
-        } else if (this.getPendingFlowContext(loadedPayment)) {
-          payment = loadedPayment;
         } else {
-          // Orphan payment?
-          throw new NotFoundException('Payment entity context lost');
+          const ctx = this.getPendingFlowContext(loadedPayment);
+          if (!ctx) {
+            // Orphan payment?
+            throw new NotFoundException('Payment entity context lost');
+          }
+          // Deferred-flow payments (wallet recharge, offer/subscription/gift,
+          // pay-first event/trip) carry their owner in the stored context.
+          // Enforce ownership here — otherwise a caller could confirm another
+          // user's pending payment and have the entitlement/credit (e.g. a
+          // wallet top-up) applied to their own account.
+          if (ctx.userId && ctx.userId !== userId) {
+            throw new NotFoundException('Payment not found or access denied');
+          }
+          payment = loadedPayment;
         }
       }
     }
@@ -1555,10 +1587,7 @@ export class PaymentsService {
         walletLink,
       );
     } else {
-      const bypass =
-        !this.configService.get<string>('MOYASAR_SECRET_KEY') ||
-        (this.configService.get<string>('PAYMENTS_BYPASS') || '').toString() ===
-          'true';
+      const bypass = this.isPaymentBypassEnabled();
       if (!bypass) {
         if (!this.moyasarService)
           throw new BadRequestException('Payment gateway not configured');
@@ -1671,6 +1700,7 @@ export class PaymentsService {
           }>;
           notes?: string;
           acceptedTerms: boolean;
+          couponCode?: string;
         };
 
         const totalAmount = Number(pendingFlowContext.totalAmount ?? 0);
@@ -1733,6 +1763,30 @@ export class PaymentsService {
           createdEventRequestId: savedEventRequest.id,
         });
         await queryRunner.manager.save(payment);
+
+        // Record coupon redemption within the same transaction (idempotent on
+        // event request id). Swallow errors so a recording issue can't roll
+        // back an already-paid event.
+        if (ep.couponCode && this.couponsService) {
+          try {
+            await this.couponsService.redeem(
+              {
+                code: ep.couponCode,
+                userId,
+                amount: totalAmount,
+                reference: savedEventRequest.id,
+                branchId: ep.branchId,
+              },
+              queryRunner.manager,
+            );
+          } catch (e) {
+            this.logger.warn(
+              `Coupon redemption recording failed for event ${savedEventRequest.id}: ${
+                e?.message || e
+              }`,
+            );
+          }
+        }
 
         // Create Booking
         const newBooking = queryRunner.manager.create(Booking, {
@@ -2096,6 +2150,12 @@ export class PaymentsService {
         bookingIdForLoyalty || undefined,
       );
 
+      // Referral reward: granted to the referrer only after the referee's
+      // first successful payment (idempotent; never throws).
+      if (this.referralsService) {
+        await this.referralsService.processRefereePayment(userId, payment.id);
+      }
+
       // Realtime updates
       // this.realtime?.emitBookingUpdated(booking.id, { bookingId: booking.id, status: booking.status });
       // TODO: Emit for events?
@@ -2118,18 +2178,38 @@ export class PaymentsService {
     }
   }
 
+  /**
+   * Constant-time string comparison to avoid leaking the secret via timing.
+   * Returns false on any length mismatch or non-string input.
+   */
+  private secretsMatch(a?: string | null, b?: string | null): boolean {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
+    const aBuf = Buffer.from(a);
+    const bBuf = Buffer.from(b);
+    if (aBuf.length !== bBuf.length) return false;
+    return crypto.timingSafeEqual(aBuf, bBuf);
+  }
+
   async handleWebhook(dto: WebhookEventDto) {
-    // Signature verification (Moyasar sends `secret_token` matching the
-    // shared secret configured in the dashboard).
-    const expectedSecret =
-      this.configService.get<string>('PAYMENT_WEBHOOK_SECRET') ||
-      'dev-webhook-secret';
+    // Webhook authentication. Moyasar sends `secret_token` matching the shared
+    // secret configured in the dashboard. The secret is REQUIRED — there is no
+    // hardcoded fallback, so a deployment that forgot to configure it rejects
+    // all webhooks (fail-closed) instead of trusting a well-known default.
+    const expectedSecret = this.configService.get<string>(
+      'PAYMENT_WEBHOOK_SECRET',
+    );
+    if (!expectedSecret) {
+      this.logger.error(
+        'PAYMENT_WEBHOOK_SECRET is not configured — rejecting webhook',
+      );
+      throw new UnauthorizedException('Webhook secret not configured');
+    }
     const providedSecret =
       (dto as any).secret_token ||
       (dto as any).secret ||
       dto.data?.secret_token ||
       dto.data?.secret;
-    if (expectedSecret && providedSecret !== expectedSecret) {
+    if (!this.secretsMatch(providedSecret, expectedSecret)) {
       throw new UnauthorizedException('Invalid webhook signature');
     }
 
@@ -2224,6 +2304,57 @@ export class PaymentsService {
 
     if (dto.eventType === 'payment.succeeded') {
       if (payment.status !== PaymentStatus.COMPLETED) {
+        // Defense-in-depth: independently confirm with Moyasar that this
+        // payment really succeeded for the expected amount/currency before
+        // granting any entitlement. A forged webhook (even one with a leaked
+        // secret, or one tampering with the amount) cannot pass this, because
+        // it cannot fake Moyasar's authenticated API response.
+        const gatewayId = payment.gatewayRef || moyasarPaymentId;
+        const isInternalRef =
+          !gatewayId ||
+          gatewayId.startsWith('bypass_') ||
+          gatewayId.startsWith('wallet_');
+        if (
+          !this.isPaymentBypassEnabled() &&
+          this.moyasarService &&
+          !isInternalRef
+        ) {
+          let verified: {
+            status?: string;
+            amount?: number;
+            currency?: string;
+          };
+          try {
+            verified = await this.moyasarService.retrievePayment(gatewayId!);
+          } catch (e) {
+            this.logger.error(
+              `Webhook gateway verification failed for payment ${payment.id}: ${
+                e?.message || e
+              }`,
+            );
+            throw new BadRequestException(
+              'Unable to verify payment with gateway',
+            );
+          }
+          const succeeded = ['paid', 'authorized'].includes(
+            (verified.status || '').toLowerCase(),
+          );
+          const expectedAmount = Math.round(Number(payment.amount) * 100);
+          if (
+            !succeeded ||
+            Number(verified.amount) !== expectedAmount ||
+            (verified.currency || '').toUpperCase() !==
+              (payment.currency || '').toUpperCase()
+          ) {
+            this.logger.warn(
+              `Webhook verification mismatch payment=${payment.id} status=${verified.status} amount=${verified.amount} expected=${expectedAmount}`,
+            );
+            throw new BadRequestException(
+              'Webhook payment verification mismatch',
+            );
+          }
+        }
+
         payment.status = PaymentStatus.COMPLETED;
         payment.paidAt = new Date();
         await this.paymentRepository.save(payment);

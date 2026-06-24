@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -163,42 +163,50 @@ export class WalletService {
     };
   }
 
-  async completeRechargeFromPayment(
+  /**
+   * Credit a wallet atomically. Locks the wallet row (pessimistic_write) so
+   * concurrent credits/debits to the same wallet serialize, and is idempotent
+   * per `reference` (a repeated credit returns the existing transaction instead
+   * of crediting twice). Always runs inside a transaction — either the caller's
+   * `manager`, or a fresh one we open.
+   */
+  private async applyCreditLocked(
+    manager: EntityManager,
     userId: string,
     amount: number,
-    paymentId: string,
-    manager?: any,
-    method: PaymentMethod = PaymentMethod.CREDIT_CARD,
+    reference: string,
+    method: PaymentMethod,
+    metadata: Record<string, unknown>,
   ) {
-    const walletRepository = manager
-      ? manager.getRepository(Wallet)
-      : this.walletRepository;
-    const transactionRepository = manager
-      ? manager.getRepository(WalletTransaction)
-      : this.transactionRepository;
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      throw new BadRequestException('Credit amount must be a positive number');
+    }
 
+    const walletRepository = manager.getRepository(Wallet);
+    const transactionRepository = manager.getRepository(WalletTransaction);
+
+    // Lock the wallet row for the duration of the transaction.
     const wallet = await walletRepository.findOne({
       where: { userId },
+      lock: { mode: 'pessimistic_write' },
     });
     if (!wallet) throw new NotFoundException('Wallet not found');
 
     const existingTransaction = await transactionRepository.findOne({
-      where: {
-        userId,
-        reference: `payment_${paymentId}`,
-      },
+      where: { userId, reference },
     });
     if (existingTransaction) {
       return {
         success: true,
         transactionId: existingTransaction.id,
-        amount,
+        amount: amt,
         newBalance: Number(wallet.balance),
       };
     }
 
-    wallet.balance = Number(wallet.balance) + Number(amount);
-    wallet.totalEarned = Number(wallet.totalEarned) + Number(amount);
+    wallet.balance = Number(wallet.balance) + amt;
+    wallet.totalEarned = Number(wallet.totalEarned) + amt;
     wallet.lastTransactionAt = new Date();
     await walletRepository.save(wallet);
 
@@ -206,23 +214,44 @@ export class WalletService {
       walletId: wallet.id,
       userId,
       type: WalletTransactionType.DEPOSIT,
-      amount,
+      amount: amt,
       status: WalletTransactionStatus.SUCCESS,
       method,
-      reference: `payment_${paymentId}`,
-      metadata: {
-        flowType: 'wallet_recharge',
-        paymentId,
-      },
+      reference,
+      metadata,
     });
     const savedTransaction = await transactionRepository.save(transaction);
 
     return {
       success: true,
       transactionId: savedTransaction.id,
-      amount,
+      amount: amt,
       newBalance: Number(wallet.balance),
     };
+  }
+
+  async completeRechargeFromPayment(
+    userId: string,
+    amount: number,
+    paymentId: string,
+    manager?: EntityManager,
+    method: PaymentMethod = PaymentMethod.CREDIT_CARD,
+  ) {
+    const reference = `payment_${paymentId}`;
+    const metadata = { flowType: 'wallet_recharge', paymentId };
+    if (manager) {
+      return this.applyCreditLocked(
+        manager,
+        userId,
+        amount,
+        reference,
+        method,
+        metadata,
+      );
+    }
+    return this.dataSource.transaction((m) =>
+      this.applyCreditLocked(m, userId, amount, reference, method, metadata),
+    );
   }
 
   async creditWallet(
@@ -233,58 +262,23 @@ export class WalletService {
       method?: PaymentMethod;
       metadata?: Record<string, unknown>;
     },
-    manager?: any,
+    manager?: EntityManager,
   ) {
-    const walletRepository = manager
-      ? manager.getRepository(Wallet)
-      : this.walletRepository;
-    const transactionRepository = manager
-      ? manager.getRepository(WalletTransaction)
-      : this.transactionRepository;
-
-    const wallet = await walletRepository.findOne({
-      where: { userId },
-    });
-    if (!wallet) throw new NotFoundException('Wallet not found');
-
-    const existingTransaction = await transactionRepository.findOne({
-      where: {
+    const method = link.method ?? PaymentMethod.WALLET;
+    const metadata = link.metadata ?? {};
+    if (manager) {
+      return this.applyCreditLocked(
+        manager,
         userId,
-        reference: link.reference,
-      },
-    });
-    if (existingTransaction) {
-      return {
-        success: true,
-        transactionId: existingTransaction.id,
         amount,
-        newBalance: Number(wallet.balance),
-      };
+        link.reference,
+        method,
+        metadata,
+      );
     }
-
-    wallet.balance = Number(wallet.balance) + Number(amount);
-    wallet.totalEarned = Number(wallet.totalEarned) + Number(amount);
-    wallet.lastTransactionAt = new Date();
-    await walletRepository.save(wallet);
-
-    const transaction = transactionRepository.create({
-      walletId: wallet.id,
-      userId,
-      type: WalletTransactionType.DEPOSIT,
-      amount,
-      status: WalletTransactionStatus.SUCCESS,
-      method: link.method ?? PaymentMethod.WALLET,
-      reference: link.reference,
-      metadata: link.metadata ?? {},
-    });
-    const savedTransaction = await transactionRepository.save(transaction);
-
-    return {
-      success: true,
-      transactionId: savedTransaction.id,
-      amount,
-      newBalance: Number(wallet.balance),
-    };
+    return this.dataSource.transaction((m) =>
+      this.applyCreditLocked(m, userId, amount, link.reference, method, metadata),
+    );
   }
 
   /**
@@ -304,20 +298,9 @@ export class WalletService {
       `Deduct wallet: userId=${userId}, amount=${amount}, reference=${link.reference}, relatedBookingId=${link.relatedBookingId ?? 'none'}`,
     );
 
-    const wallet = await this.walletRepository.findOne({
-      where: { userId },
-    });
-    if (!wallet) throw new NotFoundException('Wallet not found');
-
-    const balance = Number(wallet.balance);
     const deductAmount = Number(amount);
-
-    if (balance < deductAmount) {
-      const errorMsg = 'Insufficient wallet balance';
-      this.logger.warn(
-        `Wallet deduction failed: userId=${userId}, balance=${balance}, required=${deductAmount}`,
-      );
-      throw new BadRequestException(errorMsg);
+    if (!Number.isFinite(deductAmount) || deductAmount <= 0) {
+      throw new BadRequestException('Deduction amount must be a positive number');
     }
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -325,6 +308,22 @@ export class WalletService {
     await queryRunner.startTransaction();
 
     try {
+      // Lock the wallet row so the balance check and the debit are atomic
+      // against concurrent deductions (prevents double-spend / overdraft).
+      const wallet = await queryRunner.manager.findOne(Wallet, {
+        where: { userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!wallet) throw new NotFoundException('Wallet not found');
+
+      const balance = Number(wallet.balance);
+      if (balance < deductAmount) {
+        this.logger.warn(
+          `Wallet deduction failed: userId=${userId}, balance=${balance}, required=${deductAmount}`,
+        );
+        throw new BadRequestException('Insufficient wallet balance');
+      }
+
       // Deduct from wallet
       wallet.balance = balance - deductAmount;
       wallet.totalSpent = Number(wallet.totalSpent) + deductAmount;

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { DataSource, ILike, Repository } from 'typeorm';
 import { ReferralCode } from '../../database/entities/referral-code.entity';
 import { ReferralAttribution } from '../../database/entities/referral-attribution.entity';
 import {
@@ -19,10 +19,10 @@ import { ListEarningsDto } from './dto/list-earnings.dto';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
-// نظام الإحالات: المكافأة عبارة عن نقاط ولاء تُمنح للداعي (referrer)
-// فور قيام المستخدم المدعو (referee) بإدخال كود الإحالة — بدون انتظار دفع
-// وبدون موافقة الادمن. عدد النقاط يُحدَّد من قاعدة الولاء النشطة عبر لوحة الأدمن
-// (LoyaltyRule.referralRewardPoints).
+// نظام الإحالات: المكافأة عبارة عن نقاط ولاء تُمنح للداعي (referrer) بعد قيام
+// المستخدم المدعو (referee) بإتمام أول عملية دفع ناجحة — وليس بمجرد إدخال الكود.
+// هذا يمنع استغلال النظام عبر حسابات وهمية. عدد النقاط يُحدَّد من قاعدة الولاء
+// النشطة عبر لوحة الأدمن (LoyaltyRule.referralRewardPoints).
 
 @Injectable()
 export class ReferralsService {
@@ -37,6 +37,7 @@ export class ReferralsService {
     private readonly earnRepo: Repository<ReferralEarning>,
     private readonly loyalty: LoyaltyService,
     private readonly notifications: NotificationsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async createCode(dto: CreateReferralCodeDto) {
@@ -109,7 +110,8 @@ export class ReferralsService {
       );
     }
 
-    // إنشاء attribution جديد
+    // إنشاء attribution جديد — بدون منح أي نقاط الآن. المكافأة تُمنح للداعي
+    // فقط بعد إتمام المدعو لأول عملية دفع ناجحة (processRefereePayment).
     const attr = this.attrRepo.create({
       refereeId: userId,
       referrerId: code.userId,
@@ -117,56 +119,79 @@ export class ReferralsService {
     });
     await this.attrRepo.save(attr);
 
-    // منح نقاط الولاء للداعي فوراً — عدد النقاط من قاعدة الولاء النشطة (لوحة الأدمن)
-    const rule = await this.loyalty.getActiveRule();
-    const rewardPoints = Number(rule.referralRewardPoints) || 0;
-    let awardedPoints = 0;
-
-    if (rewardPoints > 0) {
-      try {
-        const result = await this.loyalty.adjustWallet(code.userId, {
-          pointsDelta: rewardPoints,
-          reason: 'Referral reward',
-        });
-        awardedPoints = rewardPoints;
-
-        // إشعار الداعي بحصوله على نقاط الإحالة
-        try {
-          await this.notifications.enqueue({
-            type: 'REFERRAL_REWARD',
-            to: { userId: code.userId },
-            data: { points: rewardPoints, totalPoints: result.points },
-            channels: ['sms', 'push'],
-          });
-        } catch (e) {
-          this.logger.error(
-            `Failed to notify referrer ${code.userId} of referral reward: ${e}`,
-          );
-        }
-      } catch (e) {
-        // لا نُفشل عملية الإحالة لو تعذّر منح النقاط — يُسجَّل الخطأ فقط
-        this.logger.error(
-          `Failed to credit ${rewardPoints} referral points to referrer ${code.userId}: ${e}`,
-        );
-      }
-    }
-
-    // تسجيل المكافأة كسجل دائم (يظهر في تبويب الأرباح بلوحة الأدمن)
-    if (awardedPoints > 0) {
-      const earning = this.earnRepo.create({
-        referrerId: code.userId,
-        refereeId: userId,
-        amount: awardedPoints,
-        status: ReferralEarningStatus.APPROVED,
-      });
-      await this.earnRepo.save(earning);
-    }
-
     return {
       attributed: true,
       referrerId: code.userId,
-      rewardPoints: awardedPoints,
+      // المكافأة مؤجَّلة حتى أول عملية دفع — لذلك صفر الآن.
+      rewardPoints: 0,
     };
+  }
+
+  /**
+   * Award the referral reward to the referrer after the referee completes their
+   * FIRST successful payment. Idempotent and concurrency-safe: locks the
+   * referee's attribution row and refuses to award twice (one reward per
+   * referee, ever). Never throws — referral rewards must not break payments.
+   */
+  async processRefereePayment(
+    refereeId: string,
+    sourcePaymentId?: string,
+  ): Promise<void> {
+    try {
+      const rule = await this.loyalty.getActiveRule();
+      const rewardPoints = Number(rule.referralRewardPoints) || 0;
+      if (rewardPoints <= 0) return;
+
+      const outcome = await this.dataSource.transaction(async (manager) => {
+        const attrRepo = manager.getRepository(ReferralAttribution);
+        const earnRepo = manager.getRepository(ReferralEarning);
+
+        // Lock the attribution row so concurrent payments can't double-award.
+        const attr = await attrRepo.findOne({
+          where: { refereeId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!attr) return null;
+
+        // Already rewarded? (one earning per referee, ever)
+        const existing = await earnRepo.findOne({ where: { refereeId } });
+        if (existing) return null;
+
+        const earning = earnRepo.create({
+          referrerId: attr.referrerId,
+          refereeId,
+          amount: rewardPoints,
+          sourcePaymentId: sourcePaymentId ?? undefined,
+          status: ReferralEarningStatus.APPROVED,
+        });
+        await earnRepo.save(earning);
+        return { referrerId: attr.referrerId };
+      });
+
+      if (!outcome) return;
+
+      // Credit loyalty points + notify outside the attribution transaction.
+      const result = await this.loyalty.adjustWallet(outcome.referrerId, {
+        pointsDelta: rewardPoints,
+        reason: 'Referral reward',
+      });
+      try {
+        await this.notifications.enqueue({
+          type: 'REFERRAL_REWARD',
+          to: { userId: outcome.referrerId },
+          data: { points: rewardPoints, totalPoints: result.points },
+          channels: ['sms', 'push'],
+        });
+      } catch (e) {
+        this.logger.error(
+          `Failed to notify referrer ${outcome.referrerId} of referral reward: ${e}`,
+        );
+      }
+    } catch (e: any) {
+      this.logger.error(
+        `processRefereePayment failed for referee ${refereeId}: ${e?.message || e}`,
+      );
+    }
   }
 
   async listEarnings(dto: ListEarningsDto) {

@@ -76,12 +76,14 @@ export class EventsService {
     couponCode: string | undefined | null,
     amount: number,
     branchId?: string | null,
+    userId?: string,
   ): Promise<{ discount: number; finalAmount: number }> {
     if (!couponCode || !couponCode.trim() || amount <= 0) {
       return { discount: 0, finalAmount: amount };
     }
     const preview = await this.couponsService.preview(couponCode.trim(), amount, {
       branchId: branchId || undefined,
+      userId,
     });
     if (!preview.valid) {
       throw new BadRequestException('Invalid or expired coupon code');
@@ -280,6 +282,7 @@ export class EventsService {
       dto.couponCode,
       grossAmount,
       dto.branchId,
+      userId,
     );
     const depositAmount = this.normalizeMoney(
       totalAmount * (EventsService.DEPOSIT_PERCENTAGE / 100),
@@ -316,6 +319,15 @@ export class EventsService {
       paymentMethod: dto.paymentMethod,
     });
     const saved = await this.eventRepo.save(req);
+
+    // Record coupon redemption (best-effort, idempotent on event request id).
+    await this.couponsService.tryRedeem({
+      code: dto.couponCode,
+      userId,
+      amount: grossAmount,
+      reference: saved.id,
+      branchId: dto.branchId || undefined,
+    });
 
     await this.adminNotifications.notify({
       type: 'EVENT_REQUEST_CREATED',
