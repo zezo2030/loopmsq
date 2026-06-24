@@ -1665,14 +1665,30 @@ export class BookingsService {
   }
 
   async issueTicketsForBooking(bookingId: string): Promise<Ticket[]> {
-    const booking = await this.bookingRepository.findOne({
-      where: { id: bookingId },
-    });
-    if (!booking) throw new NotFoundException('Booking not found');
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      // Lock the booking row so concurrent confirmations serialize here.
+      // This path can be re-entered by the client redirect confirm, the
+      // gateway webhook, retries, or a double-tap; without serialization +
+      // an idempotency check, a 20-person booking would get 40 tickets.
+      const booking = await queryRunner.manager.findOne(Booking, {
+        where: { id: bookingId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!booking) throw new NotFoundException('Booking not found');
+
+      // Idempotency: if tickets were already issued for this booking, return
+      // them as-is instead of generating a second full set.
+      const existing = await queryRunner.manager.find(Ticket, {
+        where: { bookingId: booking.id },
+      });
+      if (existing.length > 0) {
+        await queryRunner.commitTransaction();
+        return existing;
+      }
+
       const bonus = booking.bonusTickets ?? 0;
       const tickets = await this.generateTickets(
         queryRunner,
