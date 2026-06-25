@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, Logger, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
@@ -58,7 +58,21 @@ async function bootstrap() {
 
   // Global prefix
   const apiPrefix = configService.get<string>('API_PREFIX') || 'api/v1';
-  app.setGlobalPrefix(apiPrefix);
+  // Deep-link entry points must live at the domain ROOT, not under the API
+  // prefix: iOS/Android only fetch the app-association files from
+  // https://<domain>/.well-known/... and the WhatsApp claim link points at the
+  // bare /gift/claim path. Excluding them keeps these routes prefix-free.
+  app.setGlobalPrefix(apiPrefix, {
+    exclude: [
+      { path: 'gift/claim', method: RequestMethod.GET },
+      {
+        path: '.well-known/apple-app-site-association',
+        method: RequestMethod.GET,
+      },
+      { path: '.well-known/assetlinks.json', method: RequestMethod.GET },
+      { path: 'health', method: RequestMethod.GET },
+    ],
+  });
 
   // Global validation pipe
   app.useGlobalPipes(
