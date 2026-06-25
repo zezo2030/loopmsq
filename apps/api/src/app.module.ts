@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { I18nModule, AcceptLanguageResolver, QueryResolver } from 'nestjs-i18n';
 import { join } from 'path';
@@ -44,6 +44,7 @@ import { SubscriptionPurchasesModule } from './modules/subscription-purchases/su
 import { GiftOrdersModule } from './modules/gift-orders/gift-orders.module';
 import { AdminNotificationsModule } from './modules/admin-notifications/admin-notifications.module';
 import { InvoicingModule } from './modules/invoicing/invoicing.module';
+import { AppVersionMiddleware } from './common/middleware/app-version.middleware';
 
 // Resolve uploads root dynamically to support local and Docker paths, with env override
 const defaultUploadsCandidates = [
@@ -176,4 +177,10 @@ function resolveUploadsRootFromEnvOrDefault(config?: ConfigService): string {
   controllers: [AppController],
   providers: [AppService, EncryptionService, RedisService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    // Server-side app-version gate. Reads its own config switch (serverEnforced)
+    // at runtime, so it is safe to apply globally — it no-ops while disabled.
+    consumer.apply(AppVersionMiddleware).forRoutes('*');
+  }
+}

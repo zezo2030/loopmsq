@@ -122,6 +122,8 @@ export default function Settings() {
         if (appVersion) {
           appVersionForm.setFieldsValue({
             enabled: appVersion.enabled,
+            serverEnforced: appVersion.serverEnforced,
+            blockLegacy: appVersion.blockLegacy,
             minRequiredVersionAndroid: appVersion.minRequiredVersionAndroid,
             minRequiredVersionIos: appVersion.minRequiredVersionIos,
             androidStoreUrl: appVersion.androidStoreUrl,
@@ -455,6 +457,8 @@ export default function Settings() {
           try {
             await updateAppVersionConfig({
               enabled: !!values.enabled,
+              serverEnforced: !!values.serverEnforced,
+              blockLegacy: !!values.blockLegacy,
               minRequiredVersionAndroid: (values.minRequiredVersionAndroid || '0.0.0').trim(),
               minRequiredVersionIos: (values.minRequiredVersionIos || '0.0.0').trim(),
               androidStoreUrl: (values.androidStoreUrl || '').trim(),
@@ -513,6 +517,31 @@ export default function Settings() {
               </Form.Item>
             </Col>
           </Row>
+        </div>
+
+        <div style={sectionBox}>
+          <Title level={5} style={{ marginTop: 0, marginBottom: 4 }}>
+            الفرض من جهة السيرفر
+          </Title>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            يرفض السيرفر طلبات النسخ القديمة مباشرةً (HTTP 426)، حتى النسخ التي لا تحتوي على شاشة التحديث.
+          </Text>
+          <Form.Item
+            name="serverEnforced"
+            label="تفعيل الفرض من جهة السيرفر"
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+          <Form.Item
+            name="blockLegacy"
+            label="حجب النسخ القديمة جدًا بدون هوية"
+            valuePropName="checked"
+            extra="النسخ القديمة لا ترسل هوية الإصدار، فستُحجب برسالة خطأ عامة وليس بشاشة تحديث منسّقة. فعّلها بعد التأكد من انتشار النسخة الجديدة."
+            style={{ marginBottom: 0 }}
+          >
+            <Switch />
+          </Form.Item>
         </div>
 
         <div style={sectionBox}>

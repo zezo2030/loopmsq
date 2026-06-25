@@ -14,6 +14,23 @@ export class UpdateAppVersionConfigDto {
   enabled?: boolean;
 
   @ApiProperty({
+    description: 'Master switch for the server-side version gate (middleware)',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  serverEnforced?: boolean;
+
+  @ApiProperty({
+    description:
+      'Reject native-mobile requests with no app-version header (pre-gate builds)',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  blockLegacy?: boolean;
+
+  @ApiProperty({
     description: 'Minimum required version on Android (e.g. "2.1.0")',
     required: false,
   })

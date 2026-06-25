@@ -27,6 +27,12 @@ type PrivateEventTermsConfig = {
 
 type AppVersionConfig = {
   enabled: boolean;
+  // Master switch for the server-side middleware gate (independent of `enabled`,
+  // which drives the client-side /app/version check).
+  serverEnforced: boolean;
+  // When true, reject native-mobile requests that carry no app-version header
+  // (i.e. pre-gate customer builds that predate the version-header feature).
+  blockLegacy: boolean;
   minRequiredVersionAndroid: string;
   minRequiredVersionIos: string;
   androidStoreUrl: string;
@@ -58,6 +64,8 @@ export class AdminConfigService {
 
   static readonly DEFAULT_APP_VERSION_CONFIG: AppVersionConfig = {
     enabled: false,
+    serverEnforced: false,
+    blockLegacy: false,
     minRequiredVersionAndroid: '0.0.0',
     minRequiredVersionIos: '0.0.0',
     androidStoreUrl: '',
@@ -248,6 +256,8 @@ export class AdminConfigService {
     const next: AppVersionConfig = { ...current };
 
     if (dto.enabled !== undefined) next.enabled = dto.enabled;
+    if (dto.serverEnforced !== undefined) next.serverEnforced = dto.serverEnforced;
+    if (dto.blockLegacy !== undefined) next.blockLegacy = dto.blockLegacy;
     if (dto.minRequiredVersionAndroid !== undefined) {
       next.minRequiredVersionAndroid = dto.minRequiredVersionAndroid;
     }

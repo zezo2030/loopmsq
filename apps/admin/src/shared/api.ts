@@ -106,6 +106,8 @@ export type PrivateEventTermsConfig = {
 
 export type AppVersionConfig = {
   enabled: boolean
+  serverEnforced: boolean
+  blockLegacy: boolean
   minRequiredVersionAndroid: string
   minRequiredVersionIos: string
   androidStoreUrl: string
