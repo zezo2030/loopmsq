@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  Button,
   Card,
   Col,
   DatePicker,
   Empty,
+  Form,
+  Image,
   Input,
   Modal,
   Row,
@@ -14,18 +17,23 @@ import {
   Table,
   Tag,
   Typography,
+  Upload,
   message,
 } from 'antd'
 import {
   CalendarOutlined,
   CreditCardOutlined,
+  DeleteOutlined,
   EditOutlined,
   FieldTimeOutlined,
+  GiftOutlined,
   ReloadOutlined,
   SearchOutlined,
+  UploadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { apiGet, apiPatch } from '../../api'
+import { apiGet, apiPatch, apiPost } from '../../api'
+import { resolveFileUrl } from '../../shared/url'
 
 const PAYMENT_STATUS_OPTIONS = [
   { value: 'completed', label: 'مدفوع' },
@@ -94,6 +102,17 @@ export default function SubscriptionsList() {
   const [payModalRow, setPayModalRow] = useState<SubscriptionRow | null>(null)
   const [payModalStatus, setPayModalStatus] = useState<string | undefined>()
   const [savingPayStatus, setSavingPayStatus] = useState(false)
+  const [freeOpen, setFreeOpen] = useState(false)
+  const [creatingFree, setCreatingFree] = useState(false)
+  const [freeForm] = Form.useForm()
+  const freeBranchId = Form.useWatch('branchId', freeForm)
+  const holderImageUrl = Form.useWatch('holderImageUrl', freeForm)
+  const [uploadingHolderImage, setUploadingHolderImage] = useState(false)
+  const [userSearch, setUserSearch] = useState('')
+  const [debouncedUserSearch, setDebouncedUserSearch] = useState('')
+  const [userOptions, setUserOptions] = useState<Array<{ label: string; value: string }>>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [planOptions, setPlanOptions] = useState<Array<{ label: string; value: string }>>([])
   const navigate = useNavigate()
 
   const openPaymentModal = (row: SubscriptionRow) => {
@@ -125,6 +144,113 @@ export default function SubscriptionsList() {
 
   const formatDate = (value?: string | null) =>
     value ? new Date(value).toLocaleString('ar-SA') : '-'
+
+  const loadPlans = async (branch?: string) => {
+    if (!branch) {
+      setPlanOptions([])
+      return
+    }
+    try {
+      const res = await apiGet<any>(
+        `/admin/subscription-plans?isActive=true&branchId=${branch}`,
+      )
+      const list = Array.isArray(res) ? res : (res?.plans || [])
+      setPlanOptions(
+        list.map((plan: any) => ({
+          value: plan.id,
+          label: `${plan.title} — ${formatCurrency(Number(plan.price || 0), plan.currency)}`,
+        })),
+      )
+    } catch {
+      setPlanOptions([])
+    }
+  }
+
+  const onFreeBranchChange = (branch: string) => {
+    freeForm.setFieldsValue({ subscriptionPlanId: undefined })
+    setPlanOptions([])
+    loadPlans(branch)
+  }
+
+  const loadUsers = async (q: string) => {
+    setUsersLoading(true)
+    try {
+      const params = new URLSearchParams({ page: '1', limit: '50', role: 'user' })
+      if (q) params.set('q', q)
+      const res = await apiGet<any>(`/users?${params.toString()}`)
+      const list = Array.isArray(res) ? res : (res?.users || [])
+      setUserOptions(
+        list.map((u: any) => ({
+          value: u.id,
+          label: `${u.name || u.email || 'مستخدم'}${u.phone ? ` (${u.phone})` : ''}`,
+        })),
+      )
+    } catch {
+      setUserOptions([])
+    } finally {
+      setUsersLoading(false)
+    }
+  }
+
+  const openFreeModal = () => {
+    freeForm.resetFields()
+    setUserSearch('')
+    setUserOptions([])
+    setPlanOptions([])
+    setFreeOpen(true)
+    loadUsers('')
+  }
+
+  const uploadHolderImage = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      message.error('يجب أن يكون الملف صورة')
+      return
+    }
+    setUploadingHolderImage(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await apiPost<{ imageUrl: string }>(
+        '/subscription-purchases/upload-holder-photo',
+        fd,
+      )
+      freeForm.setFieldsValue({ holderImageUrl: res.imageUrl })
+      message.success('تم رفع صورة الحامل')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      message.error(`تعذر رفع الصورة${detail ? `: ${detail}` : ''}`)
+    } finally {
+      setUploadingHolderImage(false)
+    }
+  }
+
+  const submitFree = async () => {
+    let values: any
+    try {
+      values = await freeForm.validateFields()
+    } catch {
+      return
+    }
+    setCreatingFree(true)
+    try {
+      await apiPost('/subscription-purchases/admin/free', {
+        userId: values.userId,
+        subscriptionPlanId: values.subscriptionPlanId,
+        holderName: values.holderName?.trim(),
+        holderImageUrl: values.holderImageUrl?.trim() || undefined,
+        note: values.note?.trim() || undefined,
+      })
+      message.success('تم إنشاء اشتراك مجاني وتفعيله للعميل')
+      setFreeOpen(false)
+      freeForm.resetFields()
+      await loadRows()
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      message.error(`تعذر إنشاء الاشتراك المجاني${detail ? `: ${detail}` : ''}`)
+    } finally {
+      setCreatingFree(false)
+    }
+  }
 
   const loadBranches = async () => {
     try {
@@ -188,6 +314,15 @@ export default function SubscriptionsList() {
   useEffect(() => {
     loadRows()
   }, [debouncedSearch, status, paymentStatus, branchId, dateRange])
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedUserSearch(userSearch.trim()), 350)
+    return () => window.clearTimeout(t)
+  }, [userSearch])
+
+  useEffect(() => {
+    if (freeOpen) loadUsers(debouncedUserSearch)
+  }, [debouncedUserSearch])
 
   const columns = useMemo(
     () => [
@@ -280,6 +415,9 @@ export default function SubscriptionsList() {
             <Title level={2} style={{ margin: 0 }}>الاشتراكات المشتراة</Title>
             <Text type="secondary">متابعة جميع اشتراكات العملاء عبر الفروع مع حالة الدفع والاستهلاك.</Text>
           </div>
+          <Button type="primary" icon={<GiftOutlined />} onClick={openFreeModal}>
+            إنشاء اشتراك مجاني
+          </Button>
         </div>
       </div>
 
@@ -413,6 +551,121 @@ export default function SubscriptionsList() {
             )}
           </Space>
         )}
+      </Modal>
+
+      <Modal
+        title="إنشاء اشتراك مجاني لعميل"
+        open={freeOpen}
+        onCancel={() => {
+          setFreeOpen(false)
+          freeForm.resetFields()
+        }}
+        onOk={submitFree}
+        okButtonProps={{ loading: creatingFree }}
+        okText="إنشاء وتفعيل"
+        cancelText="إلغاء"
+        destroyOnClose
+      >
+        <Form form={freeForm} layout="vertical">
+          <Form.Item
+            name="userId"
+            label="العميل"
+            rules={[{ required: true, message: 'يرجى اختيار العميل' }]}
+          >
+            <Select
+              showSearch
+              placeholder="ابحث بالاسم أو البريد أو الجوال"
+              options={userOptions}
+              loading={usersLoading}
+              filterOption={false}
+              onSearch={setUserSearch}
+              notFoundContent={usersLoading ? 'جاري التحميل...' : 'لا يوجد عملاء مطابقون'}
+            />
+          </Form.Item>
+          <Form.Item
+            name="branchId"
+            label="الفرع"
+            rules={[{ required: true, message: 'يرجى اختيار الفرع' }]}
+          >
+            <Select
+              showSearch
+              placeholder="اختر الفرع"
+              options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
+              optionFilterProp="label"
+              onChange={onFreeBranchChange}
+            />
+          </Form.Item>
+          <Form.Item
+            name="subscriptionPlanId"
+            label="الباقة"
+            rules={[{ required: true, message: 'يرجى اختيار الباقة' }]}
+          >
+            <Select
+              showSearch
+              disabled={!freeBranchId}
+              placeholder={freeBranchId ? 'اختر الباقة' : 'اختر الفرع أولًا'}
+              options={planOptions}
+              optionFilterProp="label"
+              notFoundContent="لا توجد باقات في هذا الفرع"
+            />
+          </Form.Item>
+          <Form.Item
+            name="holderName"
+            label="اسم حامل الاشتراك"
+            rules={[
+              { required: true, message: 'يرجى إدخال اسم حامل الاشتراك' },
+              { min: 2, max: 100, message: 'الاسم يجب أن يكون بين 2 و100 حرف' },
+            ]}
+          >
+            <Input placeholder="مثال: عمر أحمد" />
+          </Form.Item>
+          <Form.Item label="صورة الحامل (اختياري)">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {holderImageUrl ? (
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <Image
+                    src={resolveFileUrl(holderImageUrl)}
+                    alt="صورة الحامل"
+                    style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8 }}
+                  />
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => freeForm.setFieldsValue({ holderImageUrl: undefined })}
+                    style={{ position: 'absolute', top: 4, right: 4 }}
+                  />
+                </div>
+              ) : (
+                <Upload
+                  accept="image/*"
+                  showUploadList={false}
+                  beforeUpload={(file) => {
+                    uploadHolderImage(file)
+                    return false
+                  }}
+                >
+                  <Button icon={<UploadOutlined />} loading={uploadingHolderImage}>
+                    {uploadingHolderImage ? 'جاري الرفع...' : 'رفع صورة الحامل'}
+                  </Button>
+                </Upload>
+              )}
+            </Space>
+          </Form.Item>
+          <Form.Item name="holderImageUrl" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name="note" label="ملاحظة (اختياري)">
+            <Input.TextArea
+              rows={2}
+              maxLength={500}
+              placeholder="سبب منح الاشتراك المجاني"
+            />
+          </Form.Item>
+          <Text type="secondary">
+            سيتم إنشاء الاشتراك وتفعيله فورًا بدون أي دفع، مع إصدار رمز الدخول وإشعار العميل.
+          </Text>
+        </Form>
       </Modal>
     </div>
   )

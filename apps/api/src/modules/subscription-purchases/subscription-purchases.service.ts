@@ -26,6 +26,7 @@ import {
   CreateSubscriptionPurchaseOptions,
   CreateSubscriptionPurchasePayload,
 } from './dto/create-subscription-purchase.dto';
+import { AdminCreateFreeSubscriptionDto } from './dto/admin-create-free-subscription.dto';
 import { DeductHoursDto } from './dto/deduct-hours.dto';
 import { User } from '../../database/entities/user.entity';
 import { CloudinaryService } from '../../utils/cloudinary.service';
@@ -312,28 +313,35 @@ export class SubscriptionPurchasesService {
     }
     const holderName = trimmedHolderName || 'Gift recipient';
 
+    const forceFree = options?.forceFree === true;
     const loyaltyStatus = await this.getSixthPurchaseLoyaltyStatus(
       userId,
       plan.branchId,
       plan.id,
     );
-    const grossPrice = loyaltyStatus.isEligibleForFreePurchase
-      ? 0
-      : Number(plan.price);
-    const { finalAmount: totalPrice } = await this.resolveCouponDiscount(
-      dto.couponCode,
-      grossPrice,
-      plan.branchId,
-      userId,
-    );
+    const grossPrice =
+      forceFree || loyaltyStatus.isEligibleForFreePurchase ? 0 : Number(plan.price);
+    // Admin free grants bypass coupons entirely and are always zero-priced.
+    const { finalAmount: totalPrice } = forceFree
+      ? { finalAmount: 0 }
+      : await this.resolveCouponDiscount(
+          dto.couponCode,
+          grossPrice,
+          plan.branchId,
+          userId,
+        );
 
-    const resumable = await this.findResumablePendingCheckout(
-      userId,
-      plan.branchId,
-      plan.id,
-      holderName,
-      loyaltyStatus,
-    );
+    // Admin free grants always create a fresh activated purchase; never reuse a
+    // user-initiated pending checkout.
+    const resumable = forceFree
+      ? null
+      : await this.findResumablePendingCheckout(
+          userId,
+          plan.branchId,
+          plan.id,
+          holderName,
+          loyaltyStatus,
+        );
     if (resumable) {
       const { purchase: rp, payment: pay } = resumable;
       if (rp.holderName !== holderName) {
@@ -436,7 +444,17 @@ export class SubscriptionPurchasesService {
           acceptedTerms: true,
           acceptedTermsAt: new Date().toISOString(),
           termsAndConditions: plan.termsAndConditions || null,
-          loyaltyRewardApplied: loyaltyStatus.isEligibleForFreePurchase,
+          // Admin free grants stay neutral to loyalty (not a counted "reward").
+          loyaltyRewardApplied:
+            !forceFree && loyaltyStatus.isEligibleForFreePurchase,
+          ...(forceFree
+            ? {
+                adminFreeGrant: true,
+                grantedByAdminId: options?.grantedByAdminId ?? null,
+                grantNote: options?.grantNote?.trim() || null,
+                grantedAt: new Date().toISOString(),
+              }
+            : {}),
         },
       });
 
@@ -459,13 +477,16 @@ export class SubscriptionPurchasesService {
       await queryRunner.commitTransaction();
 
       // Record coupon redemption (best-effort, idempotent on purchase id).
-      await this.couponsService.tryRedeem({
-        code: dto.couponCode,
-        userId,
-        amount: grossPrice,
-        reference: savedPurchase.id,
-        branchId: plan.branchId || undefined,
-      });
+      // Skipped for admin free grants which never carry a coupon.
+      if (!forceFree) {
+        await this.couponsService.tryRedeem({
+          code: dto.couponCode,
+          userId,
+          amount: grossPrice,
+          reference: savedPurchase.id,
+          branchId: plan.branchId || undefined,
+        });
+      }
 
       if (totalPrice === 0) {
         savedPayment.status = PaymentStatus.COMPLETED;
@@ -676,6 +697,44 @@ export class SubscriptionPurchasesService {
       paymentStatus: updated?.paymentStatus ?? newStatus,
       status: updated?.status,
     };
+  }
+
+  /**
+   * Admin-issued free subscription grant for a specific customer. Reuses the
+   * normal purchase flow with a forced zero price, so the subscription is
+   * activated immediately (QR + notification) without any payment, and stays
+   * neutral to the user's loyalty accounting.
+   */
+  async adminCreateFreePurchase(
+    dto: AdminCreateFreeSubscriptionDto,
+    adminUserId: string,
+  ) {
+    const user = await this.userRepo.findOne({ where: { id: dto.userId } });
+    if (!user) {
+      throw new NotFoundException('Target user not found');
+    }
+
+    const result = await this.createPurchase(
+      dto.userId,
+      {
+        subscriptionPlanId: dto.subscriptionPlanId,
+        acceptedTerms: true,
+        holderName: dto.holderName,
+        holderImageUrl: dto.holderImageUrl,
+      },
+      {
+        allowMissingHolderImage: true,
+        forceFree: true,
+        grantedByAdminId: adminUserId,
+        grantNote: dto.note,
+      },
+    );
+
+    this.logger.log(
+      `Admin ${adminUserId} granted free subscription ${result.id} (plan ${dto.subscriptionPlanId}) to user ${dto.userId}`,
+    );
+
+    return result;
   }
 
   /**
@@ -1514,6 +1573,10 @@ export class SubscriptionPurchasesService {
       })
       .andWhere(
         "COALESCE(purchase.metadata->>'loyaltyRewardApplied', 'false') <> 'true'",
+      )
+      // Admin free grants are not paid purchases; exclude them from loyalty count.
+      .andWhere(
+        "COALESCE(purchase.metadata->>'adminFreeGrant', 'false') <> 'true'",
       )
       .getCount();
 

@@ -186,6 +186,22 @@ export class ContentController {
     return this.contentService.updateBranchStatus(id, status);
   }
 
+  @Delete('branches/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Archive (soft-delete) a branch (Admin only). Works even if the branch has customer subscriptions, bookings or other related data; related records are preserved.',
+  })
+  @ApiResponse({ status: 200, description: 'Branch archived successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  async deleteBranch(@Param('id', ParseUUIDPipe) id: string) {
+    return this.contentService.deleteBranch(id);
+  }
+
   @Post('branches/upload-video')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)

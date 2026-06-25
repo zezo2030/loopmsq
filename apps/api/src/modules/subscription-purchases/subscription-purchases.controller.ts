@@ -28,6 +28,7 @@ import { SubscriptionQuoteDto } from './dto/subscription-quote.dto';
 import { CreateSubscriptionPurchaseDto } from './dto/create-subscription-purchase.dto';
 import { DeductHoursDto } from './dto/deduct-hours.dto';
 import { UpdatePaymentStatusDto } from './dto/update-payment-status.dto';
+import { AdminCreateFreeSubscriptionDto } from './dto/admin-create-free-subscription.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { maskAmounts } from '../../common/utils/financial-mask.util';
@@ -176,6 +177,25 @@ export class SubscriptionPurchasesController {
   @ApiOperation({ summary: 'Get subscription purchase details (admin)' })
   async getAdminSubscriptionById(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findPurchaseForAdmin(id);
+  }
+
+  @Post('admin/free')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Create a free (zero-price) subscription for a customer (admin)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Free subscription created and activated',
+  })
+  @ApiResponse({ status: 400, description: 'Plan inactive' })
+  @ApiResponse({ status: 404, description: 'Target user not found' })
+  async createFreeSubscription(
+    @CurrentUser() user: User,
+    @Body() dto: AdminCreateFreeSubscriptionDto,
+  ) {
+    return this.service.adminCreateFreePurchase(dto, user.id);
   }
 
   @Patch('admin/all/:id/payment-status')

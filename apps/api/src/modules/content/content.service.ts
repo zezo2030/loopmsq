@@ -355,6 +355,27 @@ export class ContentService {
     return updatedBranch;
   }
 
+  /**
+   * Archive (soft-delete) a branch regardless of whether it has related data
+   * (customer subscriptions, bookings, offers, tickets, etc.). The branch is
+   * hidden from all listings and the app via TypeORM's soft-delete filtering,
+   * while every related record stays in the database for reporting/audit.
+   */
+  async deleteBranch(id: string): Promise<{ success: true }> {
+    // Throws NotFoundException if the branch doesn't exist (or is already archived).
+    await this.findBranchById(id);
+
+    await this.branchRepository.softDelete(id);
+
+    // Clear cache so the archived branch disappears immediately.
+    await this.redisService.del(`branch:${id}`);
+    await this.redisService.del('branches:all');
+    await this.redisService.del('branches:active');
+
+    this.logger.log(`Branch archived (soft-deleted): ${id}`);
+    return { success: true };
+  }
+
   async uploadBranchCoverImage(
     branchId: string,
     filename: string,

@@ -63,4 +63,18 @@ export type CreateSubscriptionPurchaseOptions = {
    * Internal flows (e.g. gift claim) may omit holder photo; staff sees the no-photo warning.
    */
   allowMissingHolderImage?: boolean;
+  /**
+   * Force a zero-price purchase regardless of plan price/coupons (admin free grant).
+   * The purchase is activated immediately and stays neutral to loyalty accounting
+   * (neither counts as a paid purchase nor consumes a loyalty reward).
+   */
+  forceFree?: boolean;
+  /**
+   * Admin user id that granted a {@link forceFree} subscription (audit only).
+   */
+  grantedByAdminId?: string;
+  /**
+   * Optional note attached to a {@link forceFree} grant (audit only).
+   */
+  grantNote?: string;
 };

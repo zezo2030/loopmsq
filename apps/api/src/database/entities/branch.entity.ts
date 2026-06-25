@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   OneToMany,
 } from 'typeorm';
 import { Booking } from './booking.entity';
@@ -103,6 +104,12 @@ export class Branch {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // Soft-delete (archive). When set, TypeORM automatically excludes the branch
+  // from default queries while keeping all related data (subscriptions,
+  // bookings, payments, etc.) intact for reporting.
+  @DeleteDateColumn({ nullable: true })
+  deletedAt: Date | null;
 
   @OneToMany(() => Booking, (booking) => booking.branch)
   bookings: Booking[];

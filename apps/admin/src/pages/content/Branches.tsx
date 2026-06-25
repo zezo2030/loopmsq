@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAdminAuth } from '../../auth'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image, Tabs, Row, Col, Divider, Progress, Switch } from 'antd'
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Space, Upload, Image, Tabs, Row, Col, Divider, Progress, Switch, Popconfirm } from 'antd'
 import { resolveFileUrl, resolveFileUrlWithBust } from '../../shared/url'
 import { UploadOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete, getApiBase } from '../../api'
@@ -105,6 +105,11 @@ export default function Branches() {
     mutationFn: async ({ id, status }: { id: string; status: NonNullable<Branch['status']> }) => apiPatch(`/content/branches/${id}/status`, { status }),
     onSuccess: () => { message.success(t('branches.status_updated') || 'Status updated'); qc.invalidateQueries({ queryKey: ['branches'] }) },
   })
+  const deleteBranch = useMutation({
+    mutationFn: async (id: string) => apiDelete(`/content/branches/${id}`),
+    onSuccess: () => { message.success(t('branches.deleted') || 'تم حذف الفرع'); qc.invalidateQueries({ queryKey: ['branches'] }) },
+    onError: () => { message.error(t('branches.delete_failed') || 'فشل حذف الفرع') },
+  })
 
   const handleCoverImageUpload = async (file: any, branchId: string) => {
     const formData = new FormData()
@@ -202,6 +207,19 @@ export default function Branches() {
               { label: t('branches.maintenance') || 'Maintenance', value: 'maintenance' },
             ]}
           />
+          <Popconfirm
+            title={t('branches.delete_title') || 'حذف الفرع'}
+            description={t('branches.delete_confirm') || 'سيتم أرشفة الفرع وإخفاؤه من القوائم والتطبيق. الاشتراكات والحجوزات والبيانات المالية المرتبطة بالعملاء ستبقى محفوظة. هل تريد المتابعة؟'}
+            okText={t('common.delete') || 'حذف'}
+            cancelText={t('common.cancel') || 'إلغاء'}
+            okButtonProps={{ danger: true, loading: deleteBranch.isPending }}
+            disabled={!canEdit}
+            onConfirm={() => deleteBranch.mutate(r.id)}
+          >
+            <Button size="small" danger disabled={!canEdit} icon={<DeleteOutlined />}>
+              {t('common.delete') || 'حذف'}
+            </Button>
+          </Popconfirm>
         </Space>
       ),
     },
