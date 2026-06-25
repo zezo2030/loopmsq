@@ -23,6 +23,7 @@ import { TripsModule } from '../trips/trips.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { InvoicingModule } from '../invoicing/invoicing.module';
+import { ReferralsModule } from '../referrals/referrals.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { InvoicingModule } from '../invoicing/invoicing.module';
     forwardRef(() => TripsModule),
     CouponsModule,
     InvoicingModule,
+    ReferralsModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, RedisService, MoyasarService, QRCodeService],

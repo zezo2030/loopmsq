@@ -55,6 +55,30 @@ server {
         allow all;
     }
 
+    # Deep-link entry points are served by the API at the domain ROOT
+    # (excluded from the api/v1 prefix in main.ts). They MUST reach the API
+    # (port 3000), not the web frontend, otherwise iOS/Android cannot verify the
+    # app association and the WhatsApp gift claim link 404s.
+    location = /.well-known/apple-app-site-association {
+        proxy_pass http://127.0.0.1:3000/.well-known/apple-app-site-association;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    location = /.well-known/assetlinks.json {
+        proxy_pass http://127.0.0.1:3000/.well-known/assetlinks.json;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    location /gift/claim {
+        proxy_pass http://127.0.0.1:3000/gift/claim;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
     location /api/ {
         proxy_pass http://127.0.0.1:3000/api/;
         proxy_http_version 1.1;

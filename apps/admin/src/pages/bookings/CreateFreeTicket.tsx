@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Card,
@@ -26,18 +26,25 @@ export default function CreateFreeTicket() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [userSearch, setUserSearch] = useState('')
+  const [debouncedUserSearch, setDebouncedUserSearch] = useState('')
 
-  // Load users (clients only - filter to get only users with 'user' role)
+  // Debounce the dropdown search so we don't hit the API on every keystroke.
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedUserSearch(userSearch.trim()), 350)
+    return () => window.clearTimeout(t)
+  }, [userSearch])
+
+  // Load clients (role 'user') with server-side search. The API caps limit at
+  // 100 and search by name/email is done server-side, so we query on demand
+  // instead of loading everyone up front and filtering on the client.
   const { data: users, isLoading: usersLoading } = useQuery<any[]>({
-    queryKey: ['users', 'clients'],
+    queryKey: ['users', 'clients', debouncedUserSearch],
     queryFn: async () => {
-      const res = await apiGet<{ users: any[] }>('/users?page=1&limit=1000')
-      const allUsers = Array.isArray(res) ? res : (res.users || [])
-      // Filter to get only clients (users with role 'user' or 'USER')
-      return allUsers.filter((user: any) => {
-        const roles = user.roles || []
-        return roles.includes('user') || roles.includes('USER')
-      })
+      const params = new URLSearchParams({ page: '1', limit: '100', role: 'user' })
+      if (debouncedUserSearch) params.set('q', debouncedUserSearch)
+      const res = await apiGet<{ users: any[] }>(`/users?${params.toString()}`)
+      return Array.isArray(res) ? res : (res.users || [])
     },
   })
 
@@ -146,10 +153,15 @@ export default function CreateFreeTicket() {
                       placeholder="اختر العميل الذي ستوجه له التذكرة المجانية"
                       options={userOptions}
                       loading={usersLoading}
-                      filterOption={(input, option) =>
-                        (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                      filterOption={false}
+                      onSearch={setUserSearch}
+                      notFoundContent={
+                        usersLoading
+                          ? 'جاري التحميل...'
+                          : userSearch
+                            ? 'لا يوجد عملاء مطابقون'
+                            : 'ابحث بالاسم أو البريد الإلكتروني'
                       }
-                      notFoundContent={usersLoading ? 'جاري التحميل...' : 'لا يوجد عملاء'}
                     />
                   </Form.Item>
                 </Col>

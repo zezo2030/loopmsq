@@ -31,6 +31,10 @@ export enum WalletTransactionStatus {
 @Index(['createdAt'])
 @Index(['userId', 'type'])
 @Index(['userId', 'status'])
+// Idempotency backstop: a given (user, reference) credit/debit can exist once.
+// NULL references remain allowed multiple times (Postgres treats NULLs as
+// distinct), so only flows that set a reference are de-duplicated.
+@Index(['userId', 'reference'], { unique: true })
 export class WalletTransaction {
   @PrimaryGeneratedColumn('uuid')
   id: string;

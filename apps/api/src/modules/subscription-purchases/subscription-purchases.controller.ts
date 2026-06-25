@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Param,
   Body,
   Query,
@@ -26,6 +27,7 @@ import { SubscriptionPurchasesService } from './subscription-purchases.service';
 import { SubscriptionQuoteDto } from './dto/subscription-quote.dto';
 import { CreateSubscriptionPurchaseDto } from './dto/create-subscription-purchase.dto';
 import { DeductHoursDto } from './dto/deduct-hours.dto';
+import { UpdatePaymentStatusDto } from './dto/update-payment-status.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { maskAmounts } from '../../common/utils/financial-mask.util';
@@ -174,6 +176,22 @@ export class SubscriptionPurchasesController {
   @ApiOperation({ summary: 'Get subscription purchase details (admin)' })
   async getAdminSubscriptionById(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findPurchaseForAdmin(id);
+  }
+
+  @Patch('admin/all/:id/payment-status')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Manually update subscription payment status (admin)',
+  })
+  @ApiResponse({ status: 200, description: 'Payment status updated' })
+  @ApiResponse({ status: 404, description: 'Purchase not found' })
+  async updatePaymentStatus(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdatePaymentStatusDto,
+  ) {
+    return this.service.adminUpdatePaymentStatus(id, dto.paymentStatus, user.id);
   }
 
   @Get('branch/me/:id')

@@ -75,12 +75,14 @@ export class GiftOrdersService {
     couponCode: string | undefined | null,
     amount: number,
     branchId?: string | null,
+    userId?: string,
   ): Promise<{ discount: number; finalAmount: number }> {
     if (!couponCode || !couponCode.trim() || amount <= 0) {
       return { discount: 0, finalAmount: amount };
     }
     const preview = await this.couponsService.preview(couponCode.trim(), amount, {
       branchId: branchId || undefined,
+      userId,
     });
     if (!preview.valid) {
       throw new BadRequestException('Invalid or expired coupon code');
@@ -391,6 +393,7 @@ export class GiftOrdersService {
         dto.couponCode,
         subtotal + tax,
         dto.branchId,
+        userId,
       );
 
     return {
@@ -514,6 +517,7 @@ export class GiftOrdersService {
         dto.couponCode,
         subtotal + tax,
         dto.branchId,
+        userId,
       );
 
     let senderDisplayName: string | null = null;
@@ -552,6 +556,15 @@ export class GiftOrdersService {
     const claimLink = this.ensureClaimLink(giftOrder);
 
     const saved = await this.giftOrderRepo.save(giftOrder);
+
+    // Record coupon redemption (best-effort, idempotent on gift order id).
+    await this.couponsService.tryRedeem({
+      code: dto.couponCode,
+      userId,
+      amount: subtotal,
+      reference: saved.id,
+      branchId: dto.branchId || undefined,
+    });
 
     await this.logEvent(saved.id, 'gift_created', 'sender', userId, {
       giftType: dto.giftType,
@@ -808,24 +821,61 @@ export class GiftOrdersService {
       });
     }
 
+    // Bind the claim to the intended recipient. The claim token is a bearer
+    // secret delivered over WhatsApp, but it does not prove WHO is claiming —
+    // on its own, anyone holding the token (the sender who kept it, or anyone
+    // the link was forwarded to) could redeem the gift onto their own account.
+    // Require the caller's phone to match the recipient phone the gift was
+    // addressed to.
+    let claimerPhone: string | undefined;
+    try {
+      claimerPhone = user.phone
+        ? this.encryption.decrypt(user.phone)
+        : undefined;
+    } catch {}
+    if (!claimerPhone || !phonesMatch(claimerPhone, gift.recipientPhone)) {
+      throw new ForbiddenException({
+        code: 'RECIPIENT_MISMATCH',
+        message: 'This gift can only be claimed by the intended recipient',
+      });
+    }
+
+    // Atomically acquire the claim: only the request that transitions the gift
+    // out of PENDING_CLAIM proceeds. Concurrent claims see affected=0 and are
+    // rejected — this prevents a single paid gift being provisioned twice.
+    const claimAcquired = await this.giftOrderRepo.update(
+      { id: gift.id, giftStatus: GiftStatus.PENDING_CLAIM },
+      {
+        giftStatus: GiftStatus.CLAIMED,
+        claimedByUserId: userId,
+        claimedAt: new Date(),
+      },
+    );
+    if (!claimAcquired.affected) {
+      throw new BadRequestException({
+        code: 'ALREADY_CLAIMED',
+        message: 'Gift has already been claimed',
+      });
+    }
+
     let finalAssetType: FinalAssetType;
     let finalAssetId: string;
 
-    if (gift.giftType === GiftType.OFFER) {
-      const bookingResult = await this.offerBookingsService.createBooking(
-        userId,
-        {
-          offerProductId: gift.sourceProductId,
-          addOns: gift.metadata?.addOns,
-          contactPhone: gift.recipientPhone,
-          acceptedTerms: true,
-        },
-      );
-      await this.offerBookingsService.confirmPayment(bookingResult.id);
-      finalAssetType = FinalAssetType.OFFER_BOOKING;
-      finalAssetId = bookingResult.id;
-    } else {
-      try {
+    try {
+      if (gift.giftType === GiftType.OFFER) {
+        const bookingResult = await this.offerBookingsService.createBooking(
+          userId,
+          {
+            offerProductId: gift.sourceProductId,
+            addOns: gift.metadata?.addOns,
+            contactPhone: gift.recipientPhone,
+            acceptedTerms: true,
+          },
+        );
+        await this.offerBookingsService.confirmPayment(bookingResult.id);
+        finalAssetType = FinalAssetType.OFFER_BOOKING;
+        finalAssetId = bookingResult.id;
+      } else {
         const purchaseResult =
           await this.subscriptionPurchasesService.createPurchase(
             userId,
@@ -842,16 +892,25 @@ export class GiftOrdersService {
         }
         finalAssetType = FinalAssetType.SUBSCRIPTION_PURCHASE;
         finalAssetId = purchaseResult.id;
-      } catch (error) {
-        if (error instanceof ConflictException) {
-          throw new BadRequestException({
-            code: 'ACTIVE_SUBSCRIPTION_CONFLICT',
-            message:
-              'Recipient already has an active subscription in this branch',
-          });
-        }
-        throw error;
       }
+    } catch (error) {
+      // Provisioning failed — release the claim so the recipient can retry.
+      await this.giftOrderRepo.update(
+        { id: gift.id },
+        {
+          giftStatus: GiftStatus.PENDING_CLAIM,
+          claimedByUserId: null as any,
+          claimedAt: null as any,
+        },
+      );
+      if (error instanceof ConflictException) {
+        throw new BadRequestException({
+          code: 'ACTIVE_SUBSCRIPTION_CONFLICT',
+          message:
+            'Recipient already has an active subscription in this branch',
+        });
+      }
+      throw error;
     }
 
     gift.giftStatus = GiftStatus.CLAIMED;

@@ -76,12 +76,14 @@ export class TripsService {
     couponCode: string | undefined | null,
     amount: number,
     branchId?: string | null,
+    userId?: string,
   ): Promise<{ discount: number; finalAmount: number }> {
     if (!couponCode || !couponCode.trim() || amount <= 0) {
       return { discount: 0, finalAmount: amount };
     }
     const preview = await this.couponsService.preview(couponCode.trim(), amount, {
       branchId: branchId || undefined,
+      userId,
     });
     if (!preview.valid) {
       throw new BadRequestException('Invalid or expired coupon code');
@@ -507,6 +509,7 @@ export class TripsService {
         dto.couponCode,
         pricing.totalAmount,
         dto.branchId,
+        userId,
       );
     const depositPercentage = this.getDepositPercentage(branch);
     const depositAmount = this.normalizeMoney(
@@ -550,6 +553,15 @@ export class TripsService {
       } as any,
     });
     const saved = await this.tripRepo.save(req);
+
+    // Record coupon redemption (best-effort, idempotent on trip request id).
+    await this.couponsService.tryRedeem({
+      code: dto.couponCode,
+      userId,
+      amount: pricing.totalAmount,
+      reference: saved.id,
+      branchId: dto.branchId || undefined,
+    });
 
     await this.adminNotifications.notify({
       type: 'TRIP_REQUEST_CREATED',

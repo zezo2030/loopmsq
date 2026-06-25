@@ -1,5 +1,5 @@
-import { Inject, forwardRef } from '@nestjs/common';
 import { Process, Processor } from '@nestjs/bull';
+import { ModuleRef } from '@nestjs/core';
 import type { Job } from 'bull';
 import { WhatsAppProvider } from '../providers/whatsapp.provider';
 import { GiftOrdersService } from '../../gift-orders/gift-orders.service';
@@ -24,9 +24,16 @@ type WhatsAppSendJob =
 export class WhatsAppProcessor {
   constructor(
     private readonly whatsappProvider: WhatsAppProvider,
-    @Inject(forwardRef(() => GiftOrdersService))
-    private readonly giftOrdersService: GiftOrdersService,
+    // Resolved lazily (strict:false) instead of injected, so this module does
+    // NOT need to import GiftOrdersModule. That import created a circular
+    // module-load chain (notifications -> gift-orders -> payments/coupons/...)
+    // which left NotificationsModule undefined for other importers at boot.
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private get giftOrdersService(): GiftOrdersService {
+    return this.moduleRef.get(GiftOrdersService, { strict: false });
+  }
 
   @Process('send')
   async handleSend(job: Job<WhatsAppSendJob>): Promise<void> {

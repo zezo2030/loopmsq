@@ -33,6 +33,22 @@ export class Coupon {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   discountValue: number;
 
+  // Optional cap on the discount a percentage coupon can grant (in currency).
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  maxDiscountAmount: number | null;
+
+  // Total redemptions allowed across all users. null = unlimited.
+  @Column({ type: 'int', nullable: true })
+  usageLimit: number | null;
+
+  // Redemptions allowed per user. null = unlimited.
+  @Column({ type: 'int', nullable: true })
+  perUserLimit: number | null;
+
+  // Running count of successful redemptions (incremented atomically on redeem).
+  @Column({ type: 'int', default: 0 })
+  usageCount: number;
+
   @Column({ type: 'timestamp', nullable: true })
   startsAt: Date | null;
 

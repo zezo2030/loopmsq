@@ -53,9 +53,9 @@ services:
       ANDROID_APP_PACKAGE: ${ANDROID_APP_PACKAGE:-com.company.kinetic}
       ANDROID_SHA256_FINGERPRINTS: ${ANDROID_SHA256_FINGERPRINTS:-}
       IOS_TEAM_ID: ${IOS_TEAM_ID:-}
-      IOS_APP_BUNDLE_ID: ${IOS_APP_BUNDLE_ID:-com.example.userApp}
+      IOS_APP_BUNDLE_ID: ${IOS_APP_BUNDLE_ID:-com.looppr.kinetic}
       ANDROID_STORE_URL: ${ANDROID_STORE_URL:-https://play.google.com/store/apps/details?id=com.company.kinetic}
-      IOS_STORE_URL: ${IOS_STORE_URL:-https://apps.apple.com/}
+      IOS_STORE_URL: ${IOS_STORE_URL:-https://apps.apple.com/sg/app/kinetic-كاينتيك/id6755392463}
       GIFT_CLAIM_EXPIRY_DAYS: ${GIFT_CLAIM_EXPIRY_DAYS:-30}
       # Static uploads path (prod container mount)
       UPLOAD_DEST: /app/uploads

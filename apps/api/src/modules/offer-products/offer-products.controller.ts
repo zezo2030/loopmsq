@@ -21,6 +21,7 @@ import { OfferProductsService } from './offer-products.service';
 import { CreateOfferProductDto } from './dto/create-offer-product.dto';
 import { UpdateOfferProductDto } from './dto/update-offer-product.dto';
 import { OfferCategory } from '../../database/entities/offer-product.entity';
+import { AdminGuard } from '../../common/guards/admin.guard';
 
 @ApiTags('offer-products')
 @Controller()
@@ -41,6 +42,7 @@ export class OfferProductsController {
   }
 
   @Get('admin/offer-products')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'List all offer products (admin)' })
   @ApiResponse({ status: 200, description: 'Offers retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -68,6 +70,7 @@ export class OfferProductsController {
   }
 
   @Post('admin/offer-products')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Create a new offer product (admin)' })
   @ApiResponse({ status: 201, description: 'Offer created successfully' })
   @ApiResponse({ status: 400, description: 'Validation failure' })
@@ -78,6 +81,7 @@ export class OfferProductsController {
   }
 
   @Patch('admin/offer-products/:id')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Update an offer product (admin)' })
   @ApiResponse({ status: 200, description: 'Offer updated successfully' })
   @ApiResponse({ status: 400, description: 'Validation failure' })
@@ -92,6 +96,7 @@ export class OfferProductsController {
   }
 
   @Delete('admin/offer-products/:id')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Soft-delete an offer product (admin)' })
   @ApiResponse({ status: 200, description: 'Offer deactivated successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

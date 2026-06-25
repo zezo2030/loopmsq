@@ -11,3 +11,7 @@ response.md
 # ZATCA SDK jar is licensed by ZATCA — keep it out of git
 apps/api/zatca-sdk/*.jar
 apps/api/zatca-sdk/zatca-envoice-sdk-*/
+
+# Environment files with secrets (managed outside VCS)
+.env.*
+!.env.example

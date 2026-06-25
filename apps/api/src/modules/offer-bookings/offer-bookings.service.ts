@@ -78,12 +78,14 @@ export class OfferBookingsService {
     couponCode: string | undefined | null,
     amount: number,
     branchId?: string | null,
+    userId?: string,
   ): Promise<{ discount: number; finalAmount: number }> {
     if (!couponCode || !couponCode.trim()) {
       return { discount: 0, finalAmount: amount };
     }
     const preview = await this.couponsService.preview(couponCode.trim(), amount, {
       branchId: branchId || undefined,
+      userId,
     });
     if (!preview.valid) {
       throw new BadRequestException('Invalid or expired coupon code');
@@ -129,6 +131,7 @@ export class OfferBookingsService {
       dto.couponCode,
       grossTotal,
       offer.branchId,
+      userId,
     );
 
     return {
@@ -209,6 +212,7 @@ export class OfferBookingsService {
         dto.couponCode,
         grossTotal,
         offer.branchId,
+        userId,
       );
 
     // Create offer snapshot
@@ -249,6 +253,15 @@ export class OfferBookingsService {
       const savedPayment = await queryRunner.manager.save(payment);
 
       await queryRunner.commitTransaction();
+
+      // Record coupon redemption (best-effort, idempotent on booking id).
+      await this.couponsService.tryRedeem({
+        code: dto.couponCode,
+        userId,
+        amount: grossTotal,
+        reference: savedBooking.id,
+        branchId: offer.branchId || undefined,
+      });
 
       this.logger.log(
         `Offer booking created: ${savedBooking.id} for user ${userId}, payment: ${savedPayment.id}`,
