@@ -597,6 +597,88 @@ export class SubscriptionPurchasesService {
   }
 
   /**
+   * Manually override a subscription purchase payment status from the admin
+   * dashboard. Marking as completed activates the subscription (QR + notify)
+   * via confirmPayment; marking as failed/pending only flips the flag.
+   * Related Payment rows are kept in sync, and the change is recorded in
+   * metadata for audit.
+   */
+  async adminUpdatePaymentStatus(
+    purchaseId: string,
+    newStatus: SubscriptionPurchasePaymentStatus,
+    adminUserId?: string,
+  ) {
+    const purchase = await this.purchaseRepo.findOne({
+      where: { id: purchaseId },
+    });
+
+    if (!purchase) {
+      throw new NotFoundException('Subscription purchase not found');
+    }
+
+    const previousStatus = purchase.paymentStatus;
+
+    const recordAudit = async () => {
+      const fresh = await this.purchaseRepo.findOne({
+        where: { id: purchaseId },
+      });
+      if (!fresh) return;
+      fresh.metadata = {
+        ...(fresh.metadata || {}),
+        manualPaymentStatusUpdate: {
+          from: previousStatus,
+          to: newStatus,
+          adminUserId: adminUserId || null,
+          at: new Date().toISOString(),
+        },
+      };
+      await this.purchaseRepo.save(fresh);
+    };
+
+    if (newStatus === SubscriptionPurchasePaymentStatus.COMPLETED) {
+      // Keep the related payment rows consistent, then run the normal
+      // activation path (idempotent) so the user gets an active subscription.
+      await this.paymentRepo.update(
+        { subscriptionPurchaseId: purchaseId, status: PaymentStatus.PENDING },
+        { status: PaymentStatus.COMPLETED },
+      );
+      await this.confirmPayment(purchaseId);
+      await recordAudit();
+    } else {
+      // Marking failed/pending: flip the flag and sync payment rows. A failed
+      // payment cancels the subscription so it stops counting as active.
+      purchase.paymentStatus = newStatus;
+      if (newStatus === SubscriptionPurchasePaymentStatus.FAILED) {
+        purchase.status = SubscriptionPurchaseStatus.CANCELLED;
+      }
+      await this.purchaseRepo.save(purchase);
+
+      const targetPaymentStatus =
+        newStatus === SubscriptionPurchasePaymentStatus.FAILED
+          ? PaymentStatus.FAILED
+          : PaymentStatus.PENDING;
+      await this.paymentRepo.update(
+        { subscriptionPurchaseId: purchaseId, status: PaymentStatus.COMPLETED },
+        { status: targetPaymentStatus },
+      );
+      await recordAudit();
+    }
+
+    this.logger.log(
+      `Admin ${adminUserId || 'unknown'} set payment status of purchase ${purchaseId}: ${previousStatus} -> ${newStatus}`,
+    );
+
+    const updated = await this.purchaseRepo.findOne({
+      where: { id: purchaseId },
+    });
+    return {
+      id: purchaseId,
+      paymentStatus: updated?.paymentStatus ?? newStatus,
+      status: updated?.status,
+    };
+  }
+
+  /**
    * Get paginated user subscriptions.
    */
   async findUserPurchases(
