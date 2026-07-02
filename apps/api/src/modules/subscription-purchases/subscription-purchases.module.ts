@@ -12,6 +12,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { User } from '../../database/entities/user.entity';
 import { CloudinaryModule } from '../../utils/cloudinary.module';
 import { CouponsModule } from '../coupons/coupons.module';
+import { EncryptionService } from '../../utils/encryption.util';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { CouponsModule } from '../coupons/coupons.module';
     CouponsModule,
   ],
   controllers: [SubscriptionPurchasesController, StaffSubscriptionsController],
-  providers: [SubscriptionPurchasesService, QRCodeService],
+  providers: [SubscriptionPurchasesService, QRCodeService, EncryptionService],
   exports: [SubscriptionPurchasesService],
 })
 export class SubscriptionPurchasesModule {}

@@ -63,8 +63,8 @@ export class SubscriptionPurchase {
   @Column({ type: 'timestamp' })
   startedAt: Date;
 
-  @Column({ type: 'timestamp' })
-  endsAt: Date;
+  @Column({ type: 'timestamp', nullable: true })
+  endsAt: Date | null;
 
   @Column({
     type: 'enum',

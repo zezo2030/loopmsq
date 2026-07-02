@@ -1613,8 +1613,19 @@ export class BookingsService {
     booking: Booking,
     paidPersons: number,
     bonusPersons: number,
+    // Open-ended tickets carry no fixed validity window: validFrom/validUntil
+    // are left null and are computed from the first scan (see scanTicket). Used
+    // for date-less free tickets so the UI shows no misleading date range.
+    openEnded = false,
   ): Promise<Ticket[]> {
     const tickets: Ticket[] = [];
+
+    const validFrom = openEnded ? null : booking.startTime;
+    const validUntil = openEnded
+      ? null
+      : new Date(
+          booking.startTime.getTime() + booking.durationHours * 60 * 60 * 1000,
+        );
 
     for (let i = 0; i < paidPersons; i++) {
       const qrToken = this.qrCodeService.generateQRToken(
@@ -1628,10 +1639,8 @@ export class BookingsService {
         qrTokenHash,
         status: TicketStatus.VALID,
         personCount: 1,
-        validFrom: booking.startTime,
-        validUntil: new Date(
-          booking.startTime.getTime() + booking.durationHours * 60 * 60 * 1000,
-        ),
+        validFrom,
+        validUntil,
       });
 
       const savedTicket = await queryRunner.manager.save(ticket);
@@ -1650,10 +1659,8 @@ export class BookingsService {
         qrTokenHash,
         status: TicketStatus.VALID,
         personCount: 1,
-        validFrom: booking.startTime,
-        validUntil: new Date(
-          booking.startTime.getTime() + booking.durationHours * 60 * 60 * 1000,
-        ),
+        validFrom,
+        validUntil,
         metadata: { isBonusTicket: true },
       });
 
@@ -1982,7 +1989,10 @@ export class BookingsService {
 
     // Free tickets are date-less: when no startTime is given, the ticket is
     // valid from its first scan for `durationHours`. We still store a
-    // startTime (now) to satisfy the booking schema.
+    // startTime (now) to satisfy the booking schema, but the tickets are
+    // generated open-ended (no fixed validity window) so they aren't tied to
+    // a specific date.
+    const openEnded = !dto.startTime;
     const startTime = dto.startTime ? new Date(dto.startTime) : new Date();
     if (dto.startTime) {
       if (startTime.getTime() <= new Date().getTime()) {
@@ -2013,12 +2023,15 @@ export class BookingsService {
 
       const savedBooking = await queryRunner.manager.save(booking);
 
-      // Generate tickets immediately
+      // Generate tickets immediately. When no startTime was supplied the
+      // tickets are open-ended (valid from first scan), otherwise they follow
+      // the requested slot like a normal booking.
       const tickets = await this.generateTickets(
         queryRunner,
         savedBooking,
         persons,
         0,
+        openEnded,
       );
 
       await queryRunner.commitTransaction();

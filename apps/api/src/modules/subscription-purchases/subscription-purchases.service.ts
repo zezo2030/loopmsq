@@ -31,6 +31,7 @@ import { DeductHoursDto } from './dto/deduct-hours.dto';
 import { User } from '../../database/entities/user.entity';
 import { CloudinaryService } from '../../utils/cloudinary.service';
 import { CouponsService } from '../coupons/coupons.service';
+import { EncryptionService } from '../../utils/encryption.util';
 
 type PurchaseListFilters = {
   status?: SubscriptionPurchaseStatus;
@@ -61,7 +62,17 @@ export class SubscriptionPurchasesService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly dataSource: DataSource,
     private readonly couponsService: CouponsService,
+    private readonly encryptionService: EncryptionService,
   ) {}
+
+  private decryptPhone(phone?: string | null): string {
+    if (!phone) return '';
+    try {
+      return this.encryptionService.decrypt(phone);
+    } catch {
+      return phone;
+    }
+  }
 
   /**
    * Validates a coupon code against [amount] and returns the discount.
@@ -429,7 +440,9 @@ export class SubscriptionPurchasesService {
             : totalHours,
         dailyHoursLimit,
         startedAt: provisionalStartedAt,
-        endsAt: provisionalEndsAt,
+        // Admin free grants never expire (no end date); paid/loyalty purchases
+        // follow the plan duration.
+        endsAt: forceFree ? null : provisionalEndsAt,
         qrTokenHash: provisionalQrTokenHash,
         holderName,
         holderImageUrl: allowMissingHolderImage
@@ -565,7 +578,12 @@ export class SubscriptionPurchasesService {
 
     const now = new Date();
     const startedAt = now;
-    const endsAt = this.addCalendarMonths(now, plan.durationMonths);
+    // Admin free grants never expire (no end date); everything else follows the
+    // plan duration.
+    const isAdminFreeGrant = purchase.metadata?.adminFreeGrant === true;
+    const endsAt = isAdminFreeGrant
+      ? null
+      : this.addCalendarMonths(now, plan.durationMonths);
 
     const rawToken = this.qrCodeService.generateSubscriptionToken(purchase.id);
     const qrTokenHash = this.qrCodeService.hashToken(rawToken);
@@ -936,7 +954,7 @@ export class SubscriptionPurchasesService {
       user: {
         id: purchase.userId,
         name: purchase.holderName || purchase.user?.name || 'User',
-        phone: purchase.user?.phone || '',
+        phone: this.decryptPhone(purchase.user?.phone),
         imageUrl: purchase.holderImageUrl,
       },
       branch: {
@@ -1427,7 +1445,7 @@ export class SubscriptionPurchasesService {
         user: {
           id: purchase.userId,
           name: purchase.holderName || purchase.user?.name || 'User',
-          phone: purchase.user?.phone || '',
+          phone: this.decryptPhone(purchase.user?.phone),
           email: purchase.user?.email || '',
           imageUrl: purchase.holderImageUrl,
         },
@@ -1516,7 +1534,7 @@ export class SubscriptionPurchasesService {
       user: {
         id: purchase.userId,
         name: purchase.holderName || purchase.user?.name || 'User',
-        phone: purchase.user?.phone || '',
+        phone: this.decryptPhone(purchase.user?.phone),
         email: purchase.user?.email || '',
         imageUrl: purchase.holderImageUrl,
       },
