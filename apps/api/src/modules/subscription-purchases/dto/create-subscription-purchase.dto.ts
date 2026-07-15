@@ -77,4 +77,7 @@ export type CreateSubscriptionPurchaseOptions = {
    * Optional note attached to a {@link forceFree} grant (audit only).
    */
   grantNote?: string;
+  /** Optional validity window for an admin-issued grant. */
+  startedAt?: Date;
+  endsAt?: Date;
 };

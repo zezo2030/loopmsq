@@ -72,6 +72,7 @@ import {
   GiftOrder,
   GiftPaymentStatus,
   GiftStatus,
+  WhatsAppStatus,
 } from '../../database/entities/gift-order.entity';
 import { TripsService } from '../trips/trips.service';
 import { GiftOrdersService } from '../gift-orders/gift-orders.service';
@@ -681,7 +682,49 @@ export class PaymentsService {
     return purchaseRepo.save(purchase);
   }
 
+  private async withPaymentLock<T>(
+    lockKey: string,
+    busyMessage: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    let acquired = false;
+    for (let attempt = 0; attempt < 40 && !acquired; attempt += 1) {
+      acquired = await this.redisService.acquireLock(lockKey, 60);
+      if (!acquired) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+    if (!acquired) {
+      throw new BadRequestException(busyMessage);
+    }
+
+    try {
+      return await operation();
+    } finally {
+      await this.redisService.releaseLock(lockKey);
+    }
+  }
+
   async createIntent(userId: string, dto: CreatePaymentIntentDto) {
+    const target =
+      dto.bookingId ||
+      dto.eventRequestId ||
+      dto.tripRequestId ||
+      dto.offerBookingId ||
+      dto.subscriptionPurchaseId ||
+      dto.giftOrderId ||
+      dto.offerProductId ||
+      dto.subscriptionPlanId ||
+      this.stablePayloadHash(dto);
+    const lockKey = `payment-intent:${userId}:${target}:${dto.method}`;
+    return this.withPaymentLock(
+      lockKey,
+      'Payment is already being prepared. Please retry.',
+      () => this.createIntentUnlocked(userId, dto),
+    );
+  }
+
+  private async createIntentUnlocked(userId: string, dto: CreatePaymentIntentDto) {
     let booking: Booking | null = null;
     let eventRequest: EventRequest | null = null;
     let tripRequest: SchoolTripRequest | null = null;
@@ -949,11 +992,26 @@ export class PaymentsService {
         throw new BadRequestException('Gift order is not payable');
       }
       customerUser = { id: userId } as any;
-      amountToPay = Number(giftOrder.total);
+      const giftBatchId = giftOrder.metadata?.batchId?.toString();
+      if (giftBatchId) {
+        const batchTotal = await giftOrderRepo
+          .createQueryBuilder('gift')
+          .select('COALESCE(SUM(gift.total), 0)', 'total')
+          .where(`gift.metadata->>'batchId' = :batchId`, { batchId: giftBatchId })
+          .andWhere('gift.senderUserId = :userId', { userId })
+          .andWhere('gift.paymentStatus = :status', {
+            status: GiftPaymentStatus.PENDING,
+          })
+          .getRawOne<{ total: string }>();
+        amountToPay = Number(batchTotal?.total ?? 0);
+      } else {
+        amountToPay = Number(giftOrder.total);
+      }
       deferredFlowContext = {
         flowType: 'gift_order',
         userId,
         giftOrderId: giftOrder.id,
+        giftBatchId: giftBatchId || null,
       };
     } else if (dto.tripRequestPayload) {
       const quote = await this.tripsService.quotePayFirstSchoolTripIntent(
@@ -1210,6 +1268,15 @@ export class PaymentsService {
   }
 
   async confirmPayment(userId: string, dto: ConfirmPaymentDto) {
+    const lockKey = `payment-confirm:${userId}:${dto.paymentId}`;
+    return this.withPaymentLock(
+      lockKey,
+      'Payment confirmation is already in progress.',
+      () => this.confirmPaymentUnlocked(userId, dto),
+    );
+  }
+
+  private async confirmPaymentUnlocked(userId: string, dto: ConfirmPaymentDto) {
     let booking: Booking | null = null;
     let eventRequest: EventRequest | null = null;
     let tripRequest: SchoolTripRequest | null = null;
@@ -1874,9 +1941,25 @@ export class PaymentsService {
           where: { id: pendingFlowContext.giftOrderId },
         });
         if (giftOrder) {
-          giftOrder.paymentStatus = GiftPaymentStatus.PAID;
-          giftOrder.whatsappMessageStatus = 'pending' as any;
-          await giftOrderRepo.save(giftOrder);
+          const giftBatchId = pendingFlowContext.giftBatchId?.toString();
+          if (giftBatchId) {
+            await giftOrderRepo
+              .createQueryBuilder()
+              .update(GiftOrder)
+              .set({
+                paymentStatus: GiftPaymentStatus.PAID,
+                whatsappMessageStatus: WhatsAppStatus.PENDING,
+              })
+              .where(`metadata->>'batchId' = :batchId`, { batchId: giftBatchId })
+              .andWhere('"senderUserId" = :senderUserId', {
+                senderUserId: pendingFlowContext.userId,
+              })
+              .execute();
+          } else {
+            giftOrder.paymentStatus = GiftPaymentStatus.PAID;
+            giftOrder.whatsappMessageStatus = WhatsAppStatus.PENDING;
+            await giftOrderRepo.save(giftOrder);
+          }
         }
       } else if (booking) {
         booking.status = BookingStatus.CONFIRMED;
@@ -2372,6 +2455,7 @@ export class PaymentsService {
             bookingId: payment.bookingId,
             offerBookingId: payment.offerBookingId,
             subscriptionPurchaseId: payment.subscriptionPurchaseId,
+            giftOrderId: payment.giftOrderId,
           },
         });
         const pendingFlowContext = this.getPendingFlowContext(payment);
@@ -2418,6 +2502,40 @@ export class PaymentsService {
                   pendingFlowContext,
                 );
               reloadedPayment.subscriptionPurchaseId = createdPurchase.id;
+            } else if (pendingFlowContext.flowType === 'gift_order') {
+              const giftOrderRepo = manager.getRepository(GiftOrder);
+              const senderUserId = (reloadedContext?.userId as string) || '';
+              const gift = await giftOrderRepo.findOne({
+                where: {
+                  id: pendingFlowContext.giftOrderId,
+                  senderUserId,
+                },
+              });
+              if (!gift) {
+                throw new NotFoundException('Gift order not found');
+              }
+
+              const giftBatchId = pendingFlowContext.giftBatchId?.toString();
+              if (giftBatchId) {
+                await giftOrderRepo
+                  .createQueryBuilder()
+                  .update(GiftOrder)
+                  .set({
+                    paymentStatus: GiftPaymentStatus.PAID,
+                    whatsappMessageStatus: WhatsAppStatus.PENDING,
+                  })
+                  .where(`metadata->>'batchId' = :batchId`, {
+                    batchId: giftBatchId,
+                  })
+                  .andWhere('"senderUserId" = :senderUserId', {
+                    senderUserId,
+                  })
+                  .execute();
+              } else {
+                gift.paymentStatus = GiftPaymentStatus.PAID;
+                gift.whatsappMessageStatus = WhatsAppStatus.PENDING;
+                await giftOrderRepo.save(gift);
+              }
             }
 
             await manager.save(Payment, reloadedPayment);
@@ -2456,6 +2574,19 @@ export class PaymentsService {
           } catch (e) {
             this.logger.error(
               `Webhook: Failed to confirm subscription purchase: ${e?.message || e}`,
+            );
+          }
+        }
+
+        if (payment.giftOrderId && this.giftOrdersService) {
+          try {
+            await this.giftOrdersService.dispatchGiftInvite(
+              payment.giftOrderId,
+              'payment_confirmed',
+            );
+          } catch (e) {
+            this.logger.error(
+              `Webhook: Failed to queue gift invite: ${e?.message || e}`,
             );
           }
         }

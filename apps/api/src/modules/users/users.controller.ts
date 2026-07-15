@@ -123,7 +123,7 @@ export class UsersController {
     name: 'q',
     required: false,
     type: String,
-    description: 'Search by name or email',
+    description: 'Search by name, email, or phone',
   })
   @ApiResponse({ status: 200, description: 'Users retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

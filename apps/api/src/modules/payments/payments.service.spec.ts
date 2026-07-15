@@ -21,6 +21,11 @@ import { RedisService } from '../../utils/redis.service';
 import { BookingsService } from '../bookings/bookings.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
+import { GiftOrdersService } from '../gift-orders/gift-orders.service';
+import { CouponsService } from '../coupons/coupons.service';
+import { InvoiceQueueService } from '../invoicing/invoice-queue.service';
+import { ReferralsService } from '../referrals/referrals.service';
 import { OfferBookingsService } from '../offer-bookings/offer-bookings.service';
 import { SubscriptionPurchasesService } from '../subscription-purchases/subscription-purchases.service';
 import { WalletService } from '../wallet/wallet.service';
@@ -82,6 +87,8 @@ describe('PaymentsService', () => {
   const redisMock: Partial<RedisService> = {
     get: jest.fn(async () => null),
     set: jest.fn(async () => undefined),
+    acquireLock: jest.fn(async () => true),
+    releaseLock: jest.fn(async () => undefined),
   };
 
   const notificationsMock = {
@@ -146,6 +153,7 @@ describe('PaymentsService', () => {
         { provide: ConfigService, useValue: configServiceMock },
         { provide: RedisService, useValue: redisMock },
         { provide: NotificationsService, useValue: notificationsMock },
+        { provide: AdminNotificationsService, useValue: { notify: jest.fn() } },
         { provide: LoyaltyService, useValue: loyaltyMock },
         { provide: RealtimeGateway, useValue: {} },
         { provide: BookingsService, useValue: bookingsMock },
@@ -155,6 +163,13 @@ describe('PaymentsService', () => {
         { provide: OfferBookingsService, useValue: {} },
         { provide: SubscriptionPurchasesService, useValue: {} },
         { provide: TripsService, useValue: tripsServiceMock },
+        { provide: GiftOrdersService, useValue: {} },
+        { provide: CouponsService, useValue: {} },
+        { provide: InvoiceQueueService, useValue: { enqueue: jest.fn(async () => undefined) } },
+        {
+          provide: ReferralsService,
+          useValue: { processRefereePayment: jest.fn(async () => undefined) },
+        },
       ],
     }).compile();
 

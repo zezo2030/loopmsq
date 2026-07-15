@@ -11,6 +11,7 @@ import {
   IsInt,
   Min,
   IsUrl,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { GiftType } from '../../../database/entities/gift-order.entity';
@@ -43,6 +44,16 @@ export class CreateGiftOrderDto {
   @ApiProperty()
   @IsString()
   recipientPhone: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Additional recipients; one gift is created per phone',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(9)
+  @IsString({ each: true })
+  additionalRecipientPhones?: string[];
 
   @ApiPropertyOptional({ default: false })
   @IsOptional()

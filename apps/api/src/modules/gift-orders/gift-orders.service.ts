@@ -94,6 +94,43 @@ export class GiftOrdersService {
     };
   }
 
+  private async validateGiftRecipients(
+    userId: string,
+    recipientPhones: string[],
+  ): Promise<{ sender: User | null; normalizedPhones: string[] }> {
+    const normalizedPhones = recipientPhones.map(normalizePhone);
+    if (new Set(normalizedPhones).size !== normalizedPhones.length) {
+      throw new BadRequestException('Gift recipients must be unique');
+    }
+
+    const sender = await this.userRepo.findOne({ where: { id: userId } });
+    const senderPhone = sender?.phone
+      ? this.encryption.decrypt(sender.phone)
+      : null;
+    if (
+      senderPhone &&
+      recipientPhones.some((phone) => phonesMatch(senderPhone, phone))
+    ) {
+      throw new BadRequestException({
+        code: 'SELF_GIFT_NOT_ALLOWED',
+        message: 'Cannot send a gift to yourself',
+      });
+    }
+
+    return { sender, normalizedPhones };
+  }
+
+  private allocateCurrencyAmount(total: number, count: number): number[] {
+    const totalHalalas = Math.round(total * 100);
+    const baseHalalas = Math.floor(totalHalalas / count);
+    const remainder = totalHalalas - baseHalalas * count;
+
+    return Array.from(
+      { length: count },
+      (_, index) => (baseHalalas + (index < remainder ? 1 : 0)) / 100,
+    );
+  }
+
   private isRefundPending(gift: GiftOrder): boolean {
     return gift.refundRequestStatus === GiftRefundRequestStatus.PENDING;
   }
@@ -185,6 +222,7 @@ export class GiftOrdersService {
     giftId: string,
     trigger: 'payment_confirmed' | 'manual_resend',
     actorId?: string | null,
+    skipBatchExpansion = false,
   ) {
     const gift = await this.giftOrderRepo
       .createQueryBuilder('go')
@@ -197,6 +235,26 @@ export class GiftOrdersService {
         code: 'GIFT_NOT_FOUND',
         message: 'Gift not found',
       });
+    }
+
+    const batchId = gift.metadata?.batchId?.toString();
+    if (batchId && trigger === 'payment_confirmed' && !skipBatchExpansion) {
+      const siblings = await this.giftOrderRepo
+        .createQueryBuilder('gift')
+        .select('gift.id', 'id')
+        .where(`gift.metadata->>'batchId' = :batchId`, { batchId })
+        .andWhere('gift.senderUserId = :senderUserId', {
+          senderUserId: gift.senderUserId,
+        })
+        .andWhere('gift.paymentStatus = :paymentStatus', {
+          paymentStatus: GiftPaymentStatus.PAID,
+        })
+        .getRawMany<{ id: string }>();
+      return Promise.all(
+        siblings.map((item) =>
+          this.dispatchGiftInvite(item.id, trigger, actorId, true),
+        ),
+      );
     }
 
     const claimLink = this.ensureClaimLink(gift);
@@ -305,23 +363,11 @@ export class GiftOrdersService {
   }
 
   async getQuote(userId: string, dto: GiftQuoteDto) {
-    const normalizedRecipientPhone = normalizePhone(dto.recipientPhone);
-
-    const sender = await this.userRepo.findOne({ where: { id: userId } });
-    if (sender) {
-      let senderPhone: string | undefined;
-      try {
-        senderPhone = sender.phone
-          ? this.encryption.decrypt(sender.phone)
-          : undefined;
-      } catch {}
-      if (senderPhone && phonesMatch(senderPhone, dto.recipientPhone)) {
-        throw new BadRequestException({
-          code: 'SELF_GIFT_NOT_ALLOWED',
-          message: 'Cannot send a gift to yourself',
-        });
-      }
-    }
+    const recipientPhones = [
+      dto.recipientPhone,
+      ...(dto.additionalRecipientPhones ?? []),
+    ];
+    await this.validateGiftRecipients(userId, recipientPhones);
 
     const branch = await this.branchRepo.findOne({
       where: { id: dto.branchId },
@@ -387,6 +433,7 @@ export class GiftOrdersService {
       subtotal = Number(plan.price);
     }
 
+    subtotal *= recipientPhones.length;
     tax = 0;
     const { discount: couponDiscount, finalAmount: total } =
       await this.resolveCouponDiscount(
@@ -411,27 +458,17 @@ export class GiftOrdersService {
       branchName: branch.name_ar,
       recipientPhoneValid: true,
       selfGift: false,
+      recipientsCount: recipientPhones.length,
     };
   }
 
   async createGiftOrder(userId: string, dto: CreateGiftOrderDto) {
-    const normalizedRecipientPhone = normalizePhone(dto.recipientPhone);
-
-    const sender = await this.userRepo.findOne({ where: { id: userId } });
-    if (sender) {
-      let senderPhone: string | undefined;
-      try {
-        senderPhone = sender.phone
-          ? this.encryption.decrypt(sender.phone)
-          : undefined;
-      } catch {}
-      if (senderPhone && phonesMatch(senderPhone, dto.recipientPhone)) {
-        throw new BadRequestException({
-          code: 'SELF_GIFT_NOT_ALLOWED',
-          message: 'Cannot send a gift to yourself',
-        });
-      }
-    }
+    const recipientPhones = [
+      dto.recipientPhone,
+      ...(dto.additionalRecipientPhones ?? []),
+    ];
+    const { sender, normalizedPhones } =
+      await this.validateGiftRecipients(userId, recipientPhones);
 
     const branch = await this.branchRepo.findOne({
       where: { id: dto.branchId },
@@ -511,6 +548,7 @@ export class GiftOrdersService {
       };
     }
 
+    subtotal *= recipientPhones.length;
     tax = 0;
     const { discount: couponDiscount, finalAmount: total } =
       await this.resolveCouponDiscount(
@@ -525,63 +563,106 @@ export class GiftOrdersService {
       senderDisplayName = sender.name || null;
     }
 
-    const giftOrder = new GiftOrder();
-    giftOrder.giftType = dto.giftType;
-    giftOrder.branchId = dto.branchId;
-    giftOrder.senderUserId = userId;
-    giftOrder.recipientPhone = dto.recipientPhone;
-    giftOrder.normalizedRecipientPhone = normalizedRecipientPhone;
-    giftOrder.showSenderInfo = dto.showSenderInfo ?? false;
-    giftOrder.senderDisplayNameSnapshot = senderDisplayName ?? '';
-    giftOrder.giftMessage = dto.giftMessage ?? '';
-    giftOrder.sourceProductId = dto.sourceProductId;
-    giftOrder.sourceProductSnapshot = productSnapshot;
-    giftOrder.currency = 'SAR';
-    giftOrder.subtotal = subtotal;
-    giftOrder.discount = couponDiscount;
-    giftOrder.tax = tax;
-    giftOrder.total = total;
-    giftOrder.paymentStatus = GiftPaymentStatus.PENDING;
-    giftOrder.giftStatus = GiftStatus.PENDING_CLAIM;
-    giftOrder.whatsappMessageStatus = WhatsAppStatus.PENDING;
-    giftOrder.metadata = {
-      ...(dto.addOns ? { addOns: dto.addOns } : {}),
-      ...(dto.holderName?.trim()
-        ? { holderName: dto.holderName.trim() }
-        : {}),
-      ...(dto.holderImageUrl?.trim()
-        ? { holderImageUrl: dto.holderImageUrl.trim() }
-        : {}),
-    };
-    const claimLink = this.ensureClaimLink(giftOrder);
+    const batchId = recipientPhones.length > 1 ? crypto.randomUUID() : null;
+    const allocatedSubtotals = this.allocateCurrencyAmount(
+      subtotal,
+      recipientPhones.length,
+    );
+    const allocatedDiscounts = this.allocateCurrencyAmount(
+      couponDiscount,
+      recipientPhones.length,
+    );
+    const savedOrders = await this.dataSource.transaction(async (manager) => {
+      const giftOrderRepo = manager.getRepository(GiftOrder);
+      const orders: Array<{
+        order: GiftOrder;
+        token: string;
+        claimUrl: string;
+      }> = [];
 
-    const saved = await this.giftOrderRepo.save(giftOrder);
+      for (let index = 0; index < recipientPhones.length; index += 1) {
+        const giftOrder = new GiftOrder();
+        giftOrder.giftType = dto.giftType;
+        giftOrder.branchId = dto.branchId;
+        giftOrder.senderUserId = userId;
+        giftOrder.recipientPhone = recipientPhones[index];
+        giftOrder.normalizedRecipientPhone = normalizedPhones[index];
+        giftOrder.showSenderInfo = dto.showSenderInfo ?? false;
+        giftOrder.senderDisplayNameSnapshot = senderDisplayName ?? '';
+        giftOrder.giftMessage = dto.giftMessage ?? '';
+        giftOrder.sourceProductId = dto.sourceProductId;
+        giftOrder.sourceProductSnapshot = productSnapshot;
+        giftOrder.currency = 'SAR';
+        giftOrder.subtotal = allocatedSubtotals[index];
+        giftOrder.discount = allocatedDiscounts[index];
+        giftOrder.tax = 0;
+        giftOrder.total =
+          allocatedSubtotals[index] - allocatedDiscounts[index];
+        giftOrder.paymentStatus = GiftPaymentStatus.PENDING;
+        giftOrder.giftStatus = GiftStatus.PENDING_CLAIM;
+        giftOrder.whatsappMessageStatus = WhatsAppStatus.PENDING;
+        giftOrder.metadata = {
+          ...(dto.addOns ? { addOns: dto.addOns } : {}),
+          ...(dto.holderName?.trim()
+            ? { holderName: dto.holderName.trim() }
+            : {}),
+          ...(dto.holderImageUrl?.trim()
+            ? { holderImageUrl: dto.holderImageUrl.trim() }
+            : {}),
+          ...(batchId
+            ? {
+                batchId,
+                batchSize: recipientPhones.length,
+                batchIndex: index,
+              }
+            : {}),
+        };
+        const claimLink = this.ensureClaimLink(giftOrder);
+        const saved = await giftOrderRepo.save(giftOrder);
+        orders.push({ order: saved, ...claimLink });
+      }
+
+      return orders;
+    });
+
+    const primary = savedOrders[0];
 
     // Record coupon redemption (best-effort, idempotent on gift order id).
     await this.couponsService.tryRedeem({
       code: dto.couponCode,
       userId,
       amount: subtotal,
-      reference: saved.id,
+      reference: primary.order.id,
       branchId: dto.branchId || undefined,
     });
 
-    await this.logEvent(saved.id, 'gift_created', 'sender', userId, {
-      giftType: dto.giftType,
-      recipientPhone: normalizedRecipientPhone,
-      branchId: dto.branchId,
-    });
+    await Promise.all(
+      savedOrders.map(({ order }) =>
+        this.logEvent(order.id, 'gift_created', 'sender', userId, {
+          giftType: dto.giftType,
+          recipientPhone: order.normalizedRecipientPhone,
+          branchId: dto.branchId,
+          batchId,
+        }),
+      ),
+    );
 
     return {
-      id: saved.id,
-      giftType: saved.giftType,
-      giftStatus: saved.giftStatus,
-      paymentStatus: saved.paymentStatus,
-      total: saved.total,
-      currency: saved.currency,
-      claimExpiresAt: saved.claimTokenExpiresAt,
-      claimToken: claimLink.token,
-      claimUrl: claimLink.claimUrl,
+      id: primary.order.id,
+      giftType: primary.order.giftType,
+      giftStatus: primary.order.giftStatus,
+      paymentStatus: primary.order.paymentStatus,
+      total,
+      currency: primary.order.currency,
+      claimExpiresAt: primary.order.claimTokenExpiresAt,
+      claimToken: primary.token,
+      claimUrl: primary.claimUrl,
+      orders: savedOrders.map(({ order, token, claimUrl }) => ({
+        id: order.id,
+        recipientPhone: order.normalizedRecipientPhone,
+        claimToken: token,
+        claimUrl,
+      })),
     };
   }
 

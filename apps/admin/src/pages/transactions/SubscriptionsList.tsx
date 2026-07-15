@@ -194,6 +194,9 @@ export default function SubscriptionsList() {
 
   const openFreeModal = () => {
     freeForm.resetFields()
+    freeForm.setFieldsValue({
+      validityRange: [dayjs().startOf('day'), dayjs().add(1, 'month').endOf('day')],
+    })
     setUserSearch('')
     setUserOptions([])
     setPlanOptions([])
@@ -239,6 +242,8 @@ export default function SubscriptionsList() {
         holderName: values.holderName?.trim(),
         holderImageUrl: values.holderImageUrl?.trim() || undefined,
         note: values.note?.trim() || undefined,
+        startedAt: values.validityRange?.[0]?.startOf('day').toISOString(),
+        endsAt: values.validityRange?.[1]?.endOf('day').toISOString(),
       })
       message.success('تم إنشاء اشتراك مجاني وتفعيله للعميل')
       setFreeOpen(false)
@@ -607,6 +612,17 @@ export default function SubscriptionsList() {
               options={planOptions}
               optionFilterProp="label"
               notFoundContent="لا توجد باقات في هذا الفرع"
+            />
+          </Form.Item>
+          <Form.Item
+            name="validityRange"
+            label="فترة الاشتراك"
+            rules={[{ required: true, message: 'يرجى تحديد تاريخ بداية ونهاية الاشتراك' }]}
+          >
+            <RangePicker
+              style={{ width: '100%' }}
+              format="YYYY-MM-DD"
+              disabledDate={(date) => date.isBefore(dayjs().startOf('day'))}
             />
           </Form.Item>
           <Form.Item

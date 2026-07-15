@@ -255,17 +255,42 @@ export class UsersService {
     }
 
     const q = options?.q?.trim();
-    if (q) {
-      qb.andWhere(
-        '(LOWER(user.name) LIKE LOWER(:q) OR LOWER(user.email) LIKE LOWER(:q))',
-        { q: `%${q}%` },
-      );
-    }
+    let users: User[];
+    let total: number;
 
-    const [users, total] = await qb
-      .skip((safePage - 1) * safeLimit)
-      .take(safeLimit)
-      .getManyAndCount();
+    if (q) {
+      const queryDigits = q.replace(/\D/g, '');
+      const isPhoneQuery = queryDigits.length > 0 && /^[\d+\s()-]+$/.test(q);
+      if (isPhoneQuery) {
+        // Phone numbers use randomized encryption and cannot be matched with
+        // SQL LIKE. Decrypt only for phone-shaped searches, after applying the
+        // role and branch filters above, then paginate the actual matches.
+        const candidates = await qb.getMany();
+        const matches = candidates.filter((user) => {
+          const phone = user.phone
+            ? this.encryptionService.decrypt(user.phone)
+            : '';
+          return phone.replace(/\D/g, '').includes(queryDigits);
+        });
+        total = matches.length;
+        const offset = (safePage - 1) * safeLimit;
+        users = matches.slice(offset, offset + safeLimit);
+      } else {
+        qb.andWhere(
+          '(LOWER(user.name) LIKE LOWER(:q) OR LOWER(user.email) LIKE LOWER(:q))',
+          { q: `%${q}%` },
+        );
+        [users, total] = await qb
+          .skip((safePage - 1) * safeLimit)
+          .take(safeLimit)
+          .getManyAndCount();
+      }
+    } else {
+      [users, total] = await qb
+        .skip((safePage - 1) * safeLimit)
+        .take(safeLimit)
+        .getManyAndCount();
+    }
 
     const decryptedUsers = users.map((user) => ({
       id: user.id,

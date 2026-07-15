@@ -36,7 +36,7 @@ export default function CreateFreeTicket() {
   }, [userSearch])
 
   // Load clients (role 'user') with server-side search. The API caps limit at
-  // 100 and search by name/email is done server-side, so we query on demand
+  // 100 and search by name/email/phone is done server-side, so we query on demand
   // instead of loading everyone up front and filtering on the client.
   const { data: users, isLoading: usersLoading } = useQuery<any[]>({
     queryKey: ['users', 'clients', debouncedUserSearch],

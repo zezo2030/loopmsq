@@ -1,4 +1,5 @@
 import {
+  IsDateString,
   IsOptional,
   IsString,
   IsUUID,
@@ -47,4 +48,14 @@ export class AdminCreateFreeSubscriptionDto {
   @IsString()
   @Length(0, 500)
   note?: string;
+
+  @ApiProperty({ description: 'Subscription start date/time', required: false })
+  @IsOptional()
+  @IsDateString()
+  startedAt?: string;
+
+  @ApiProperty({ description: 'Subscription end date/time', required: false })
+  @IsOptional()
+  @IsDateString()
+  endsAt?: string;
 }

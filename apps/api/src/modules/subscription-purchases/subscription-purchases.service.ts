@@ -394,11 +394,10 @@ export class SubscriptionPurchasesService {
     const totalHours = plan.totalHours != null ? Number(plan.totalHours) : null;
     const dailyHoursLimit =
       plan.dailyHoursLimit != null ? Number(plan.dailyHoursLimit) : null;
-    const provisionalStartedAt = new Date();
-    const provisionalEndsAt = this.addCalendarMonths(
-      provisionalStartedAt,
-      plan.durationMonths,
-    );
+    const provisionalStartedAt = options?.startedAt ?? new Date();
+    const provisionalEndsAt =
+      options?.endsAt ??
+      this.addCalendarMonths(provisionalStartedAt, plan.durationMonths);
     const provisionalQrToken = this.qrCodeService.generateSubscriptionToken(
       `pending-${userId}-${Date.now()}`,
     );
@@ -440,9 +439,7 @@ export class SubscriptionPurchasesService {
             : totalHours,
         dailyHoursLimit,
         startedAt: provisionalStartedAt,
-        // Admin free grants never expire (no end date); paid/loyalty purchases
-        // follow the plan duration.
-        endsAt: forceFree ? null : provisionalEndsAt,
+        endsAt: provisionalEndsAt,
         qrTokenHash: provisionalQrTokenHash,
         holderName,
         holderImageUrl: allowMissingHolderImage
@@ -466,6 +463,8 @@ export class SubscriptionPurchasesService {
                 grantedByAdminId: options?.grantedByAdminId ?? null,
                 grantNote: options?.grantNote?.trim() || null,
                 grantedAt: new Date().toISOString(),
+                grantedStartedAt: provisionalStartedAt.toISOString(),
+                grantedEndsAt: provisionalEndsAt.toISOString(),
               }
             : {}),
         },
@@ -577,13 +576,17 @@ export class SubscriptionPurchasesService {
     }
 
     const now = new Date();
-    const startedAt = now;
-    // Admin free grants never expire (no end date); everything else follows the
-    // plan duration.
+    // Admin grants may carry an explicit validity window; paid purchases start
+    // when payment is confirmed and follow the plan duration.
     const isAdminFreeGrant = purchase.metadata?.adminFreeGrant === true;
-    const endsAt = isAdminFreeGrant
-      ? null
-      : this.addCalendarMonths(now, plan.durationMonths);
+    const grantedStart = purchase.metadata?.grantedStartedAt;
+    const grantedEnd = purchase.metadata?.grantedEndsAt;
+    const startedAt =
+      isAdminFreeGrant && grantedStart ? new Date(grantedStart) : now;
+    const endsAt =
+      isAdminFreeGrant && grantedEnd
+        ? new Date(grantedEnd)
+        : this.addCalendarMonths(startedAt, plan.durationMonths);
 
     const rawToken = this.qrCodeService.generateSubscriptionToken(purchase.id);
     const qrTokenHash = this.qrCodeService.hashToken(rawToken);
@@ -732,6 +735,12 @@ export class SubscriptionPurchasesService {
       throw new NotFoundException('Target user not found');
     }
 
+    const startedAt = dto.startedAt ? new Date(dto.startedAt) : new Date();
+    const endsAt = dto.endsAt ? new Date(dto.endsAt) : undefined;
+    if (endsAt && endsAt <= startedAt) {
+      throw new BadRequestException('Subscription end date must be after start date');
+    }
+
     const result = await this.createPurchase(
       dto.userId,
       {
@@ -745,6 +754,8 @@ export class SubscriptionPurchasesService {
         forceFree: true,
         grantedByAdminId: adminUserId,
         grantNote: dto.note,
+        startedAt,
+        endsAt,
       },
     );
 

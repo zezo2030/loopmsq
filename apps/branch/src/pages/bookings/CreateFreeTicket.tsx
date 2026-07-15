@@ -53,29 +53,40 @@ export default function CreateFreeTicket() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [users, setUsers] = useState<User[]>([])
+  const [userSearch, setUserSearch] = useState('')
   const [halls, setHalls] = useState<Hall[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [loadingHalls, setLoadingHalls] = useState(false)
 
   useEffect(() => {
-    loadUsers()
     loadHalls()
   }, [])
 
-  const loadUsers = async () => {
-    if (!me?.branchId) return
-    setLoadingUsers(true)
-    try {
-      // Load users - branch manager can only see users in their branch
-      const response = await apiGet<{ users: User[] }>('/users?limit=100')
-      setUsers(response.users || [])
-    } catch (error: any) {
-      console.error('Failed to load users:', error)
-      message.error(t('free_ticket.load_users_failed') || 'فشل تحميل قائمة المستخدمين')
-    } finally {
-      setLoadingUsers(false)
+  useEffect(() => {
+    let active = true
+    const timer = window.setTimeout(async () => {
+      if (!me?.branchId) return
+      setLoadingUsers(true)
+      try {
+        const params = new URLSearchParams({ page: '1', limit: '100', role: 'user' })
+        const query = userSearch.trim()
+        if (query) params.set('q', query)
+        const response = await apiGet<{ users: User[] }>(`/users?${params.toString()}`)
+        if (active) setUsers(response.users || [])
+      } catch (error: any) {
+        if (active) {
+          console.error('Failed to load users:', error)
+          message.error(t('free_ticket.load_users_failed') || 'فشل تحميل قائمة المستخدمين')
+        }
+      } finally {
+        if (active) setLoadingUsers(false)
+      }
+    }, 350)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
     }
-  }
+  }, [userSearch, me?.branchId, t])
 
   const loadHalls = async () => {
     if (!me?.branchId) return
@@ -174,12 +185,11 @@ export default function CreateFreeTicket() {
                       placeholder={t('free_ticket.user_ph') || 'اختر المستخدم'}
                       loading={loadingUsers}
                       showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
+                      filterOption={false}
+                      onSearch={setUserSearch}
                       options={users.map((user) => ({
                         value: user.id,
-                        label: `${user.name}${user.email ? ` (${user.email})` : ''}`,
+                        label: `${user.name}${user.phone ? ` (${user.phone})` : user.email ? ` (${user.email})` : ''}`,
                       }))}
                     />
                   </Form.Item>
