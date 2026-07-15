@@ -9,7 +9,14 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager, QueryRunner } from 'typeorm';
+import {
+  Repository,
+  DataSource,
+  EntityManager,
+  QueryRunner,
+  In,
+  Not,
+} from 'typeorm';
 import {
   Payment,
   PaymentMethod,
@@ -682,6 +689,42 @@ export class PaymentsService {
     return purchaseRepo.save(purchase);
   }
 
+  /**
+   * Legacy subscription intents stored full plan.price while Moyasar charged the
+   * coupon quote. If a sibling payment on the same purchase matches the gateway
+   * amount, align this row so confirm/webhook can activate the subscription.
+   */
+  private async alignSubscriptionPaymentAmountWithGateway(
+    payment: Payment,
+    gatewayAmountHalalas: number,
+  ): Promise<void> {
+    const expectedHalalas = Math.round(Number(payment.amount) * 100);
+    if (Number(gatewayAmountHalalas) === expectedHalalas) {
+      return;
+    }
+    if (!payment.subscriptionPurchaseId) {
+      throw new BadRequestException('Payment amount mismatch');
+    }
+
+    const siblings = await this.paymentRepository.find({
+      where: { subscriptionPurchaseId: payment.subscriptionPurchaseId },
+    });
+    const matchesSibling = siblings.some(
+      (sibling) =>
+        Math.round(Number(sibling.amount) * 100) ===
+        Number(gatewayAmountHalalas),
+    );
+    if (!matchesSibling) {
+      throw new BadRequestException('Payment amount mismatch');
+    }
+
+    const aligned = Math.round(Number(gatewayAmountHalalas)) / 100;
+    this.logger.warn(
+      `Aligning subscription payment ${payment.id} amount ${payment.amount} -> ${aligned} to match gateway`,
+    );
+    payment.amount = aligned as any;
+  }
+
   private async withPaymentLock<T>(
     lockKey: string,
     busyMessage: string,
@@ -913,6 +956,64 @@ export class PaymentsService {
       if (subPurchase.paymentStatus !== 'pending')
         throw new BadRequestException('Subscription purchase not payable');
       customerUser = { id: userId } as any;
+
+      // createPurchase already inserts a pending payment with the quoted
+      // (coupon/loyalty) amount. Reuse that row — never create a second intent
+      // at full plan.price, which caused double Moyasar sessions and amount
+      // mismatches that blocked activation after a successful charge.
+      const existingSubPayment = await this.paymentRepository.findOne({
+        where: {
+          subscriptionPurchaseId: subPurchase.id,
+          method: dto.method,
+          status: In([PaymentStatus.PENDING, PaymentStatus.PROCESSING]),
+        },
+        order: { createdAt: 'ASC' },
+      });
+
+      if (existingSubPayment) {
+        if (existingSubPayment.status === PaymentStatus.PENDING) {
+          existingSubPayment.status = PaymentStatus.PROCESSING;
+          await this.paymentRepository.save(existingSubPayment);
+        }
+
+        // Kill duplicate open intents so the client cannot charge twice.
+        await this.paymentRepository.update(
+          {
+            subscriptionPurchaseId: subPurchase.id,
+            status: In([PaymentStatus.PENDING, PaymentStatus.PROCESSING]),
+            id: Not(existingSubPayment.id),
+          },
+          {
+            status: PaymentStatus.FAILED,
+            failureReason: 'superseded_by_canonical_subscription_payment',
+          },
+        );
+
+        return {
+          paymentId: existingSubPayment.id,
+          clientSecret: existingSubPayment.gatewayRef,
+          chargeId: existingSubPayment.gatewayRef,
+          provider:
+            dto.method === PaymentMethod.SAMSUNG_PAY ? 'moyasar' : undefined,
+          flowType:
+            dto.method === PaymentMethod.SAMSUNG_PAY
+              ? 'embedded_wallet'
+              : undefined,
+          walletSessionData:
+            dto.method === PaymentMethod.SAMSUNG_PAY
+              ? {
+                  paymentId: existingSubPayment.id,
+                  amount: Number(existingSubPayment.amount),
+                  currency: existingSubPayment.currency,
+                }
+              : undefined,
+          amount: existingSubPayment.amount,
+          currency: existingSubPayment.currency,
+          status: existingSubPayment.status,
+        };
+      }
+
+      // Fallback only when no payment row exists yet (legacy / partial writes).
       amountToPay = Number(
         (
           await this.dataSource
@@ -1679,7 +1780,10 @@ export class PaymentsService {
 
         const expectedAmount = Math.round(Number(payment.amount) * 100);
         if (Number(moyasarPayment.amount) !== expectedAmount) {
-          throw new BadRequestException('Payment amount mismatch');
+          await this.alignSubscriptionPaymentAmountWithGateway(
+            payment,
+            Number(moyasarPayment.amount),
+          );
         }
         if (
           (moyasarPayment.currency || '').toUpperCase() !==
@@ -2425,7 +2529,6 @@ export class PaymentsService {
           const expectedAmount = Math.round(Number(payment.amount) * 100);
           if (
             !succeeded ||
-            Number(verified.amount) !== expectedAmount ||
             (verified.currency || '').toUpperCase() !==
               (payment.currency || '').toUpperCase()
           ) {
@@ -2435,6 +2538,21 @@ export class PaymentsService {
             throw new BadRequestException(
               'Webhook payment verification mismatch',
             );
+          }
+          if (Number(verified.amount) !== expectedAmount) {
+            try {
+              await this.alignSubscriptionPaymentAmountWithGateway(
+                payment,
+                Number(verified.amount),
+              );
+            } catch {
+              this.logger.warn(
+                `Webhook verification mismatch payment=${payment.id} status=${verified.status} amount=${verified.amount} expected=${expectedAmount}`,
+              );
+              throw new BadRequestException(
+                'Webhook payment verification mismatch',
+              );
+            }
           }
         }
 

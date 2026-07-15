@@ -14,6 +14,11 @@ import {
   PaymentMethod,
   PaymentStatus,
 } from '../../database/entities/payment.entity';
+import { SubscriptionPlan } from '../../database/entities/subscription-plan.entity';
+import {
+  SubscriptionPurchase,
+  SubscriptionPurchasePaymentStatus,
+} from '../../database/entities/subscription-purchase.entity';
 import { MoyasarService } from '../../integrations/moyasar/moyasar.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { QRCodeService } from '../../utils/qr-code.service';
@@ -61,8 +66,10 @@ describe('PaymentsService', () => {
 
   const paymentRepoMock = {
     findOne: jest.fn(),
+    find: jest.fn(),
     save: jest.fn(),
     create: jest.fn(),
+    update: jest.fn(),
     createQueryBuilder: jest.fn(() => paymentQueryBuilder),
   } as unknown as jest.Mocked<Repository<Payment>>;
 
@@ -196,6 +203,70 @@ describe('PaymentsService', () => {
     expect(res.paymentId).toBe('internal-payment-1');
     expect(res.chargeId).toBe('');
     expect(res.status).toBe(PaymentStatus.PROCESSING);
+  });
+
+  it('reuses the createPurchase payment for subscription intents (coupon amount, no duplicate)', async () => {
+    const existingPayment = {
+      id: 'sub-pay-canonical',
+      subscriptionPurchaseId: 'sub-purchase-1',
+      amount: 254.15,
+      currency: 'SAR',
+      method: PaymentMethod.CREDIT_CARD,
+      status: PaymentStatus.PENDING,
+      gatewayRef: null,
+    } as Payment;
+
+    const subPurchaseRepo = {
+      findOne: jest.fn().mockResolvedValue({
+        id: 'sub-purchase-1',
+        userId: 'user-1',
+        subscriptionPlanId: 'plan-1',
+        paymentStatus: SubscriptionPurchasePaymentStatus.PENDING,
+      } as SubscriptionPurchase),
+    };
+    const planRepo = {
+      findOne: jest.fn().mockResolvedValue({
+        id: 'plan-1',
+        price: 299,
+        currency: 'SAR',
+      } as SubscriptionPlan),
+    };
+
+    ((service as any).dataSource.getRepository as jest.Mock).mockImplementation(
+      (entity: unknown) => {
+        if (entity === SubscriptionPurchase) return subPurchaseRepo;
+        if (entity === SubscriptionPlan) return planRepo;
+        return {};
+      },
+    );
+
+    paymentRepo.findOne
+      .mockResolvedValueOnce(existingPayment)
+      .mockResolvedValue(null);
+    paymentRepo.save.mockImplementation(async (p: Payment) => p);
+    paymentRepo.find.mockResolvedValue([
+      existingPayment,
+      {
+        id: 'sub-pay-wrong-full-price',
+        subscriptionPurchaseId: 'sub-purchase-1',
+        amount: 299,
+        currency: 'SAR',
+        method: PaymentMethod.CREDIT_CARD,
+        status: PaymentStatus.PROCESSING,
+      } as Payment,
+    ]);
+    paymentRepo.update.mockResolvedValue({ affected: 1 } as any);
+
+    const res = await service.createIntent('user-1', {
+      subscriptionPurchaseId: 'sub-purchase-1',
+      method: PaymentMethod.CREDIT_CARD,
+    });
+
+    expect(res.paymentId).toBe('sub-pay-canonical');
+    expect(Number(res.amount)).toBe(254.15);
+    expect(res.status).toBe(PaymentStatus.PROCESSING);
+    expect(queryRunner.manager.create).not.toHaveBeenCalled();
+    expect(paymentRepo.update).toHaveBeenCalled();
   });
 
   it('creates offer-product intent using base price plus selected add-ons', async () => {
@@ -379,6 +450,65 @@ describe('PaymentsService', () => {
         paymentId: 'mysr-payment-1',
       }),
     ).rejects.toThrow('Payment amount mismatch');
+  });
+
+  it('aligns subscription payment amount to Moyasar when a sibling quote payment matches', async () => {
+    const processingPayment = {
+      id: 'sub-pay-wrong',
+      subscriptionPurchaseId: 'sub-purchase-1',
+      amount: 299,
+      currency: 'SAR',
+      method: PaymentMethod.CREDIT_CARD,
+      status: PaymentStatus.PROCESSING,
+      gatewayRef: null,
+    } as Payment;
+
+    paymentQueryBuilder.getOne.mockResolvedValue(processingPayment);
+    paymentRepo.findOne.mockResolvedValue(processingPayment);
+    paymentRepo.find.mockResolvedValue([
+      {
+        id: 'sub-pay-quote',
+        subscriptionPurchaseId: 'sub-purchase-1',
+        amount: 254.15,
+        status: PaymentStatus.PENDING,
+      } as Payment,
+      processingPayment,
+    ]);
+
+    ((service as any).dataSource.getRepository as jest.Mock).mockImplementation(
+      (entity: unknown) => {
+        if (entity === SubscriptionPurchase) {
+          return {
+            findOne: jest.fn().mockResolvedValue({
+              id: 'sub-purchase-1',
+              userId: 'user-1',
+            }),
+          };
+        }
+        return { findOne: jest.fn() };
+      },
+    );
+
+    const confirmSubscription = jest.fn(async () => undefined);
+    (service as any).subscriptionPurchasesService = {
+      confirmPayment: confirmSubscription,
+    };
+
+    moyasarService.retrievePayment.mockResolvedValue({
+      id: 'mysr-sub-1',
+      status: 'paid',
+      amount: 25415,
+      currency: 'SAR',
+    });
+
+    const result = await service.confirmPayment('user-1', {
+      paymentId: 'sub-pay-wrong',
+      gatewayPayload: { moyasarPaymentId: 'mysr-sub-1' },
+    });
+
+    expect(result.success).toBe(true);
+    expect(Number(processingPayment.amount)).toBe(254.15);
+    expect(confirmSubscription).toHaveBeenCalledWith('sub-purchase-1');
   });
 
   it('rejects Moyasar payments when the verified currency does not match', async () => {
