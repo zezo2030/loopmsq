@@ -75,39 +75,90 @@ export class LoyaltyService {
     };
   }
 
-  async awardPoints(userId: string, amount: number, relatedBookingId?: string) {
+  async awardPoints(
+    userId: string,
+    amount: number,
+    relatedBookingId?: string,
+    relatedPaymentId?: string,
+  ) {
     const rule = await this.getActiveRule();
     const points = Math.floor(amount * Number(rule.earnRate));
     if (points <= 0) return { awarded: 0 };
 
-    const wallet = await this.walletRepo.findOne({ where: { userId } });
-    if (!wallet) throw new NotFoundException('Wallet not found');
+    const lockKey = relatedPaymentId
+      ? `loyalty:earn:${relatedPaymentId}`
+      : null;
+    if (lockKey) {
+      const acquired = await this.redisService.acquireLock(lockKey, 60);
+      if (!acquired) {
+        // Another path (webhook/confirm) is awarding or already finished.
+        const existing = await this.txRepo
+          .createQueryBuilder('tx')
+          .where('tx.userId = :userId', { userId })
+          .andWhere('tx.type = :type', { type: TransactionType.EARN })
+          .andWhere(`tx.metadata->>'paymentId' = :paymentId`, {
+            paymentId: relatedPaymentId,
+          })
+          .getOne();
+        return {
+          awarded: 0,
+          alreadyAwarded: !!existing,
+        };
+      }
+    }
 
-    wallet.loyaltyPoints += points;
-    wallet.totalEarned = Number(wallet.totalEarned) + Number(amount);
-    wallet.lastTransactionAt = new Date();
-    await this.walletRepo.save(wallet);
+    try {
+      // One earn per payment — webhook and client confirm can both run.
+      if (relatedPaymentId) {
+        const existing = await this.txRepo
+          .createQueryBuilder('tx')
+          .where('tx.userId = :userId', { userId })
+          .andWhere('tx.type = :type', { type: TransactionType.EARN })
+          .andWhere(`tx.metadata->>'paymentId' = :paymentId`, {
+            paymentId: relatedPaymentId,
+          })
+          .getOne();
+        if (existing) {
+          return { awarded: 0, alreadyAwarded: true };
+        }
+      }
 
-    const tx = this.txRepo.create({
-      userId,
-      walletId: wallet.id,
-      pointsChange: points,
-      amountChange: amount,
-      type: TransactionType.EARN,
-      reason: 'Payment completed',
-      relatedBookingId,
-      metadata: { conversionRate: Number(rule.earnRate) },
-    });
-    await this.txRepo.save(tx);
+      const wallet = await this.walletRepo.findOne({ where: { userId } });
+      if (!wallet) throw new NotFoundException('Wallet not found');
 
-    await this.notifications.enqueue({
-      type: 'LOYALTY_EARN',
-      to: { userId },
-      data: { points, totalPoints: wallet.loyaltyPoints },
-      channels: ['sms', 'push'],
-    });
+      wallet.loyaltyPoints += points;
+      wallet.totalEarned = Number(wallet.totalEarned) + Number(amount);
+      wallet.lastTransactionAt = new Date();
+      await this.walletRepo.save(wallet);
 
-    return { awarded: points };
+      const tx = this.txRepo.create({
+        userId,
+        walletId: wallet.id,
+        pointsChange: points,
+        amountChange: amount,
+        type: TransactionType.EARN,
+        reason: 'Payment completed',
+        relatedBookingId,
+        metadata: {
+          conversionRate: Number(rule.earnRate),
+          ...(relatedPaymentId ? { paymentId: relatedPaymentId } : {}),
+        },
+      });
+      await this.txRepo.save(tx);
+
+      await this.notifications.enqueue({
+        type: 'LOYALTY_EARN',
+        to: { userId },
+        data: { points, totalPoints: wallet.loyaltyPoints },
+        channels: ['sms', 'push'],
+      });
+
+      return { awarded: points };
+    } finally {
+      if (lockKey) {
+        await this.redisService.releaseLock(lockKey);
+      }
+    }
   }
 
   async redeemForTicket(userId: string, branchId: string) {

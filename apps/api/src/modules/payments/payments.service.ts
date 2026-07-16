@@ -189,6 +189,98 @@ export class PaymentsService {
     return context;
   }
 
+  /**
+   * Resolve the paying user for loyalty / referral side-effects.
+   * Payment rows do not store userId; ownership lives on the linked entity
+   * or in deferred-flow webhookData.
+   */
+  private async resolvePaymentUserId(
+    payment: Payment,
+  ): Promise<string | null> {
+    const ctx = this.getPendingFlowContext(payment);
+    if (ctx?.userId && typeof ctx.userId === 'string') {
+      return ctx.userId;
+    }
+    if (payment.bookingId) {
+      const booking =
+        payment.booking ||
+        (await this.bookingRepository.findOne({
+          where: { id: payment.bookingId },
+        }));
+      if (booking?.userId) return booking.userId;
+    }
+    if (payment.subscriptionPurchaseId) {
+      const purchase = await this.dataSource
+        .getRepository(SubscriptionPurchase)
+        .findOne({ where: { id: payment.subscriptionPurchaseId } });
+      if (purchase?.userId) return purchase.userId;
+    }
+    if (payment.offerBookingId) {
+      const offer = await this.dataSource
+        .getRepository(OfferBooking)
+        .findOne({ where: { id: payment.offerBookingId } });
+      if (offer?.userId) return offer.userId;
+    }
+    if (payment.giftOrderId) {
+      const gift = await this.dataSource
+        .getRepository(GiftOrder)
+        .findOne({ where: { id: payment.giftOrderId } });
+      if (gift?.senderUserId) return gift.senderUserId;
+    }
+    if (payment.eventRequestId) {
+      const event = await this.dataSource
+        .getRepository(EventRequest)
+        .findOne({ where: { id: payment.eventRequestId } });
+      if (event?.requesterId) return event.requesterId;
+    }
+    if (payment.tripRequestId) {
+      const trip = await this.dataSource
+        .getRepository(SchoolTripRequest)
+        .findOne({ where: { id: payment.tripRequestId } });
+      if (trip?.requesterId) return trip.requesterId;
+    }
+    return null;
+  }
+
+  /**
+   * Award loyalty for a completed payment. Idempotent per paymentId so
+   * webhook + client confirm (or re-confirm) cannot double-credit.
+   * Skips wallet recharges and zero/negative amounts.
+   */
+  private async awardLoyaltyForPayment(
+    payment: Payment,
+    userId?: string | null,
+    relatedBookingId?: string | null,
+  ): Promise<void> {
+    const ctx = this.getPendingFlowContext(payment);
+    if (ctx?.flowType === 'wallet_recharge') {
+      return;
+    }
+    const resolvedUserId = userId || (await this.resolvePaymentUserId(payment));
+    if (!resolvedUserId) {
+      this.logger.warn(
+        `Skipping loyalty award: no user for payment ${payment.id}`,
+      );
+      return;
+    }
+    const amount = Number(payment.amount);
+    if (!(amount > 0)) {
+      return;
+    }
+    try {
+      await this.loyalty.awardPoints(
+        resolvedUserId,
+        amount,
+        relatedBookingId || payment.bookingId || undefined,
+        payment.id,
+      );
+    } catch (e) {
+      this.logger.error(
+        `Failed to award loyalty for payment ${payment.id}: ${e?.message || e}`,
+      );
+    }
+  }
+
   private async syncSchoolTripBookingAfterPayment(
     queryRunner: QueryRunner,
     payment: Payment,
@@ -1598,6 +1690,8 @@ export class PaymentsService {
           payment.subscriptionPurchaseId,
         );
       }
+      // Catch-up: webhook may have completed the payment without awarding.
+      await this.awardLoyaltyForPayment(payment, userId, payment.bookingId);
       // Idempotent re-confirm: client still needs context ids for deep links.
       return {
         success: true,
@@ -2331,9 +2425,9 @@ export class PaymentsService {
       });
 
       // Award loyalty points - use bookingId only if it exists (not eventRequest.id or tripRequest.id)
-      await this.loyalty.awardPoints(
+      await this.awardLoyaltyForPayment(
+        payment,
         userId,
-        Number(payment.amount),
         bookingIdForLoyalty || undefined,
       );
 
@@ -2707,6 +2801,18 @@ export class PaymentsService {
               `Webhook: Failed to queue gift invite: ${e?.message || e}`,
             );
           }
+        }
+
+        // Loyalty must run on webhook too — client confirm often hits the
+        // already-COMPLETED early return and previously skipped awarding.
+        const payerId = await this.resolvePaymentUserId(payment);
+        await this.awardLoyaltyForPayment(payment, payerId, payment.bookingId);
+
+        if (this.referralsService && payerId) {
+          await this.referralsService.processRefereePayment(
+            payerId,
+            payment.id,
+          );
         }
 
         // Queue ZATCA e-invoice issuance (non-blocking) now that it's completed.

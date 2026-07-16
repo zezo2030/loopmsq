@@ -58,6 +58,8 @@ export class LoyaltyTransaction {
     expiresAt?: Date;
     ticketId?: string;
     branchId?: string;
+    /** Idempotency key: one EARN ledger row per completed payment. */
+    paymentId?: string;
   };
 
   @CreateDateColumn()
