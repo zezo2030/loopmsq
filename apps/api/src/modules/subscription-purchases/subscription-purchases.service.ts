@@ -824,6 +824,41 @@ export class SubscriptionPurchasesService {
   }
 
   /**
+   * Ensure an activated purchase has a scannable QR token persisted in
+   * metadata.qrData. Healed/legacy rows may have qrTokenHash without the
+   * raw token — regenerate and replace the hash in that case.
+   */
+  private async ensureSubscriptionQrData(
+    purchase: SubscriptionPurchase,
+  ): Promise<string | null> {
+    const existing = purchase.metadata?.qrData;
+    if (existing) return existing;
+
+    if (
+      purchase.paymentStatus !== SubscriptionPurchasePaymentStatus.COMPLETED
+    ) {
+      return null;
+    }
+
+    const rawToken = this.qrCodeService.generateSubscriptionToken(purchase.id);
+    const qrTokenHash = this.qrCodeService.hashToken(rawToken);
+
+    purchase.qrTokenHash = qrTokenHash;
+    purchase.metadata = {
+      ...(purchase.metadata || {}),
+      qrData: rawToken,
+      qrDataBackfilledAt: new Date().toISOString(),
+    };
+    await this.purchaseRepo.save(purchase);
+
+    this.logger.log(
+      `Backfilled missing subscription QR token for purchase ${purchase.id}`,
+    );
+
+    return rawToken;
+  }
+
+  /**
    * Get subscription purchase details (owner only).
    */
   async findPurchaseById(purchaseId: string, userId: string) {
@@ -838,15 +873,11 @@ export class SubscriptionPurchasesService {
     // Lazy expiration check
     await this.checkAndUpdateExpired(purchase);
 
-    // Get raw token from metadata
-    const rawToken = purchase.metadata?.qrData || '';
-    const qrData = rawToken
-      ? this.qrCodeService.generateSubscriptionToken(purchase.id)
-      : '';
+    const qrData = await this.ensureSubscriptionQrData(purchase);
 
     return {
       ...purchase,
-      qrData: rawToken || qrData,
+      qrData: qrData || '',
     };
   }
 
@@ -1521,6 +1552,7 @@ export class SubscriptionPurchasesService {
     await this.checkAndUpdateExpired(purchase);
 
     const usageLogs = await this.findUsageLogs(purchase.id, 1, 20);
+    const qrData = await this.ensureSubscriptionQrData(purchase);
 
     return {
       id: purchase.id,
@@ -1528,6 +1560,7 @@ export class SubscriptionPurchasesService {
       paymentStatus: purchase.paymentStatus,
       holderName: purchase.holderName,
       holderImageUrl: purchase.holderImageUrl,
+      qrData,
       totalHours:
         purchase.totalHours != null ? Number(purchase.totalHours) : null,
       remainingHours:

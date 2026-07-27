@@ -399,6 +399,82 @@ export class OfferBookingsService {
   }
 
   /**
+   * Admin manual override for offer booking payment status.
+   * Mirrors subscription purchases: completed runs confirmPayment;
+   * failed cancels the booking; pending/failed sync related Payment rows.
+   */
+  async adminUpdatePaymentStatus(
+    bookingId: string,
+    newStatus: OfferBookingPaymentStatus,
+    adminUserId?: string,
+  ) {
+    const booking = await this.bookingRepo.findOne({
+      where: { id: bookingId },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Offer booking not found');
+    }
+
+    const previousStatus = booking.paymentStatus;
+
+    const recordAudit = async () => {
+      const fresh = await this.bookingRepo.findOne({
+        where: { id: bookingId },
+      });
+      if (!fresh) return;
+      fresh.metadata = {
+        ...(fresh.metadata || {}),
+        manualPaymentStatusUpdate: {
+          from: previousStatus,
+          to: newStatus,
+          adminUserId: adminUserId || null,
+          at: new Date().toISOString(),
+        },
+      };
+      await this.bookingRepo.save(fresh);
+    };
+
+    if (newStatus === OfferBookingPaymentStatus.COMPLETED) {
+      await this.paymentRepo.update(
+        { offerBookingId: bookingId, status: PaymentStatus.PENDING },
+        { status: PaymentStatus.COMPLETED },
+      );
+      await this.confirmPayment(bookingId);
+      await recordAudit();
+    } else {
+      booking.paymentStatus = newStatus;
+      if (newStatus === OfferBookingPaymentStatus.FAILED) {
+        booking.status = OfferBookingStatus.CANCELLED;
+      }
+      await this.bookingRepo.save(booking);
+
+      const targetPaymentStatus =
+        newStatus === OfferBookingPaymentStatus.FAILED
+          ? PaymentStatus.FAILED
+          : PaymentStatus.PENDING;
+      await this.paymentRepo.update(
+        { offerBookingId: bookingId, status: PaymentStatus.COMPLETED },
+        { status: targetPaymentStatus },
+      );
+      await recordAudit();
+    }
+
+    this.logger.log(
+      `Admin ${adminUserId || 'unknown'} set payment status of offer booking ${bookingId}: ${previousStatus} -> ${newStatus}`,
+    );
+
+    const updated = await this.bookingRepo.findOne({
+      where: { id: bookingId },
+    });
+    return {
+      id: bookingId,
+      paymentStatus: updated?.paymentStatus ?? newStatus,
+      status: updated?.status,
+    };
+  }
+
+  /**
    * Get paginated user offer bookings.
    */
   async findUserBookings(userId: string, page: number = 1, limit: number = 10) {

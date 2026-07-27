@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Param,
   Body,
   Query,
@@ -21,6 +22,7 @@ import { OfferBookingsService } from './offer-bookings.service';
 import { OfferQuoteDto } from './dto/offer-quote.dto';
 import { CreateOfferBookingDto } from './dto/create-offer-booking.dto';
 import { ScanOfferTicketDto } from './dto/scan-offer-ticket.dto';
+import { UpdatePaymentStatusDto } from './dto/update-payment-status.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles, UserRole } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -143,6 +145,22 @@ export class OfferBookingsController {
   @ApiOperation({ summary: 'Get offer booking details (admin)' })
   async getAdminOfferBookingById(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findBookingForAdmin(id);
+  }
+
+  @Patch('admin/all/:id/payment-status')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Manually update offer booking payment status (admin)',
+  })
+  @ApiResponse({ status: 200, description: 'Payment status updated' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
+  async updatePaymentStatus(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdatePaymentStatusDto,
+  ) {
+    return this.service.adminUpdatePaymentStatus(id, dto.paymentStatus, user.id);
   }
 
   @Get('branch/me/:id')

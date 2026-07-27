@@ -78,6 +78,9 @@ export class OfferBooking {
   @Column({ type: 'varchar', length: 20, nullable: true })
   contactPhone: string;
 
+  @Column({ type: 'jsonb', nullable: true })
+  metadata: any;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Descriptions, Empty, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Descriptions, Empty, QRCode, Space, Table, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { apiGet } from '../../api'
 
@@ -50,6 +50,18 @@ export default function SubscriptionDetail() {
           <Descriptions.Item label="البداية">{formatDate(data.startedAt)}</Descriptions.Item>
           <Descriptions.Item label="النهاية">{formatDate(data.endsAt)}</Descriptions.Item>
         </Descriptions>
+        <Card title="باركود الاشتراك">
+          <div style={{ textAlign: 'center' }}>
+            {data.qrData ? (
+              <Space direction="vertical" size="middle" align="center">
+                <QRCode value={data.qrData} size={220} errorLevel="M" />
+                <Text type="secondary">يمكن للموظف مسح هذا الرمز من تطبيق الموظفين</Text>
+              </Space>
+            ) : (
+              <Empty description="لا يوجد باركود — الاشتراك غير مفعّل بعد" />
+            )}
+          </div>
+        </Card>
         <Card title="سجل الاستخدام">
           <Table rowKey="id" dataSource={data.usageLogs || []} pagination={{ pageSize: 10 }} columns={[
             { title: 'الموظف', dataIndex: 'staffName' },
