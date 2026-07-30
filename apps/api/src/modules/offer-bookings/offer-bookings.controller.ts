@@ -241,7 +241,7 @@ export class OfferBookingsController {
       user: {
         id: ticket.userId,
         name: ticket.user?.name || 'User',
-        phone: ticket.user?.phone || '',
+        phone: this.service.decryptPhone(ticket.user?.phone),
       },
       branch: {
         id: ticket.branchId,

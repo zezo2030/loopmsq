@@ -1,11 +1,24 @@
 import axios, { AxiosInstance } from 'axios';
 
+/**
+ * Card/wallet details of a Moyasar payment. `message` carries the issuer's
+ * decline reason (e.g. "INSUFFICIENT FUNDS", "3DS: ... expired") and `company`
+ * the real network (mada/visa/master), neither of which the client app reports.
+ */
+export interface MoyasarPaymentSource {
+  type?: string;
+  company?: string;
+  name?: string;
+  message?: string;
+}
+
 export interface MoyasarPayment {
   id: string;
   status: string;
   amount: number;
   currency: string;
   metadata?: Record<string, any>;
+  source?: MoyasarPaymentSource;
 }
 
 export class MoyasarClient {
