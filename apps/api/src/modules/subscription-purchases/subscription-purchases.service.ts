@@ -262,42 +262,6 @@ export class SubscriptionPurchasesService {
     return SubscriptionUsageMode.FLEXIBLE_TOTAL_HOURS;
   }
 
-  private isDailyCrossBranchPurchase(purchase: SubscriptionPurchase): boolean {
-    const usageMode = this.resolvePurchaseUsageMode(purchase);
-    if (
-      usageMode === SubscriptionUsageMode.DAILY_UNLIMITED ||
-      usageMode === SubscriptionUsageMode.DAILY_LIMITED ||
-      usageMode === SubscriptionUsageMode.FLEXIBLE_TOTAL_HOURS
-    ) {
-      return true;
-    }
-
-    // Legacy snapshots may still contain older naming.
-    const legacySnapshotMode = purchase.planSnapshot?.usageMode
-      ?.toString()
-      .toLowerCase()
-      .trim();
-    if (
-      legacySnapshotMode === 'daily_limited' ||
-      legacySnapshotMode === 'daily_unlimited' ||
-      legacySnapshotMode === 'monthly_pool' ||
-      legacySnapshotMode === 'unlimited'
-    ) {
-      return true;
-    }
-
-    // Fallback heuristic: any explicit daily cap implies a daily plan.
-    const snapshotDailyCap = Number(purchase.planSnapshot?.dailyHoursLimit);
-    if (
-      purchase.dailyHoursLimit != null ||
-      (Number.isFinite(snapshotDailyCap) && snapshotDailyCap > 0)
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
   /**
    * Create a subscription purchase and initiate payment.
    */
@@ -864,12 +828,8 @@ export class SubscriptionPurchasesService {
   ): Promise<void> {
     const staff = await this.userRepo.findOne({ where: { id: staffId } });
 
-    // Daily-based subscriptions are valid cross-branch by business rule.
-    // Only pooled total-hours subscriptions remain branch-restricted.
-    if (this.isDailyCrossBranchPurchase(purchase)) {
-      return;
-    }
-
+    // Every subscription is tied to the branch it was bought at, regardless of
+    // usage mode: staff may only serve their own branch's subscribers.
     if (!staff?.branchId || staff.branchId !== purchase.branchId) {
       const b = purchase.branch;
       const ticketBranchName = b?.name_ar || b?.name_en || '';

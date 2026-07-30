@@ -33,7 +33,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     }
 
+    // Preserve any extra payload the thrower attached (e.g. errorCode,
+    // ticketBranchName) so clients can render a specific message instead of a
+    // generic one. The envelope fields below always win.
+    const RESERVED = ['statusCode', 'timestamp', 'path', 'method', 'message'];
+    const extra =
+      exceptionResponse && typeof exceptionResponse === 'object'
+        ? Object.fromEntries(
+            Object.entries(exceptionResponse).filter(
+              ([key]) => !RESERVED.includes(key),
+            ),
+          )
+        : {};
+
     const errorResponse = {
+      ...extra,
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
