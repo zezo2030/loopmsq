@@ -3,8 +3,18 @@
  * but confirm failed due to amount mismatch (full plan.price vs coupon quote).
  */
 const { Client } = require('pg');
+const crypto = require('crypto');
 
 const MOYASAR_SECRET = process.env.MOYASAR_SECRET_KEY;
+
+function generateSubscriptionToken(purchaseId) {
+  const randomSuffix = crypto.randomBytes(4).toString('hex');
+  return `SP:${purchaseId}:${randomSuffix}`;
+}
+
+function hashToken(rawToken) {
+  return crypto.createHash('sha256').update(rawToken).digest('hex');
+}
 const client = new Client({
   host: process.env.DATABASE_HOST || 'postgres',
   port: Number(process.env.DATABASE_PORT || 5432),
@@ -104,21 +114,34 @@ async function main() {
         [row.purchase_id, row.payment_id],
       );
 
+      const rawToken = generateSubscriptionToken(row.purchase_id);
+      const qrTokenHash = hashToken(rawToken);
+
       await client.query(
         `UPDATE subscription_purchases
          SET status = 'active',
              "paymentStatus" = 'completed',
              "startedAt" = $2,
              "endsAt" = $3,
+             "qrTokenHash" = $6,
              metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
                'healedAt', to_jsonb(NOW()::text),
                'healedReason', to_jsonb('moyasar_paid_amount_mismatch'::text),
                'healedPaymentId', to_jsonb($4::text),
-               'healedGatewayAmount', to_jsonb($5::text)
+               'healedGatewayAmount', to_jsonb($5::text),
+               'qrData', to_jsonb($7::text)
              ),
              "updatedAt" = NOW()
          WHERE id = $1`,
-        [row.purchase_id, startedAt, endsAt, row.payment_id, String(paidSar)],
+        [
+          row.purchase_id,
+          startedAt,
+          endsAt,
+          row.payment_id,
+          String(paidSar),
+          qrTokenHash,
+          rawToken,
+        ],
       );
 
       await client.query('COMMIT');

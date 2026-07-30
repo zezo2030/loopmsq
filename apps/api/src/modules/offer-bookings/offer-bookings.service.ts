@@ -38,6 +38,7 @@ import { instanceToPlain } from 'class-transformer';
 import { OfferQuoteDto } from './dto/offer-quote.dto';
 import { CreateOfferBookingDto } from './dto/create-offer-booking.dto';
 import { CouponsService } from '../coupons/coupons.service';
+import { EncryptionService } from '../../utils/encryption.util';
 
 type OfferBookingListFilters = {
   status?: OfferBookingStatus;
@@ -68,7 +69,19 @@ export class OfferBookingsService {
     private readonly adminNotifications: AdminNotificationsService,
     private readonly dataSource: DataSource,
     private readonly couponsService: CouponsService,
+    private readonly encryptionService: EncryptionService,
   ) {}
+
+  /** Decrypts a stored phone value; returns the original string if decrypt fails. */
+  decryptPhone(phone?: string | null): string {
+    if (!phone) return '';
+    try {
+      const decrypted = this.encryptionService.decrypt(phone);
+      return decrypted || phone;
+    } catch {
+      return phone;
+    }
+  }
 
   /**
    * Validates a coupon code against [amount] and returns the discount.
@@ -316,37 +329,50 @@ export class OfferBookingsService {
       throw new NotFoundException('Offer product not found');
     }
 
-    const existingTickets = await this.ticketRepo.find({
-      where: { offerBookingId },
-    });
-
-    if (existingTickets.length > 0) {
-      this.logger.log(
-        `Booking ${offerBookingId} already has ${existingTickets.length} tickets - ensuring consistency`,
-      );
-      booking.paymentStatus = OfferBookingPaymentStatus.COMPLETED;
-      await this.bookingRepo.save(booking);
-      return;
-    }
-
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      booking.paymentStatus = OfferBookingPaymentStatus.COMPLETED;
-      await queryRunner.manager.save(OfferBooking, booking);
+      // Lock the booking row so concurrent confirmations serialize here. This
+      // path is re-entered by the client redirect confirm, the gateway webhook
+      // and retries; checking for existing tickets outside the lock let two
+      // callers both see zero and issue a full set each (quantity 2 -> 4).
+      const lockedBooking = await queryRunner.manager.findOne(OfferBooking, {
+        where: { id: offerBookingId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!lockedBooking) {
+        throw new NotFoundException('Offer booking not found');
+      }
+
+      const existingTickets = await queryRunner.manager.find(OfferTicket, {
+        where: { offerBookingId },
+      });
+
+      if (existingTickets.length > 0) {
+        this.logger.log(
+          `Booking ${offerBookingId} already has ${existingTickets.length} tickets - ensuring consistency`,
+        );
+        lockedBooking.paymentStatus = OfferBookingPaymentStatus.COMPLETED;
+        await queryRunner.manager.save(OfferBooking, lockedBooking);
+        await queryRunner.commitTransaction();
+        return;
+      }
+
+      lockedBooking.paymentStatus = OfferBookingPaymentStatus.COMPLETED;
+      await queryRunner.manager.save(OfferBooking, lockedBooking);
 
       const tickets: OfferTicket[] = [];
       const ticketKind = offer.offerCategory === OfferCategory.HOUR_BASED
         ? OfferTicketKind.TIMED
         : OfferTicketKind.STANDARD;
-      const ticketsToCreate = Math.max(1, Number(booking.quantity ?? 1));
+      const ticketsToCreate = Math.max(1, Number(lockedBooking.quantity ?? 1));
 
       for (let i = 0; i < ticketsToCreate; i++) {
         const ticket = await this.createOfferTicket(
           queryRunner,
-          booking,
+          lockedBooking,
           offer,
           ticketKind,
         );
@@ -399,6 +425,82 @@ export class OfferBookingsService {
   }
 
   /**
+   * Admin manual override for offer booking payment status.
+   * Mirrors subscription purchases: completed runs confirmPayment;
+   * failed cancels the booking; pending/failed sync related Payment rows.
+   */
+  async adminUpdatePaymentStatus(
+    bookingId: string,
+    newStatus: OfferBookingPaymentStatus,
+    adminUserId?: string,
+  ) {
+    const booking = await this.bookingRepo.findOne({
+      where: { id: bookingId },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Offer booking not found');
+    }
+
+    const previousStatus = booking.paymentStatus;
+
+    const recordAudit = async () => {
+      const fresh = await this.bookingRepo.findOne({
+        where: { id: bookingId },
+      });
+      if (!fresh) return;
+      fresh.metadata = {
+        ...(fresh.metadata || {}),
+        manualPaymentStatusUpdate: {
+          from: previousStatus,
+          to: newStatus,
+          adminUserId: adminUserId || null,
+          at: new Date().toISOString(),
+        },
+      };
+      await this.bookingRepo.save(fresh);
+    };
+
+    if (newStatus === OfferBookingPaymentStatus.COMPLETED) {
+      await this.paymentRepo.update(
+        { offerBookingId: bookingId, status: PaymentStatus.PENDING },
+        { status: PaymentStatus.COMPLETED },
+      );
+      await this.confirmPayment(bookingId);
+      await recordAudit();
+    } else {
+      booking.paymentStatus = newStatus;
+      if (newStatus === OfferBookingPaymentStatus.FAILED) {
+        booking.status = OfferBookingStatus.CANCELLED;
+      }
+      await this.bookingRepo.save(booking);
+
+      const targetPaymentStatus =
+        newStatus === OfferBookingPaymentStatus.FAILED
+          ? PaymentStatus.FAILED
+          : PaymentStatus.PENDING;
+      await this.paymentRepo.update(
+        { offerBookingId: bookingId, status: PaymentStatus.COMPLETED },
+        { status: targetPaymentStatus },
+      );
+      await recordAudit();
+    }
+
+    this.logger.log(
+      `Admin ${adminUserId || 'unknown'} set payment status of offer booking ${bookingId}: ${previousStatus} -> ${newStatus}`,
+    );
+
+    const updated = await this.bookingRepo.findOne({
+      where: { id: bookingId },
+    });
+    return {
+      id: bookingId,
+      paymentStatus: updated?.paymentStatus ?? newStatus,
+      status: updated?.status,
+    };
+  }
+
+  /**
    * Get paginated user offer bookings.
    */
   async findUserBookings(userId: string, page: number = 1, limit: number = 10) {
@@ -407,15 +509,34 @@ export class OfferBookingsService {
       .leftJoinAndSelect('booking.offerProduct', 'offerProduct')
       .leftJoinAndSelect('booking.tickets', 'ticket')
       .where('booking.userId = :userId', { userId })
+      // An abandoned checkout is cancelled without ever holding a ticket; it is
+      // noise in the user's list, not something they can act on.
       .andWhere(
         `(
-          NOT EXISTS (
+          booking.status <> 'cancelled'
+          OR EXISTS (
+            SELECT 1 FROM offer_tickets tc
+            WHERE tc."offerBookingId" = booking.id
+          )
+        )`
+      )
+      // Old bookings are decluttered from the list, but only once *every*
+      // ticket is consumed. Scanning one ticket of a multi-ticket booking must
+      // never hide the siblings that are still usable.
+      .andWhere(
+        `(
+          EXISTS (
             SELECT 1 FROM offer_tickets t2
             WHERE t2."offerBookingId" = booking.id
-              AND (t2.status = 'used' OR t2.status = 'expired')
-              AND t2."scannedAt" IS NOT NULL
-              AND t2."scannedAt" < NOW() - INTERVAL '24 HOURS'
+              AND t2.status IN ('valid', 'in_use')
           )
+          OR COALESCE(
+               (
+                 SELECT MAX(t3."scannedAt") FROM offer_tickets t3
+                 WHERE t3."offerBookingId" = booking.id
+               ),
+               NOW()
+             ) >= NOW() - INTERVAL '24 HOURS'
         )`
       )
       .orderBy('booking.createdAt', 'DESC')
@@ -431,11 +552,17 @@ export class OfferBookingsService {
     }
 
     const mappedBookings = bookings.map((booking) => {
-      const isUsed = booking.tickets?.some(
-        (t) =>
-          t.status === OfferTicketStatus.USED ||
-          t.status === OfferTicketStatus.EXPIRED,
-      );
+      const tickets = booking.tickets ?? [];
+      // A booking counts as used only when no ticket is left to scan. Deriving
+      // this from "any ticket used" marked whole multi-ticket bookings as used
+      // after the first scan.
+      const isUsed =
+        tickets.length > 0 &&
+        !tickets.some(
+          (t) =>
+            t.status === OfferTicketStatus.VALID ||
+            t.status === OfferTicketStatus.IN_USE,
+        );
 
       // Plain object so JSON serialization always includes the derived status (spread
       // of TypeORM entities can keep the original column value in some pipelines).
@@ -936,7 +1063,7 @@ export class OfferBookingsService {
         user: {
           id: booking.userId,
           name: booking.user?.name || 'User',
-          phone: booking.user?.phone || '',
+          phone: this.decryptPhone(booking.user?.phone),
           email: booking.user?.email || '',
         },
         branch: {
@@ -1110,7 +1237,7 @@ export class OfferBookingsService {
       user: {
         id: booking.userId,
         name: booking.user?.name || 'User',
-        phone: booking.user?.phone || '',
+        phone: this.decryptPhone(booking.user?.phone),
         email: booking.user?.email || '',
       },
       branch: {

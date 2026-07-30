@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Descriptions, Empty, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Descriptions, Empty, QRCode, Space, Table, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { apiGet } from '../../api'
 
@@ -10,6 +10,7 @@ type Detail = {
   id: string
   status: string
   paymentStatus: string
+  qrData?: string | null
   totalHours: number | null
   remainingHours: number | null
   dailyHoursLimit: number | null
@@ -90,6 +91,21 @@ export default function SubscriptionDetail() {
                   <Descriptions.Item label="آخر تحديث">{formatDate(data.updatedAt)}</Descriptions.Item>
                   <Descriptions.Item label="الوصف" span={2}>{data.plan.description || 'لا يوجد وصف'}</Descriptions.Item>
                 </Descriptions>
+
+                <Card title="باركود الاشتراك">
+                  <div style={{ textAlign: 'center' }}>
+                    {data.qrData ? (
+                      <Space direction="vertical" size="middle" align="center">
+                        <QRCode value={data.qrData} size={220} errorLevel="M" />
+                        <Text type="secondary" copyable={{ text: data.qrData }} style={{ wordBreak: 'break-all' }}>
+                          يمكن للموظف مسح هذا الرمز من تطبيق الموظفين
+                        </Text>
+                      </Space>
+                    ) : (
+                      <Empty description="لا يوجد باركود — الاشتراك غير مفعّل بعد" />
+                    )}
+                  </div>
+                </Card>
 
                 <Card title="سجل الاستخدام">
                   <Table

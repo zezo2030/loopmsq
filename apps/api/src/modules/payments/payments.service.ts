@@ -45,6 +45,7 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { BookingsService } from '../bookings/bookings.service';
 import { MoyasarService } from '../../integrations/moyasar/moyasar.service';
+import { MoyasarPaymentSource } from '../../integrations/moyasar/moyasar.client';
 import { WalletService } from '../wallet/wallet.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { resolveEventTicketWindow } from '../../utils/event-ticket-window.util';
@@ -815,6 +816,78 @@ export class PaymentsService {
       `Aligning subscription payment ${payment.id} amount ${payment.amount} -> ${aligned} to match gateway`,
     );
     payment.amount = aligned as any;
+  }
+
+  /**
+   * Maps an issuer/gateway decline message to a message the user can act on.
+   * Without this the app only ever showed a generic failure, so customers whose
+   * card was declined by their bank reported it as an app bug.
+   */
+  private describeGatewayFailure(gatewayMessage?: string | null): string {
+    const raw = (gatewayMessage || '').trim();
+    const normalized = raw.toUpperCase();
+
+    if (normalized.includes('INSUFFICIENT')) {
+      return 'الرصيد غير كافٍ لإتمام العملية. تأكد من رصيد البطاقة ثم أعد المحاولة.';
+    }
+    if (normalized.includes('ISSUER NOT AVAILABLE')) {
+      return 'خدمة البنك المُصدر للبطاقة غير متاحة حالياً. أعد المحاولة بعد قليل.';
+    }
+    if (normalized.includes('EXPIRED') && normalized.includes('3DS')) {
+      return 'انتهت مدة رمز التحقق قبل إدخاله. أعد المحاولة وأدخل الرمز فوراً عند وصوله.';
+    }
+    if (normalized.includes('3DS')) {
+      return 'فشل التحقق من البطاقة مع البنك. تأكد من رمز التحقق المرسل من بنكك ثم أعد المحاولة.';
+    }
+    if (normalized.includes('WITHDRAWAL LIMIT') || normalized.includes('LIMIT')) {
+      return 'تم تجاوز حد الشراء المسموح على البطاقة. راجع بنكك أو استخدم بطاقة أخرى.';
+    }
+    if (normalized.includes('COUNTRY NOT ALLOWED')) {
+      return 'البطاقة صادرة من دولة غير مدعومة للدفع. استخدم بطاقة سعودية.';
+    }
+    if (normalized.includes('DECLINED') || normalized.includes('BLOCKED')) {
+      return 'رفض البنك المُصدر للبطاقة العملية. راجع بنكك للسماح بالشراء عبر الإنترنت أو استخدم بطاقة أخرى.';
+    }
+    return 'لم تكتمل عملية الدفع. أعد المحاولة أو استخدم بطاقة أخرى.';
+  }
+
+  /**
+   * Persists why the gateway rejected a payment. The client app reports every
+   * card as `credit_card`, so the real network is taken from Moyasar to make
+   * per-network failure rates (mada in particular) measurable.
+   */
+  private async recordGatewayFailure(
+    payment: Payment,
+    source?: MoyasarPaymentSource | null,
+  ): Promise<string> {
+    const gatewayMessage = source?.message || null;
+    const userMessage = this.describeGatewayFailure(gatewayMessage);
+
+    payment.failureReason = gatewayMessage || userMessage;
+    payment.gatewayResponse = {
+      sourceType: source?.type ?? null,
+      company: source?.company ?? null,
+      message: gatewayMessage,
+    };
+
+    const network = (source?.company || '').toLowerCase();
+    if (network === 'mada' && payment.method !== PaymentMethod.MADA) {
+      payment.method = PaymentMethod.MADA;
+    }
+
+    if (
+      payment.status !== PaymentStatus.COMPLETED &&
+      payment.status !== PaymentStatus.REFUNDED
+    ) {
+      payment.status = PaymentStatus.FAILED;
+    }
+
+    await this.paymentRepository.save(payment);
+    this.logger.warn(
+      `Payment ${payment.id} failed at gateway [${network || 'unknown'}]: ${gatewayMessage || 'no reason reported'}`,
+    );
+
+    return userMessage;
   }
 
   private async withPaymentLock<T>(
@@ -1869,7 +1942,11 @@ export class PaymentsService {
           (moyasarPayment.status || '').toLowerCase(),
         );
         if (!succeeded) {
-          throw new BadRequestException('Payment not completed');
+          const userMessage = await this.recordGatewayFailure(
+            payment,
+            moyasarPayment.source,
+          );
+          throw new BadRequestException(userMessage);
         }
 
         const expectedAmount = Math.round(Number(payment.amount) * 100);
@@ -1887,6 +1964,16 @@ export class PaymentsService {
         }
 
         payment.gatewayRef = moyasarPaymentId;
+
+        // The client app labels every card as `credit_card`; recording the
+        // network Moyasar actually charged is what makes a mada-specific
+        // success/failure rate measurable.
+        if (
+          (moyasarPayment.source?.company || '').toLowerCase() === 'mada' &&
+          payment.method !== PaymentMethod.MADA
+        ) {
+          payment.method = PaymentMethod.MADA;
+        }
       }
     }
 
@@ -2564,8 +2651,12 @@ export class PaymentsService {
         payment.status !== PaymentStatus.FAILED &&
         payment.status !== PaymentStatus.COMPLETED
       ) {
-        payment.status = PaymentStatus.FAILED;
-        await this.paymentRepository.save(payment);
+        // Moyasar reports the issuer decline under `source.message`; the old
+        // `data.failureReason` lookup never resolved, so every failure was
+        // recorded without a reason.
+        const source = ((dto.data as any)?.source ||
+          null) as MoyasarPaymentSource | null;
+        await this.recordGatewayFailure(payment, source);
         await this.adminNotifications.notify({
           type: 'PAYMENT_FAILED',
           severity: 'critical',
@@ -2577,7 +2668,8 @@ export class PaymentsService {
           data: {
             amount: payment.amount,
             method: payment.method,
-            failureReason: (dto.data as any)?.failureReason || null,
+            cardNetwork: source?.company || null,
+            failureReason: payment.failureReason,
           },
         });
       }

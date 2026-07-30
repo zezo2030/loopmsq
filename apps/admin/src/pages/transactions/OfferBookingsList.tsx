@@ -6,6 +6,7 @@ import {
   DatePicker,
   Empty,
   Input,
+  Modal,
   Row,
   Select,
   Space,
@@ -18,14 +19,21 @@ import {
 import {
   CalendarOutlined,
   CreditCardOutlined,
+  EditOutlined,
   GiftOutlined,
   ReloadOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
-import { apiGet } from '../../api'
+import { apiGet, apiPatch } from '../../api'
 
 const { RangePicker } = DatePicker
 const { Text, Title } = Typography
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: 'completed', label: 'مدفوع' },
+  { value: 'pending', label: 'بانتظار الدفع' },
+  { value: 'failed', label: 'فشل الدفع' },
+]
 
 type OfferBookingRow = {
   id: string
@@ -80,7 +88,34 @@ export default function OfferBookingsList() {
   const [paymentStatus, setPaymentStatus] = useState<string | undefined>()
   const [branchId, setBranchId] = useState<string | undefined>()
   const [dateRange, setDateRange] = useState<any>(null)
+  const [payModalRow, setPayModalRow] = useState<OfferBookingRow | null>(null)
+  const [payModalStatus, setPayModalStatus] = useState<string | undefined>()
+  const [savingPayStatus, setSavingPayStatus] = useState(false)
   const navigate = useNavigate()
+
+  const openPaymentModal = (row: OfferBookingRow) => {
+    setPayModalRow(row)
+    setPayModalStatus(row.paymentStatus)
+  }
+
+  const submitPaymentStatus = async () => {
+    if (!payModalRow || !payModalStatus) return
+    setSavingPayStatus(true)
+    try {
+      await apiPatch(
+        `/offer-bookings/admin/all/${payModalRow.id}/payment-status`,
+        { paymentStatus: payModalStatus },
+      )
+      message.success('تم تحديث حالة الدفع')
+      setPayModalRow(null)
+      await loadRows()
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      message.error(`تعذر تحديث حالة الدفع${detail ? `: ${detail}` : ''}`)
+    } finally {
+      setSavingPayStatus(false)
+    }
+  }
 
   const formatCurrency = (value: number, currency = 'SAR') =>
     `${new Intl.NumberFormat('ar-SA').format(value || 0)} ${currency}`
@@ -208,7 +243,14 @@ export default function OfferBookingsList() {
       {
         title: 'التفاصيل',
         key: 'actions',
-        render: (_: unknown, row: OfferBookingRow) => <a onClick={() => navigate(`/admin/finance/offer-bookings/${row.id}`)}>عرض</a>,
+        render: (_: unknown, row: OfferBookingRow) => (
+          <Space direction="vertical" size={4}>
+            <a onClick={() => navigate(`/admin/finance/offer-bookings/${row.id}`)}>عرض</a>
+            <a onClick={() => openPaymentModal(row)}>
+              <EditOutlined /> تغيير حالة الدفع
+            </a>
+          </Space>
+        ),
       },
     ],
     [],
@@ -280,11 +322,7 @@ export default function OfferBookingsList() {
                   placeholder="حالة الدفع"
                   value={paymentStatus}
                   onChange={setPaymentStatus}
-                  options={[
-                    { value: 'completed', label: 'مدفوع' },
-                    { value: 'pending', label: 'بانتظار الدفع' },
-                    { value: 'failed', label: 'فشل الدفع' },
-                  ]}
+                  options={PAYMENT_STATUS_OPTIONS}
                 />
                 <Select
                   allowClear
@@ -314,6 +352,39 @@ export default function OfferBookingsList() {
           </Card>
         </div>
       </div>
+
+      <Modal
+        title="تغيير حالة الدفع يدويًا"
+        open={!!payModalRow}
+        onCancel={() => setPayModalRow(null)}
+        onOk={submitPaymentStatus}
+        okButtonProps={{ disabled: !payModalStatus, loading: savingPayStatus }}
+        okText="حفظ"
+        cancelText="إلغاء"
+        destroyOnClose
+      >
+        {payModalRow && (
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <div>
+              <Text type="secondary">العميل</Text>
+              <div style={{ fontWeight: 700 }}>{payModalRow.user.name || 'مستخدم'}</div>
+            </div>
+            <div>
+              <Text type="secondary">العرض</Text>
+              <div>{payModalRow.offer.title}</div>
+            </div>
+            <div>
+              <Text type="secondary">حالة الدفع الجديدة</Text>
+              <Select
+                style={{ width: '100%', marginTop: 4 }}
+                value={payModalStatus}
+                onChange={setPayModalStatus}
+                options={PAYMENT_STATUS_OPTIONS}
+              />
+            </div>
+          </Space>
+        )}
+      </Modal>
     </div>
   )
 }

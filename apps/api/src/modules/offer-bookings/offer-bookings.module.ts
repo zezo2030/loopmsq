@@ -9,10 +9,12 @@ import { OfferBookingsController } from './offer-bookings.controller';
 import { OfferBookingsService } from './offer-bookings.service';
 import { QRCodeService } from '../../utils/qr-code.service';
 import { OfferTicketExpiryProcessor } from './offer-ticket-expiry.processor';
+import { OfferBookingCleanupProcessor } from './offer-booking-cleanup.processor';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { User } from '../../database/entities/user.entity';
+import { EncryptionService } from '../../utils/encryption.util';
 
 @Module({
   imports: [
@@ -29,7 +31,13 @@ import { User } from '../../database/entities/user.entity';
     CouponsModule,
   ],
   controllers: [OfferBookingsController],
-  providers: [OfferBookingsService, QRCodeService, OfferTicketExpiryProcessor],
+  providers: [
+    OfferBookingsService,
+    QRCodeService,
+    OfferTicketExpiryProcessor,
+    OfferBookingCleanupProcessor,
+    EncryptionService,
+  ],
   exports: [OfferBookingsService],
 })
 export class OfferBookingsModule {}
