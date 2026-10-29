@@ -13,6 +13,7 @@ import { User } from '../../database/entities/user.entity';
 import { CloudinaryModule } from '../../utils/cloudinary.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { EncryptionService } from '../../utils/encryption.util';
+import { SubscriptionActivationReconcileProcessor } from './subscription-activation-reconcile.processor';
 
 @Module({
   imports: [
@@ -28,7 +29,12 @@ import { EncryptionService } from '../../utils/encryption.util';
     CouponsModule,
   ],
   controllers: [SubscriptionPurchasesController, StaffSubscriptionsController],
-  providers: [SubscriptionPurchasesService, QRCodeService, EncryptionService],
+  providers: [
+    SubscriptionPurchasesService,
+    QRCodeService,
+    EncryptionService,
+    SubscriptionActivationReconcileProcessor,
+  ],
   exports: [SubscriptionPurchasesService],
 })
 export class SubscriptionPurchasesModule {}

@@ -95,6 +95,36 @@ export class TripsService {
     };
   }
 
+  /**
+   * Takes a coupon discount off a trip's pricing the way the request-first
+   * flow does (deposit on the discounted total), so pay-first charges it too.
+   */
+  private discountTripPricing<
+    P extends { totalAmount: number; depositAmount: number; amountDueNow: number },
+  >(
+    pricing: P,
+    discount: number,
+    branch: Partial<Branch> | null | undefined,
+    paymentOption: 'full' | 'deposit',
+  ): P & { remainingAmount: number } {
+    const totalAmount = this.normalizeMoney(
+      Math.max(0, pricing.totalAmount - Math.max(0, discount || 0)),
+    );
+    const depositAmount = this.normalizeMoney(
+      totalAmount * (this.getDepositPercentage(branch) / 100),
+    );
+    return {
+      ...pricing,
+      totalAmount,
+      depositAmount,
+      remainingAmount:
+        paymentOption === 'deposit'
+          ? this.normalizeMoney(totalAmount - depositAmount)
+          : 0,
+      amountDueNow: paymentOption === 'deposit' ? depositAmount : totalAmount,
+    };
+  }
+
   private getMonthlyPrices(
     branch?: Partial<Branch> | null,
   ): Record<number, number> {
@@ -1306,8 +1336,25 @@ export class TripsService {
         ? accompanyingRaw
         : 0;
 
+    // The app shows (and checks wallet balance against) the coupon-discounted
+    // price; without this the card was charged the full price.
+    const couponCode =
+      raw.couponCode != null ? String(raw.couponCode).trim() || null : null;
+    const { discount: couponDiscount } = await this.resolveCouponDiscount(
+      couponCode,
+      pricing.totalAmount,
+      branchId,
+      userId,
+    );
+    const priced = this.discountTripPricing(
+      pricing,
+      couponDiscount,
+      branch,
+      paymentOption,
+    );
+
     return {
-      amountToPay: pricing.amountDueNow,
+      amountToPay: priced.amountDueNow,
       deferredFlowContext: {
         flowType: 'trip_request_pay_first',
         userId,
@@ -1324,9 +1371,13 @@ export class TripsService {
               : null,
           paymentOption,
           addOns: resolvedAddOns,
+          couponCode: couponDiscount > 0 ? couponCode : null,
         },
-        totalAmount: pricing.totalAmount,
-        depositAmount: pricing.depositAmount,
+        // Fixed at quote time: the charge is made against this discount, so
+        // confirmation must not fail if the coupon runs out meanwhile.
+        couponDiscount,
+        totalAmount: priced.totalAmount,
+        depositAmount: priced.depositAmount,
         ticketsSubtotal: pricing.ticketsSubtotal,
         addonsSubtotal: pricing.addonsSubtotal,
         ticketPricePerStudent: pricing.ticketPricePerStudent,
@@ -1401,13 +1452,24 @@ export class TripsService {
       preferredTime,
     });
 
-    const pricing = this.buildPricing({
+    const basePricing = this.buildPricing({
       branch,
       studentsCount,
       preferredDate,
       paymentOption,
       addOns: resolvedAddOns,
     });
+    const couponCode =
+      tp.couponCode != null ? String(tp.couponCode).trim() || null : null;
+    const couponDiscount = couponCode
+      ? Number(pendingFlowContext?.couponDiscount ?? 0)
+      : 0;
+    const pricing = this.discountTripPricing(
+      basePricing,
+      couponDiscount,
+      branch,
+      paymentOption,
+    );
 
     const expectedDue = pricing.amountDueNow;
     if (
@@ -1465,10 +1527,27 @@ export class TripsService {
       amountPaid: paidAmount as any,
       remainingAmount: remainingAmount as any,
       pricingMonth: pricing.pricingMonth,
-      pricingSnapshot: pricing.pricingSnapshot as any,
+      pricingSnapshot: {
+        ...pricing.pricingSnapshot,
+        couponCode,
+        couponDiscount,
+      } as any,
       paymentMethod: payment.method as any,
     });
 
-    return tripRepo.save(row);
+    const saved = await tripRepo.save(row);
+
+    // Record coupon redemption (best-effort, idempotent on trip request id).
+    if (couponCode && couponDiscount > 0) {
+      await this.couponsService.tryRedeem({
+        code: couponCode,
+        userId,
+        amount: basePricing.totalAmount,
+        reference: saved.id,
+        branchId: branchId || undefined,
+      });
+    }
+
+    return saved;
   }
 }

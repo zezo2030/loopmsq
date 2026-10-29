@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
   Optional,
+  ServiceUnavailableException,
   UnauthorizedException,
   forwardRef,
 } from '@nestjs/common';
@@ -849,6 +850,67 @@ export class PaymentsService {
       return 'رفض البنك المُصدر للبطاقة العملية. راجع بنكك للسماح بالشراء عبر الإنترنت أو استخدم بطاقة أخرى.';
     }
     return 'لم تكتمل عملية الدفع. أعد المحاولة أو استخدم بطاقة أخرى.';
+  }
+
+  /**
+   * A second gateway charge was confirmed against a payment that is already
+   * COMPLETED (customer paid twice for one order). The order stays as it is;
+   * the extra charge is recorded on the payment and logged as an error so it
+   * can be refunded from the Moyasar dashboard instead of going unnoticed.
+   */
+  private async flagDuplicateGatewayCharge(
+    payment: Payment,
+    chargeId: string,
+  ): Promise<void> {
+    try {
+      const existing: any[] = payment.gatewayResponse?.duplicateCharges ?? [];
+      if (existing.some((c) => c?.id === chargeId)) return;
+
+      let status: string | null = null;
+      let amount: number | null = null;
+      if (this.moyasarService) {
+        const charge = await this.moyasarService.retrievePayment(chargeId);
+        status = (charge.status || '').toLowerCase();
+        amount = Number(charge.amount) / 100;
+      }
+      // Only money that actually left the card needs a refund.
+      if (status && !['paid', 'authorized', 'captured'].includes(status)) {
+        return;
+      }
+
+      payment.gatewayResponse = {
+        ...(payment.gatewayResponse || {}),
+        duplicateCharges: [
+          ...existing,
+          { id: chargeId, status, amount, detectedAt: new Date().toISOString() },
+        ],
+      };
+      await this.paymentRepository.save(payment);
+      // No dedicated type exists; PAYMENT_FAILED/critical keeps it in the
+      // admin bell without a migration of the notification type column.
+      await this.adminNotifications.notify({
+        type: 'PAYMENT_FAILED',
+        severity: 'critical',
+        title: 'خصم مكرر — يحتاج استرداد',
+        body: `تم خصم ${amount ?? payment.amount} ر.س مرة ثانية على دفعة مكتملة. استرد العملية ${chargeId} من لوحة ميسر.`,
+        branchId: (payment as any).booking?.branchId || null,
+        resourceType: 'payment',
+        resourceId: payment.id,
+        data: {
+          duplicateChargeId: chargeId,
+          originalChargeId: payment.gatewayRef,
+          amount,
+        },
+      });
+      this.logger.error(
+        `DUPLICATE CHARGE: payment ${payment.id} is already completed with ${payment.gatewayRef}, ` +
+          `but Moyasar charge ${chargeId} (${amount ?? '?'} SAR, ${status ?? 'unverified'}) was also confirmed. Refund it manually.`,
+      );
+    } catch (e: any) {
+      this.logger.error(
+        `DUPLICATE CHARGE check failed for payment ${payment.id} / charge ${chargeId}: ${e?.message || e}`,
+      );
+    }
   }
 
   /**
@@ -1755,6 +1817,16 @@ export class PaymentsService {
 
     if (!payment) throw new NotFoundException('Payment not found');
     if (payment.status === PaymentStatus.COMPLETED) {
+      const gatewayPayload = dto.gatewayPayload || {};
+      const reportedChargeId = (gatewayPayload.moyasarPaymentId ||
+        gatewayPayload.paymentId) as string | undefined;
+      if (
+        reportedChargeId &&
+        payment.gatewayRef &&
+        reportedChargeId !== payment.gatewayRef
+      ) {
+        await this.flagDuplicateGatewayCharge(payment, reportedChargeId);
+      }
       if (payment.offerBookingId && this.offerBookingsService) {
         await this.offerBookingsService.confirmPayment(payment.offerBookingId);
       }
@@ -2477,8 +2549,15 @@ export class PaymentsService {
             payment.subscriptionPurchaseId,
           );
         } catch (e) {
+          // The payment is already committed as COMPLETED. Reporting success
+          // here left a paid subscription stuck in pending_payment (hidden in
+          // the app). Fail the call instead: the app's re-check confirms again,
+          // and the COMPLETED branch retries the activation.
           this.logger.error(
-            `Failed to confirm subscription purchase payment: ${e?.message || e}`,
+            `Failed to confirm subscription purchase payment ${payment.id}: ${e?.message || e}`,
+          );
+          throw new ServiceUnavailableException(
+            'تم استلام الدفع ولكن تعذّر تفعيل الاشتراك الآن. اضغط إعادة التحقق بعد لحظات.',
           );
         }
       }
@@ -2676,13 +2755,24 @@ export class PaymentsService {
     }
 
     if (dto.eventType === 'payment.succeeded') {
+      if (
+        payment.status === PaymentStatus.COMPLETED &&
+        moyasarPaymentId &&
+        payment.gatewayRef &&
+        moyasarPaymentId !== payment.gatewayRef
+      ) {
+        await this.flagDuplicateGatewayCharge(payment, moyasarPaymentId);
+      }
       if (payment.status !== PaymentStatus.COMPLETED) {
         // Defense-in-depth: independently confirm with Moyasar that this
         // payment really succeeded for the expected amount/currency before
         // granting any entitlement. A forged webhook (even one with a leaked
         // secret, or one tampering with the amount) cannot pass this, because
         // it cannot fake Moyasar's authenticated API response.
-        const gatewayId = payment.gatewayRef || moyasarPaymentId;
+        // Verify the charge this event is about: gatewayRef is set by the
+        // first event seen, which may be an earlier failed attempt on the same
+        // payment, and verifying that one rejected the paid retry.
+        const gatewayId = moyasarPaymentId || payment.gatewayRef;
         const isInternalRef =
           !gatewayId ||
           gatewayId.startsWith('bypass_') ||
@@ -2742,6 +2832,7 @@ export class PaymentsService {
           }
         }
 
+        if (moyasarPaymentId) payment.gatewayRef = moyasarPaymentId;
         payment.status = PaymentStatus.COMPLETED;
         payment.paidAt = new Date();
         if (!payment.transactionId) {
