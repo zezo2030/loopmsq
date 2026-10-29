@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { Coupon } from '../../database/entities/coupon.entity';
 import { CouponRedemption } from '../../database/entities/coupon-redemption.entity';
 import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
@@ -24,10 +24,19 @@ export class CouponsService {
     private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
+  /**
+   * Coupons with a null `branchId` are global (valid at every branch), so a
+   * branch-scoped listing returns them alongside that branch's own coupons.
+   */
   list(filter?: { branchId?: string }) {
-    const where: any = {};
-    if (filter?.branchId) where.branchId = filter.branchId;
+    const where: any = filter?.branchId
+      ? [{ branchId: filter.branchId }, { branchId: IsNull() }]
+      : {};
     return this.repo.find({ where, order: { createdAt: 'DESC' } as any });
+  }
+
+  findOne(id: string) {
+    return this.repo.findOne({ where: { id } });
   }
 
   listCouponsByBranch(branchId: string) {
@@ -51,11 +60,9 @@ export class CouponsService {
   }
 
   async create(dto: Partial<Coupon>) {
-    if (!dto.branchId) {
-      throw new Error('branchId is required');
-    }
     this.validateDiscountConfig(dto);
-    const entity = this.repo.create(dto);
+    // No branch = the coupon is valid at every branch.
+    const entity = this.repo.create({ ...dto, branchId: dto.branchId ?? null });
     const saved = await this.repo.save(entity);
     await this.adminNotifications.notify({
       type: 'COUPON_CREATED',

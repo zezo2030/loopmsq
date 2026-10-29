@@ -12,14 +12,14 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import i18n from '@/i18n'
 import { useTranslation } from 'react-i18next'
+import { signOut } from '@/shared/auth'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 
 export function Header() {
   const { t } = useTranslation()
 
   const handleLogout = () => {
-    localStorage.removeItem('accessToken')
-    window.location.href = '/login'
+    signOut()
   }
 
   const toggleLang = () => {

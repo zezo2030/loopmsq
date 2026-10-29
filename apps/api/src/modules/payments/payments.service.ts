@@ -2744,6 +2744,9 @@ export class PaymentsService {
 
         payment.status = PaymentStatus.COMPLETED;
         payment.paidAt = new Date();
+        if (!payment.transactionId) {
+          payment.transactionId = `txn_${payment.id}`;
+        }
         await this.paymentRepository.save(payment);
         await this.adminNotifications.notify({
           type: 'PAYMENT_SUCCESS',

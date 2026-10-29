@@ -76,7 +76,7 @@ export default function Packages() {
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('packages.new_package')}</Button>
       </div>
-      <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
+      <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ defaultPageSize: 10, showSizeChanger: true }} />
 
       <Modal
         title={editing ? t('packages.edit_package') : t('packages.create_package')}

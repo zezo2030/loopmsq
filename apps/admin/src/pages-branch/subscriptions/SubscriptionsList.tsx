@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  Avatar,
   Card,
   Col,
   DatePicker,
   Empty,
+  Image,
   Input,
   Row,
   Select,
@@ -15,8 +17,9 @@ import {
   Typography,
   message,
 } from 'antd'
-import { CalendarOutlined, CreditCardOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { CalendarOutlined, CreditCardOutlined, ReloadOutlined, SearchOutlined, UserOutlined } from '@ant-design/icons'
 import { apiGet } from '../../shared/api'
+import { resolveFileUrl } from '../../shared/url'
 import { useAuth, canViewBookingAmounts } from '../../shared/auth'
 
 const { RangePicker } = DatePicker
@@ -26,6 +29,8 @@ type SubscriptionRow = {
   id: string
   status: 'active' | 'depleted' | 'expired' | 'cancelled'
   paymentStatus: 'pending' | 'completed' | 'failed'
+  holderName: string | null
+  holderImageUrl: string | null
   totalHours: number | null
   remainingHours: number | null
   dailyHoursLimit: number | null
@@ -33,7 +38,8 @@ type SubscriptionRow = {
   endsAt: string
   createdAt: string
   updatedAt: string
-  user: { id: string; name: string; phone: string; email: string }
+  user: { id: string; name: string; phone: string; email: string; imageUrl?: string | null }
+  account?: { id: string; name: string; phone: string; email: string }
   branch: { id: string; name: string }
   plan: { id: string; title: string; usageMode: string; durationMonths: number | null; price: number; currency: string }
 }
@@ -90,14 +96,37 @@ export default function SubscriptionsList() {
   const columns = useMemo(
     () => [
       {
-        title: 'العميل',
-        key: 'user',
-        render: (_: unknown, row: SubscriptionRow) => (
-          <div>
-            <div style={{ fontWeight: 700 }}>{row.user.name}</div>
-            <Text type="secondary">{row.user.phone || row.user.email || '-'}</Text>
-          </div>
-        ),
+        title: 'حامل الاشتراك',
+        key: 'holder',
+        width: 260,
+        render: (_: unknown, row: SubscriptionRow) => {
+          const photo = row.holderImageUrl || row.user.imageUrl
+          const holderName = row.holderName || row.user.name || 'مستخدم'
+          return (
+            <Space align="start">
+              {photo ? (
+                <Image
+                  src={resolveFileUrl(photo)}
+                  alt={holderName}
+                  width={48}
+                  height={48}
+                  style={{ objectFit: 'cover', borderRadius: 8 }}
+                />
+              ) : (
+                <Avatar shape="square" size={48} icon={<UserOutlined />} />
+              )}
+              <div>
+                <div style={{ fontWeight: 700 }}>{holderName}</div>
+                <div>
+                  <Text type="secondary">صاحب الحساب: {row.account?.name || '-'}</Text>
+                </div>
+                <Text type="secondary">
+                  {row.account?.phone || row.user.phone || row.account?.email || row.user.email || '-'}
+                </Text>
+              </div>
+            </Space>
+          )
+        },
       },
       {
         title: 'الخطة',
@@ -179,7 +208,7 @@ export default function SubscriptionsList() {
             </Space>
           </Card>
           <Card>
-            <Table<SubscriptionRow> rowKey="id" loading={loading} dataSource={rows} columns={columns as any} locale={{ emptyText: <Empty description="لا توجد اشتراكات حالياً" /> }} pagination={{ pageSize: 10, showSizeChanger: true }} scroll={{ x: 900 }} />
+            <Table<SubscriptionRow> rowKey="id" loading={loading} dataSource={rows} columns={columns as any} locale={{ emptyText: <Empty description="لا توجد اشتراكات حالياً" /> }} pagination={{ defaultPageSize: 10, showSizeChanger: true }} scroll={{ x: 1050 }} />
           </Card>
         </div>
       </div>

@@ -1451,6 +1451,14 @@ export class SubscriptionPurchasesService {
           email: purchase.user?.email || '',
           imageUrl: purchase.holderImageUrl,
         },
+        // The account owner (app user who paid) kept separate from the
+        // subscription holder (usually the child) shown in `user`.
+        account: {
+          id: purchase.userId,
+          name: purchase.user?.name || '',
+          phone: this.decryptPhone(purchase.user?.phone),
+          email: purchase.user?.email || '',
+        },
         branch: {
           id: purchase.branchId,
           name:
@@ -1541,6 +1549,14 @@ export class SubscriptionPurchasesService {
         phone: this.decryptPhone(purchase.user?.phone),
         email: purchase.user?.email || '',
         imageUrl: purchase.holderImageUrl,
+      },
+      // The account owner (app user who paid) kept separate from the
+      // subscription holder (usually the child) shown in `user`.
+      account: {
+        id: purchase.userId,
+        name: purchase.user?.name || '',
+        phone: this.decryptPhone(purchase.user?.phone),
+        email: purchase.user?.email || '',
       },
       branch: {
         id: purchase.branchId,

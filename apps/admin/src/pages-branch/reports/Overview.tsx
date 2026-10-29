@@ -4,6 +4,7 @@ import { DownloadOutlined, CalendarOutlined, DollarOutlined, BarChartOutlined } 
 import '../../theme.css'
 import { useTranslation } from 'react-i18next'
 import { apiGet } from '../../shared/api'
+import { authFetch } from '../../shared/session'
 import { useAuth, canViewRevenue, canViewBookingAmounts } from '../../shared/auth'
 
 const { RangePicker } = DatePicker
@@ -92,12 +93,7 @@ export default function Overview() {
         params.append('from', dateRange[0].toISOString())
         params.append('to', dateRange[1].toISOString())
       }
-      const base = (import.meta as any).env?.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE || 'http://localhost:3000/api/v1'
-      const response = await fetch(`${base}/reports/export?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      const response = await authFetch(`/reports/export?${params.toString()}`)
       if (!response.ok) throw new Error('Export failed')
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)

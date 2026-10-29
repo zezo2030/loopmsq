@@ -186,7 +186,7 @@ export default function OfferBookingsList() {
             </Space>
           </Card>
           <Card>
-            <Table<OfferBookingRow> rowKey="id" loading={loading} dataSource={rows} columns={columns as any} locale={{ emptyText: <Empty description="لا توجد حجوزات عروض حالياً" /> }} pagination={{ pageSize: 10, showSizeChanger: true }} scroll={{ x: 900 }} />
+            <Table<OfferBookingRow> rowKey="id" loading={loading} dataSource={rows} columns={columns as any} locale={{ emptyText: <Empty description="لا توجد حجوزات عروض حالياً" /> }} pagination={{ defaultPageSize: 10, showSizeChanger: true }} scroll={{ x: 900 }} />
           </Card>
         </div>
       </div>

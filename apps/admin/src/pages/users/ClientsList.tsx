@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Space, Table, Tag, Input, Avatar, Tooltip } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { authFetch } from '../../shared/session'
 import { 
   UserOutlined, 
   SearchOutlined, 
@@ -22,10 +23,6 @@ type UserRow = {
   createdAt?: string
 }
 
-function getApiBase(): string {
-  const base = (import.meta as any).env?.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE
-  return (typeof base === 'string' && base) ? base : 'http://localhost:3000/api/v1'
-}
 
 export default function ClientsList() {
   const { t } = useTranslation()
@@ -52,16 +49,13 @@ export default function ClientsList() {
     ;(async () => {
       setLoading(true)
       try {
-        const token = localStorage.getItem('accessToken')
         const params = new URLSearchParams({
           page: String(page),
           limit: String(pageSize),
           role: 'user',
         })
         if (searchQuery) params.set('q', searchQuery)
-        const resp = await fetch(`${getApiBase()}/users?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const resp = await authFetch(`/users?${params.toString()}`)
         if (!resp.ok) throw new Error(t('users.load_failed') || 'Failed to load users')
         const data = await resp.json()
         if (!mounted) return

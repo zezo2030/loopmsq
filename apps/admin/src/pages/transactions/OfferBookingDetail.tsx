@@ -93,7 +93,7 @@ export default function OfferBookingDetail() {
                 <Card title="التذاكر">
                   <Table
                     rowKey="id"
-                    pagination={{ pageSize: 10 }}
+                    pagination={{ defaultPageSize: 10, showSizeChanger: true }}
                     dataSource={data.tickets || []}
                     columns={[
                       { title: 'المعرف', dataIndex: 'id' },

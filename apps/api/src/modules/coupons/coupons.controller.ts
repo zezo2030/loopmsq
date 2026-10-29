@@ -11,6 +11,7 @@ import {
   UseGuards,
   Query,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CouponsService } from './coupons.service';
@@ -26,6 +27,25 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 @Controller()
 export class CouponsController {
   constructor(private readonly coupons: CouponsService) {}
+
+  /**
+   * Branch managers may only touch coupons that belong to their own branch.
+   * Global coupons (branchId = null) are admin-owned even though they show up
+   * in every branch's listing.
+   */
+  private async assertCanManage(id: string, me: User) {
+    if (!me?.roles?.includes(UserRole.BRANCH_MANAGER)) return;
+    if (!me.branchId) throw new ForbiddenException('No branch assigned');
+    const coupon = await this.coupons.findOne(id);
+    if (!coupon) throw new NotFoundException('Coupon not found');
+    if (coupon.branchId !== me.branchId) {
+      throw new ForbiddenException(
+        coupon.branchId
+          ? 'Not allowed for other branches'
+          : 'Coupons for all branches can only be managed by an admin',
+      );
+    }
+  }
 
   // Admin CRUD
   @Get('admin/coupons')
@@ -64,16 +84,13 @@ export class CouponsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  update(
+  async update(
     @Param('id') id: string,
     @Body() body: UpdateCouponDto,
     @CurrentUser() me: User,
   ) {
+    await this.assertCanManage(id, me);
     if (me?.roles?.includes(UserRole.BRANCH_MANAGER)) {
-      if (!me.branchId) throw new ForbiddenException('No branch assigned');
-      if ((body as any).branchId && (body as any).branchId !== me.branchId) {
-        throw new ForbiddenException('Not allowed for other branches');
-      }
       (body as any).branchId = me.branchId as any;
     }
     return this.coupons.update(id, {
@@ -87,7 +104,8 @@ export class CouponsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BRANCH_MANAGER)
   @ApiBearerAuth()
-  remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @CurrentUser() me: User) {
+    await this.assertCanManage(id, me);
     return this.coupons.remove(id);
   }
 

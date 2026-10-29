@@ -14,12 +14,16 @@ export default function Notifications() {
     setSuccess(null)
     setError(null)
     try {
-      await apiPost('/notifications/promo', {
+      const res = await apiPost<{ success: boolean; devices?: number }>('/notifications/promo', {
         message: values.message,
         lang: values.lang || 'ar',
         channels: ['push'], // إرسال فقط عبر Firebase Push
       })
-      setSuccess('تم إرسال الإشعار لجميع الأجهزة بنجاح')
+      setSuccess(
+        res?.devices
+          ? `تم إرسال الإشعار إلى ${res.devices} جهاز مسجّل`
+          : 'تم إرسال الإشعار لجميع الأجهزة بنجاح',
+      )
     } catch (e: any) {
       setError(e?.message || 'فشل إرسال الإشعار')
     } finally {

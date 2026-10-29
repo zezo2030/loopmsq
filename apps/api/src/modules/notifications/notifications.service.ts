@@ -348,7 +348,12 @@ export class NotificationsService {
 
   private async getAllDeviceTokens(): Promise<string[]> {
     const list = await this.tokenRepo.find();
-    return list.map((t) => t.token);
+    return Array.from(new Set(list.map((t) => t.token).filter(Boolean)));
+  }
+
+  /** Number of devices a broadcast would currently reach. */
+  async countDeviceTokens(): Promise<number> {
+    return (await this.getAllDeviceTokens()).length;
   }
 
   private buildPushData(n: EnqueueNotification): Record<string, string> {
@@ -412,6 +417,8 @@ export class NotificationsService {
         return lang === 'ar' ? 'تم استلام الهدية' : 'Gift Claimed';
       case 'GIFT_EXPIRED':
         return lang === 'ar' ? 'انتهت صلاحية الهدية' : 'Gift Expired';
+      case 'PROMO':
+        return lang === 'ar' ? 'عرض ترويجي' : 'Promotion';
       default:
         return lang === 'ar' ? 'تنبيه' : 'Notification';
     }

@@ -23,6 +23,7 @@ interface PaymentItem {
   method: string
   paidAt?: string
   createdAt: string
+  webhookData?: { flowType?: string } | null
 }
 
 interface PaymentsResponse {
@@ -134,7 +135,12 @@ export default function PaymentsList() {
         if (r.offerBookingId) refs.push({ label: t('payments.ref_offer') || 'Offer', id: r.offerBookingId })
         if (r.subscriptionPurchaseId) refs.push({ label: t('payments.ref_subscription') || 'Subscription', id: r.subscriptionPurchaseId })
         if (r.giftOrderId) refs.push({ label: t('payments.ref_gift') || 'Gift', id: r.giftOrderId })
-        if (refs.length === 0) return '-'
+        if (refs.length === 0) {
+          if (r.webhookData?.flowType === 'wallet_recharge') {
+            return <Tag color="purple">{t('payments.ref_wallet_recharge') || 'Wallet Recharge'}</Tag>
+          }
+          return '-'
+        }
         return (
           <span>
             {refs.map((x, i) => (
@@ -189,6 +195,9 @@ export default function PaymentsList() {
     if (r.offerBookingId) refs.push(`${t('payments.ref_offer') || 'Offer'}: ${r.offerBookingId}`)
     if (r.subscriptionPurchaseId) refs.push(`${t('payments.ref_subscription') || 'Subscription'}: ${r.subscriptionPurchaseId}`)
     if (r.giftOrderId) refs.push(`${t('payments.ref_gift') || 'Gift'}: ${r.giftOrderId}`)
+    if (!refs.length && r.webhookData?.flowType === 'wallet_recharge') {
+      return t('payments.ref_wallet_recharge') || 'Wallet Recharge'
+    }
     return refs.length ? refs.join(' | ') : '-'
   }
 

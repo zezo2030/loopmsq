@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  Avatar,
   Button,
   Card,
   Col,
@@ -30,6 +31,7 @@ import {
   ReloadOutlined,
   SearchOutlined,
   UploadOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { apiGet, apiPatch, apiPost } from '../../api'
@@ -48,6 +50,8 @@ type SubscriptionRow = {
   id: string
   status: 'active' | 'depleted' | 'expired' | 'cancelled'
   paymentStatus: 'pending' | 'completed' | 'failed'
+  holderName: string | null
+  holderImageUrl: string | null
   totalHours: number | null
   remainingHours: number | null
   dailyHoursLimit: number | null
@@ -55,7 +59,8 @@ type SubscriptionRow = {
   endsAt: string
   createdAt: string
   updatedAt: string
-  user: { id: string; name: string; phone: string; email: string }
+  user: { id: string; name: string; phone: string; email: string; imageUrl?: string | null }
+  account?: { id: string; name: string; phone: string; email: string }
   branch: { id: string; name: string }
   plan: {
     id: string
@@ -332,14 +337,38 @@ export default function SubscriptionsList() {
   const columns = useMemo(
     () => [
       {
-        title: 'المشترك',
-        key: 'user',
-        render: (_: unknown, row: SubscriptionRow) => (
-          <div>
-            <div style={{ fontWeight: 700 }}>{row.user.name || 'مستخدم'}</div>
-            <Text type="secondary">{row.user.phone || row.user.email || '-'}</Text>
-          </div>
-        ),
+        title: 'حامل الاشتراك',
+        key: 'holder',
+        width: 260,
+        render: (_: unknown, row: SubscriptionRow) => {
+          const photo = row.holderImageUrl || row.user.imageUrl
+          const holderName = row.holderName || row.user.name || 'مستخدم'
+          const ownerName = row.account?.name || ''
+          return (
+            <Space align="start">
+              {photo ? (
+                <Image
+                  src={resolveFileUrl(photo)}
+                  alt={holderName}
+                  width={48}
+                  height={48}
+                  style={{ objectFit: 'cover', borderRadius: 8 }}
+                />
+              ) : (
+                <Avatar shape="square" size={48} icon={<UserOutlined />} />
+              )}
+              <div>
+                <div style={{ fontWeight: 700 }}>{holderName}</div>
+                <div>
+                  <Text type="secondary">صاحب الحساب: {ownerName || '-'}</Text>
+                </div>
+                <Text type="secondary">
+                  {row.account?.phone || row.user.phone || row.account?.email || row.user.email || '-'}
+                </Text>
+              </div>
+            </Space>
+          )
+        },
       },
       {
         title: 'الفرع',
@@ -508,7 +537,7 @@ export default function SubscriptionsList() {
               locale={{
                 emptyText: <Empty description="لا توجد اشتراكات مطابقة" />,
               }}
-              pagination={{ pageSize: 12, showSizeChanger: true }}
+              pagination={{ defaultPageSize: 12, showSizeChanger: true }}
               scroll={{ x: 1100 }}
             />
           </Card>
@@ -528,8 +557,13 @@ export default function SubscriptionsList() {
         {payModalRow && (
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
             <div>
-              <Text type="secondary">المشترك</Text>
-              <div style={{ fontWeight: 700 }}>{payModalRow.user.name || 'مستخدم'}</div>
+              <Text type="secondary">حامل الاشتراك</Text>
+              <div style={{ fontWeight: 700 }}>
+                {payModalRow.holderName || payModalRow.user.name || 'مستخدم'}
+              </div>
+              <Text type="secondary">
+                صاحب الحساب: {payModalRow.account?.name || '-'}
+              </Text>
             </div>
             <div>
               <Text type="secondary">الخطة</Text>

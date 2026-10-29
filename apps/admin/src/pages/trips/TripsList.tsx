@@ -464,7 +464,7 @@ export default function TripsList() {
               loading={loading}
               pagination={{
                 total: filteredTrips.length,
-                pageSize: 20,
+                defaultPageSize: 20,
                 showSizeChanger: true,
                 showQuickJumper: true,
                 showTotal: (total, range) => 

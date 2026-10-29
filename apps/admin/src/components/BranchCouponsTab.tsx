@@ -6,7 +6,8 @@ import dayjs from 'dayjs'
 
 type Coupon = {
   id: string
-  branchId: string
+  // null = a global coupon, valid at every branch
+  branchId: string | null
   code: string
   discountType: 'percentage' | 'fixed'
   discountValue: number
@@ -54,13 +55,14 @@ export default function BranchCouponsTab({ branchId }: BranchCouponsTabProps) {
 
   const columns = [
     { title: 'Code', dataIndex: 'code' },
+    { title: 'Scope', dataIndex: 'branchId', render: (v: string | null) => (v ? 'This branch' : 'All branches') },
     { title: 'Type', dataIndex: 'discountType' },
     { title: 'Value', dataIndex: 'discountValue' },
     { title: 'Active', dataIndex: 'isActive', render: (v: boolean) => (v ? 'Yes' : 'No') },
     { title: 'Schedule', render: (_: any, r: Coupon) => `${r.startsAt ?? '-'} → ${r.endsAt ?? '-'}` },
     { title: 'Actions', render: (_: any, r: Coupon) => (
       <span style={{ display: 'flex', gap: 8 }}>
-        <Button size="small" onClick={() => { 
+        <Button size="small" disabled={!r.branchId} title={!r.branchId ? 'Manage all-branch coupons from Content > Coupons' : undefined} onClick={() => { 
           setEditing(r); 
           form.setFieldsValue({
             ...r,
@@ -69,7 +71,7 @@ export default function BranchCouponsTab({ branchId }: BranchCouponsTabProps) {
           setOpen(true) 
         }}>Edit</Button>
         <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ code: r.code }) }}>Preview</Button>
-        <Button size="small" danger onClick={() => deleteMutation.mutate(r.id)}>Delete</Button>
+        <Button size="small" danger disabled={!r.branchId} onClick={() => deleteMutation.mutate(r.id)}>Delete</Button>
       </span>
     )},
   ]
@@ -80,7 +82,7 @@ export default function BranchCouponsTab({ branchId }: BranchCouponsTabProps) {
         <Button onClick={() => { setPreviewOpen(true); previewForm.resetFields() }}>Preview Any Code</Button>
         <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>New Coupon</Button>
       </div>
-      <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
+      <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ defaultPageSize: 10, showSizeChanger: true }} />
 
       <Modal
         title={editing ? 'Edit Coupon' : 'Create Coupon'}

@@ -588,7 +588,7 @@ export default function BookingsList() {
               }}
               pagination={{
                 total: filteredBookings.length,
-                pageSize: 20,
+                defaultPageSize: 20,
                 showSizeChanger: true,
                 showQuickJumper: true,
                 showTotal: (total, range) => 

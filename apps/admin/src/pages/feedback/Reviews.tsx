@@ -53,7 +53,7 @@ export default function Reviews() {
         <Input placeholder="Search by booking/user/comment" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 320 }} />
         <Select placeholder="Rating" value={rating} onChange={setRating} allowClear style={{ width: 160 }} options={[1,2,3,4,5].map(n => ({ label: `${n}★`, value: String(n) }))} />
       </Space>
-      <Table rowKey="id" loading={loading} dataSource={filtered} columns={columns as any} pagination={{ pageSize: 20 }} />
+      <Table rowKey="id" loading={loading} dataSource={filtered} columns={columns as any} pagination={{ defaultPageSize: 20, showSizeChanger: true }} />
     </Card>
   )
 }

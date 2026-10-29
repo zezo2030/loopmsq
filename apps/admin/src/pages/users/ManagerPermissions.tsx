@@ -260,7 +260,7 @@ export default function ManagerPermissions() {
               dataSource={filtered}
               columns={columns as any}
               loading={loading}
-              pagination={{ pageSize: 20, showSizeChanger: true }}
+              pagination={{ defaultPageSize: 20, showSizeChanger: true }}
               scroll={{ x: 800 }}
             />
           </div>

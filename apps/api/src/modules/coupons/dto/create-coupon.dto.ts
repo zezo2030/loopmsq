@@ -14,8 +14,11 @@ import {
 } from 'class-validator';
 
 export class CreateCouponDto {
+  // null/omitted = the coupon applies to every branch. Branch managers cannot
+  // create global coupons; the controller pins their own branch instead.
+  @IsOptional()
   @IsUUID()
-  branchId: string;
+  branchId?: string | null;
 
   @IsString()
   @IsNotEmpty()

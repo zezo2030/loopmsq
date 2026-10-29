@@ -77,7 +77,7 @@ export default function Tickets() {
         ]} />
         <Button onClick={load}>{t('common.refresh') || 'Refresh'}</Button>
       </Space>
-      <Table rowKey="id" loading={loading} dataSource={filtered} columns={columns as any} pagination={{ pageSize: 20 }} />
+      <Table rowKey="id" loading={loading} dataSource={filtered} columns={columns as any} pagination={{ defaultPageSize: 20, showSizeChanger: true }} />
 
       <Modal
         title={t('support.assign_update') || 'Assign / Update Status'}

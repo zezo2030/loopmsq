@@ -346,7 +346,7 @@ export default function OfferBookingsList() {
               dataSource={rows}
               columns={columns as any}
               locale={{ emptyText: <Empty description="لا توجد حجوزات عروض مطابقة" /> }}
-              pagination={{ pageSize: 12, showSizeChanger: true }}
+              pagination={{ defaultPageSize: 12, showSizeChanger: true }}
               scroll={{ x: 1000 }}
             />
           </Card>

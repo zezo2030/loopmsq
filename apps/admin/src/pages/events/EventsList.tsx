@@ -584,7 +584,7 @@ export default function EventsList() {
               loading={loading}
               pagination={{
                 total: filteredEvents.length,
-                pageSize: 20,
+                defaultPageSize: 20,
                 showSizeChanger: true,
                 showQuickJumper: true,
                 showTotal: (total, range) => 

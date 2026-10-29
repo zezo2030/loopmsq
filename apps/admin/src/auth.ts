@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { authFetch, getAccessToken, getRefreshToken } from './shared/session';
 
 export type MeResponse = {
   id: string;
@@ -9,18 +10,10 @@ export type MeResponse = {
   branchId?: string; // optional: موجود لمُدراء الفروع
 };
 
-function getApiBase(): string {
-  // Vite env or fallback used elsewhere in the app
-  const base = (import.meta as any).env?.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE;
-  return (typeof base === 'string' && base) ? base : 'http://localhost:3000/api/v1';
-}
-
-export async function fetchMe(accessToken?: string): Promise<MeResponse | null> {
-  if (!accessToken) return null;
-  const resp = await fetch(`${getApiBase()}/auth/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    credentials: 'include',
-  });
+export async function fetchMe(): Promise<MeResponse | null> {
+  // authFetch refreshes an expired access token before giving up.
+  if (!getAccessToken() && !getRefreshToken()) return null;
+  const resp = await authFetch('/auth/me', { credentials: 'include' });
   if (!resp.ok) return null;
   return resp.json();
 }
@@ -34,8 +27,7 @@ export function useAdminAuth() {
     let mounted = true;
     (async () => {
       try {
-        const token = localStorage.getItem('accessToken') || undefined;
-        const profile = await fetchMe(token);
+        const profile = await fetchMe();
         if (!mounted) return;
         if (!profile) {
           setStatus('unauthorized');

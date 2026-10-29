@@ -9,7 +9,8 @@ import { useTranslation } from 'react-i18next'
 
 type Coupon = {
   id: string
-  branchId: string
+  // null = the coupon works at every branch
+  branchId: string | null
   code: string
   discountType: 'percentage' | 'fixed'
   discountValue: number
@@ -59,7 +60,7 @@ export default function Coupons() {
   })
 
   const columns = [
-    { title: t('coupons.branch'), dataIndex: 'branchId', render: (v: string) => branches?.find(b => b.id === v)?.name_en || v },
+    { title: t('coupons.branch'), dataIndex: 'branchId', render: (v: string | null) => (v ? (branches?.find(b => b.id === v)?.name_en || v) : t('coupons.all_branches')) },
     { title: t('coupons.code'), dataIndex: 'code' },
     { title: t('coupons.type'), dataIndex: 'discountType' },
     { title: t('coupons.value'), dataIndex: 'discountValue' },
@@ -69,6 +70,7 @@ export default function Coupons() {
       <span style={{ display: 'flex', gap: 8 }}>
         <Button size="small" onClick={() => { setEditing(r); form.setFieldsValue({
           ...r,
+          allBranches: !r.branchId,
           range: [r.startsAt ? dayjs(r.startsAt) : null, r.endsAt ? dayjs(r.endsAt) : null]
         }); setOpen(true) }}>{t('coupons.edit')}</Button>
         <Button size="small" onClick={() => { setPreviewOpen(true); previewForm.setFieldsValue({ code: r.code }) }}>{t('coupons.preview')}</Button>
@@ -93,7 +95,7 @@ export default function Coupons() {
         <Button onClick={() => { setPreviewOpen(true); previewForm.resetFields() }}>{t('coupons.preview_any_code')}</Button>
         <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setOpen(true) }}>{t('coupons.new_coupon')}</Button>
       </div>
-      <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
+      <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ defaultPageSize: 10, showSizeChanger: true }} />
 
       <Modal
         title={editing ? t('coupons.edit_coupon') : t('coupons.create_coupon')}
@@ -102,7 +104,8 @@ export default function Coupons() {
         onOk={() => {
           form.validateFields().then(values => {
             const body: any = {
-              branchId: enforcedBranchId || values.branchId,
+              // null tells the API the coupon is valid at every branch.
+              branchId: enforcedBranchId || (values.allBranches ? null : values.branchId),
               code: values.code,
               discountType: values.discountType,
               discountValue: Number(values.discountValue),
@@ -118,15 +121,21 @@ export default function Coupons() {
       >
         <Form form={form} layout="vertical" initialValues={{ discountType: 'percentage', isActive: true }}>
           {!isBranchMode && (
-            <Form.Item name="branchId" label={t('coupons.branch')} rules={[{ required: true }]}> 
-              <Select
-                placeholder={t('coupons.select_branch')}
-                options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
-                onChange={() => {
-                  // Branch is set, backend will handle the rest
-                }}
-              />
-            </Form.Item>
+            <>
+              <Form.Item name="allBranches" label={t('coupons.all_branches')} valuePropName="checked" extra={t('coupons.all_branches_hint')}>
+                <Switch />
+              </Form.Item>
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.allBranches !== cur.allBranches}>
+                {({ getFieldValue }) => getFieldValue('allBranches') ? null : (
+                  <Form.Item name="branchId" label={t('coupons.branch')} rules={[{ required: true }]}>
+                    <Select
+                      placeholder={t('coupons.select_branch')}
+                      options={(branches || []).map(b => ({ value: b.id, label: b.name_en }))}
+                    />
+                  </Form.Item>
+                )}
+              </Form.Item>
+            </>
           )}
           <Form.Item name="code" label={t('coupons.code')} rules={[{ required: true }]}>
             <Input />

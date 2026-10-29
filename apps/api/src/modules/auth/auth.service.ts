@@ -786,15 +786,24 @@ export class AuthService {
       roles: user.roles,
     };
 
+    // Sessions are meant to stay signed in: the access token is long-lived and
+    // the refresh token effectively never expires, so clients only land back on
+    // the login screen when the account itself is disabled.
+    const accessTokenTtl =
+      this.configService.get<string>('JWT_EXPIRES_IN') || '30d';
+    const refreshTokenTtl =
+      this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '3650d';
+
     const accessToken = await this.jwtService.signAsync(payload, {
-      expiresIn: '4h',
+      // `expiresIn` is typed as a literal duration union; the value is env-driven.
+      expiresIn: accessTokenTtl as any,
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {
       secret:
         this.configService.get<string>('JWT_REFRESH_SECRET') ||
         'default-refresh-secret',
-      expiresIn: '7d',
+      expiresIn: refreshTokenTtl as any,
     });
 
     return {

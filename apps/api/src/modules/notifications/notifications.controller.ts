@@ -46,6 +46,7 @@ export class NotificationsController {
   @HttpCode(HttpStatus.OK)
   async sendPromo(@Body() body: PromoDto) {
     // إرسال فقط عبر Firebase Push لجميع الأجهزة
+    const devices = await this.notifications.countDeviceTokens();
     await this.notifications.enqueue({
       type: 'PROMO',
       to: {}, // فارغ = إرسال لجميع الأجهزة
@@ -53,7 +54,7 @@ export class NotificationsController {
       lang: body.lang,
       channels: ['push'], // فقط Firebase Push
     });
-    return { success: true };
+    return { success: true, devices };
   }
 
   @Get()

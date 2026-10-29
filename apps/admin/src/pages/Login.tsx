@@ -6,11 +6,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { clearSession, getApiBase, saveSession } from '@/shared/session'
 
-function getApiBase(): string {
-  const base = (import.meta as any).env?.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE
-  return typeof base === 'string' && base ? base : 'http://localhost:3000/api/v1'
-}
+
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
@@ -47,7 +45,8 @@ export default function Login() {
       })
       if (!resp.ok) throw new Error(t('auth.invalid', { defaultValue: 'Invalid credentials' }))
       const data = await resp.json()
-      localStorage.setItem('accessToken', data.accessToken)
+      // Keep the refresh token too — without it the session dies after 4h.
+      saveSession({ accessToken: data.accessToken, refreshToken: data.refreshToken })
       message.success(t('login.success', { defaultValue: 'Logged in successfully' }))
 
       const meResp = await fetch(`${getApiBase()}/auth/me`, {
@@ -58,6 +57,7 @@ export default function Login() {
 
       const wanted = roleChoice === 'admin' ? 'admin' : 'branch_manager'
       if (!roles.includes(wanted)) {
+        clearSession()
         message.error(
           t('auth.not_authorized', {
             defaultValue: 'Selected role is not authorized for this account',

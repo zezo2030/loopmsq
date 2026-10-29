@@ -108,7 +108,7 @@ export default function BranchOffersTab({ branchId }: BranchOffersTabProps) {
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); form.setFieldsValue({ discountType: 'percentage', isActive: true, buyCount: 1, freeCount: 1 }); setOpen(true) }}>{t('offers.new_offer')}</Button>
       </div>
-      <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
+      <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ defaultPageSize: 10, showSizeChanger: true }} />
 
       <Modal
         title={editing ? t('offers.edit_offer') : t('offers.create_offer')}

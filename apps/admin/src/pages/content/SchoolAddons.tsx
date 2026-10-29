@@ -172,7 +172,7 @@ export default function SchoolAddons() {
           loading={isLoading}
           dataSource={data || []}
           columns={columns as any}
-          pagination={{ pageSize: 10 }}
+          pagination={{ defaultPageSize: 10, showSizeChanger: true }}
         />
       </Card>
 

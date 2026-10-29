@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card, Row, Col, Statistic, DatePicker, Select, Space, Button, message } from 'antd'
-import { apiGet, getApiBase } from '../../api'
+import { apiGet } from '../../api'
+import { authFetch } from '../../shared/session'
 import { useTranslation } from 'react-i18next'
 
 type Overview = {
@@ -87,10 +88,7 @@ export default function ReportsOverview() {
           if (from) params.set('from', from)
           if (to) params.set('to', to)
           if (branchId) params.set('branchId', branchId)
-          const token = localStorage.getItem('accessToken')
-          const resp = await fetch(`${getApiBase()}/reports/export?${params.toString()}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
+          const resp = await authFetch(`/reports/export?${params.toString()}`)
           if (!resp.ok) throw new Error(await resp.text() || 'Export failed')
           const blob = await resp.blob()
           const url = window.URL.createObjectURL(blob)

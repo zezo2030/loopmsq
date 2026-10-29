@@ -150,7 +150,7 @@ export default function IntroVideo() {
           {t('intro_video.new')}
         </Button>
       </div>
-      <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ pageSize: 10 }} />
+      <Table rowKey="id" loading={isLoading} dataSource={data || []} columns={columns as any} pagination={{ defaultPageSize: 10, showSizeChanger: true }} />
 
       <Modal
         title={editing ? t('intro_video.edit') : t('intro_video.new')}

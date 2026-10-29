@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Descriptions, Empty, QRCode, Space, Table, Tag, Typography, message } from 'antd'
-import { ArrowLeftOutlined } from '@ant-design/icons'
+import { Avatar, Button, Card, Descriptions, Empty, Image, QRCode, Space, Table, Tag, Typography, message } from 'antd'
+import { ArrowLeftOutlined, UserOutlined } from '@ant-design/icons'
 import { apiGet } from '../../api'
+import { resolveFileUrl } from '../../shared/url'
 
 const { Title, Text } = Typography
 
@@ -10,6 +11,8 @@ type Detail = {
   id: string
   status: string
   paymentStatus: string
+  holderName?: string | null
+  holderImageUrl?: string | null
   qrData?: string | null
   totalHours: number | null
   remainingHours: number | null
@@ -18,7 +21,8 @@ type Detail = {
   endsAt: string
   createdAt: string
   updatedAt: string
-  user: { name: string; phone: string; email: string }
+  user: { name: string; phone: string; email: string; imageUrl?: string | null }
+  account?: { id: string; name: string; phone: string; email: string }
   branch: { name: string }
   plan: { title: string; usageMode: string; durationMonths: number | null; price: number; currency: string; description?: string | null }
   usageLogs: Array<{ id: string; staffName: string; deductedHours: number; remainingHoursAfter: number; createdAt: string; notes?: string }>
@@ -70,11 +74,34 @@ export default function SubscriptionDetail() {
           <Card loading={loading}>
             {data && (
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                <Space align="center" size="middle">
+                  {data.holderImageUrl || data.user.imageUrl ? (
+                    <Image
+                      src={resolveFileUrl((data.holderImageUrl || data.user.imageUrl) as string)}
+                      alt={data.holderName || data.user.name}
+                      width={110}
+                      height={110}
+                      style={{ objectFit: 'cover', borderRadius: 12 }}
+                    />
+                  ) : (
+                    <Avatar shape="square" size={110} icon={<UserOutlined />} />
+                  )}
+                  <Space direction="vertical" size={2}>
+                    <Text type="secondary">حامل الاشتراك</Text>
+                    <Title level={4} style={{ margin: 0 }}>
+                      {data.holderName || data.user.name || '-'}
+                    </Title>
+                    <Text type="secondary">صاحب الحساب: {data.account?.name || '-'}</Text>
+                    <Text type="secondary">{data.account?.phone || data.user.phone || '-'}</Text>
+                  </Space>
+                </Space>
+
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="المعرف">{data.id}</Descriptions.Item>
-                  <Descriptions.Item label="العميل">{data.user.name}</Descriptions.Item>
-                  <Descriptions.Item label="الهاتف">{data.user.phone || '-'}</Descriptions.Item>
-                  <Descriptions.Item label="البريد">{data.user.email || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="حامل الاشتراك">{data.holderName || data.user.name || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="صاحب الحساب">{data.account?.name || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="الهاتف">{data.account?.phone || data.user.phone || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="البريد">{data.account?.email || data.user.email || '-'}</Descriptions.Item>
                   <Descriptions.Item label="الفرع">{data.branch.name}</Descriptions.Item>
                   <Descriptions.Item label="الخطة">{data.plan.title}</Descriptions.Item>
                   <Descriptions.Item label="السعر">{formatCurrency(data.plan.price, data.plan.currency)}</Descriptions.Item>
@@ -110,7 +137,7 @@ export default function SubscriptionDetail() {
                 <Card title="سجل الاستخدام">
                   <Table
                     rowKey="id"
-                    pagination={{ pageSize: 10 }}
+                    pagination={{ defaultPageSize: 10, showSizeChanger: true }}
                     dataSource={data.usageLogs || []}
                     columns={[
                       { title: 'الموظف', dataIndex: 'staffName' },

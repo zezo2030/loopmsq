@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Space, Table, Tag, Input, Select, Avatar, Tooltip, message, Popconfirm } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { authFetch } from '../../shared/session'
 import { 
   UserOutlined, 
   SearchOutlined, 
@@ -23,10 +24,6 @@ type UserRow = {
   createdAt?: string
 }
 
-function getApiBase(): string {
-  const base = (import.meta as any).env?.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE
-  return (typeof base === 'string' && base) ? base : 'http://localhost:3000/api/v1'
-}
 
 export default function UsersList() {
   const { t } = useTranslation()
@@ -55,15 +52,13 @@ export default function UsersList() {
     ;(async () => {
       setLoading(true)
       try {
-        const token = localStorage.getItem('accessToken')
         const params = new URLSearchParams({
           page: String(page),
           limit: String(pageSize),
         })
         if (roleFilter) params.set('role', roleFilter)
         if (searchQuery) params.set('q', searchQuery)
-        const resp = await fetch(`${getApiBase()}/users?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const resp = await authFetch(`/users?${params.toString()}`, {
         })
         if (!resp.ok) throw new Error(t('users.load_failed') || 'Failed to load users')
         const data = await resp.json()
@@ -206,10 +201,8 @@ export default function UsersList() {
               cancelText={t('common.cancel') || 'Cancel'}
               onConfirm={async () => {
                 try {
-                  const token = localStorage.getItem('accessToken')
-                  const resp = await fetch(`${getApiBase()}/users/${record.id}/deactivate`, {
+                  const resp = await authFetch(`/users/${record.id}/deactivate`, {
                     method: 'PATCH',
-                    headers: { Authorization: `Bearer ${token}` },
                   })
                   if (!resp.ok) throw new Error(await resp.text() || (t('users.failed') || 'Failed'))
                   message.success(t('users.deactivated') || 'User deactivated')
@@ -227,10 +220,8 @@ export default function UsersList() {
               size="small"
               onClick={async () => {
                 try {
-                  const token = localStorage.getItem('accessToken')
-                  const resp = await fetch(`${getApiBase()}/users/${record.id}/activate`, {
+                  const resp = await authFetch(`/users/${record.id}/activate`, {
                     method: 'PATCH',
-                    headers: { Authorization: `Bearer ${token}` },
                   })
                   if (!resp.ok) throw new Error(await resp.text() || (t('users.failed') || 'Failed'))
                   message.success(t('users.activated') || 'User activated')
@@ -254,10 +245,8 @@ export default function UsersList() {
             cancelText={t('common.cancel') || 'Cancel'}
             onConfirm={async () => {
               try {
-                const token = localStorage.getItem('accessToken')
-                const resp = await fetch(`${getApiBase()}/users/${record.id}/delete`, {
+                const resp = await authFetch(`/users/${record.id}/delete`, {
                   method: 'PATCH',
-                  headers: { Authorization: `Bearer ${token}` },
                 })
                 if (!resp.ok) {
                   let msg = t('users.delete_failed') || 'Failed to delete user'

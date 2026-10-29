@@ -1,39 +1,28 @@
-export function getApiBase(): string {
-  const base = (import.meta as any).env?.VITE_API_BASE || (window as any).NEXT_PUBLIC_API_BASE
-  return (typeof base === 'string' && base) ? base : 'http://localhost:3000/api/v1'
-}
+import { authFetch, getApiBase } from './session'
+
+export { getApiBase }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const token = localStorage.getItem('accessToken')
-  const resp = await fetch(`${getApiBase()}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const resp = await authFetch(path)
   if (!resp.ok) throw new Error(await parseErrorResponse(resp) || 'Request failed')
   return resp.json()
 }
 
 export async function apiPost<T>(path: string, body: any): Promise<T> {
-  const token = localStorage.getItem('accessToken')
-  const resp = await fetch(`${getApiBase()}${path}`, {
+  const isFormData = body instanceof FormData
+  const resp = await authFetch(path, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
+    headers: isFormData ? {} : { 'Content-Type': 'application/json' },
+    body: isFormData ? body : JSON.stringify(body),
   })
   if (!resp.ok) throw new Error(await parseErrorResponse(resp) || 'Request failed')
   return resp.json()
 }
 
 export async function apiPut<T>(path: string, body: any): Promise<T> {
-  const token = localStorage.getItem('accessToken')
-  const resp = await fetch(`${getApiBase()}${path}`, {
+  const resp = await authFetch(path, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
   if (!resp.ok) throw new Error(await parseErrorResponse(resp) || 'Request failed')
@@ -41,13 +30,9 @@ export async function apiPut<T>(path: string, body: any): Promise<T> {
 }
 
 export async function apiPatch<T>(path: string, body: any): Promise<T> {
-  const token = localStorage.getItem('accessToken')
-  const resp = await fetch(`${getApiBase()}${path}`, {
+  const resp = await authFetch(path, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
   if (!resp.ok) throw new Error(await parseErrorResponse(resp) || 'Request failed')
@@ -55,13 +40,7 @@ export async function apiPatch<T>(path: string, body: any): Promise<T> {
 }
 
 export async function apiDelete<T>(path: string): Promise<T> {
-  const token = localStorage.getItem('accessToken')
-  const resp = await fetch(`${getApiBase()}${path}`, {
-    method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
+  const resp = await authFetch(path, { method: 'DELETE' })
   if (!resp.ok) throw new Error(await parseErrorResponse(resp) || 'Request failed')
   try { return await resp.json() } catch { return undefined as unknown as T }
 }

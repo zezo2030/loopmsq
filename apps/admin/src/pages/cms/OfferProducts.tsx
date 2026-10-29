@@ -282,7 +282,7 @@ export default function OfferProducts() {
           {t('offerProducts.new_offer')}
         </Button>
       </div>
-      <Table rowKey="id" loading={isLoading} dataSource={data?.offers || []} columns={columns as any} pagination={{ pageSize: 10 }} />
+      <Table rowKey="id" loading={isLoading} dataSource={data?.offers || []} columns={columns as any} pagination={{ defaultPageSize: 10, showSizeChanger: true }} />
 
       <Modal
         title={editing ? t('offerProducts.edit_offer') : t('offerProducts.create_offer')}

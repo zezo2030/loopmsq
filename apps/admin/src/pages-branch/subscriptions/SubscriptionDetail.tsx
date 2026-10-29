@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Descriptions, Empty, QRCode, Space, Table, Tag, Typography, message } from 'antd'
-import { ArrowLeftOutlined } from '@ant-design/icons'
+import { Avatar, Button, Card, Descriptions, Empty, Image, QRCode, Space, Table, Tag, Typography, message } from 'antd'
+import { ArrowLeftOutlined, UserOutlined } from '@ant-design/icons'
 import { apiGet } from '../../shared/api'
+import { resolveFileUrl } from '../../shared/url'
 
 const { Title, Text } = Typography
 
@@ -40,10 +41,33 @@ export default function SubscriptionDetail() {
           <Card loading={loading}>
             {data && (
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                <Space align="center" size="middle">
+                  {data.holderImageUrl || data.user?.imageUrl ? (
+                    <Image
+                      src={resolveFileUrl(data.holderImageUrl || data.user?.imageUrl)}
+                      alt={data.holderName || data.user?.name || 'حامل الاشتراك'}
+                      width={110}
+                      height={110}
+                      style={{ objectFit: 'cover', borderRadius: 12 }}
+                    />
+                  ) : (
+                    <Avatar shape="square" size={110} icon={<UserOutlined />} />
+                  )}
+                  <Space direction="vertical" size={2}>
+                    <Text type="secondary">حامل الاشتراك</Text>
+                    <Title level={4} style={{ margin: 0 }}>
+                      {data.holderName || data.user?.name || '-'}
+                    </Title>
+                    <Text type="secondary">صاحب الحساب: {data.account?.name || '-'}</Text>
+                    <Text type="secondary">{data.account?.phone || data.user?.phone || '-'}</Text>
+                  </Space>
+                </Space>
+
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="المعرف">{data.id}</Descriptions.Item>
-                  <Descriptions.Item label="العميل">{data.user?.name}</Descriptions.Item>
-                  <Descriptions.Item label="الهاتف">{data.user?.phone || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="حامل الاشتراك">{data.holderName || data.user?.name || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="صاحب الحساب">{data.account?.name || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="الهاتف">{data.account?.phone || data.user?.phone || '-'}</Descriptions.Item>
                   <Descriptions.Item label="الخطة">{data.plan?.title}</Descriptions.Item>
                   <Descriptions.Item label="السعر">{formatCurrency(Number(data.plan?.price || 0), data.plan?.currency || 'SAR')}</Descriptions.Item>
                   <Descriptions.Item label="إجمالي الساعات">{data.totalHours ?? 'غير محدود'}</Descriptions.Item>
@@ -70,7 +94,7 @@ export default function SubscriptionDetail() {
                   <Table
                     rowKey="id"
                     dataSource={data.usageLogs || []}
-                    pagination={{ pageSize: 10 }}
+                    pagination={{ defaultPageSize: 10, showSizeChanger: true }}
                     columns={[
                       { title: 'الموظف', dataIndex: 'staffName' },
                       { title: 'الساعات المخصومة', dataIndex: 'deductedHours' },
