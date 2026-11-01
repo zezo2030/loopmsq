@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, Descriptions, Empty, Space, Table, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
+import TicketQrButton from '../../components/TicketQrButton'
 import { apiGet } from '../../api'
 
 const { Title, Text } = Typography
@@ -18,7 +19,7 @@ type Detail = {
   createdAt: string
   updatedAt: string
   ticketsCount: number
-  tickets: Array<{ id: string; ticketKind: string; status: string; createdAt: string; scannedAt?: string; startedAt?: string; expiresAt?: string }>
+  tickets: Array<{ id: string; ticketKind: string; status: string; createdAt: string; scannedAt?: string; startedAt?: string; expiresAt?: string; qrImage?: string | null }>
   user: { name: string; phone: string; email: string }
   branch: { name: string }
   offer: { title: string; category: string; price: number; currency: string; description?: string | null }
@@ -97,6 +98,13 @@ export default function OfferBookingDetail() {
                     dataSource={data.tickets || []}
                     columns={[
                       { title: 'المعرف', dataIndex: 'id' },
+                      {
+                        title: 'QR',
+                        key: 'qr',
+                        render: (_: unknown, t: Detail['tickets'][number]) => (
+                          <TicketQrButton qrImage={t.qrImage} ticketId={t.id} status={t.status} label="تذكرة" />
+                        ),
+                      },
                       { title: 'النوع', dataIndex: 'ticketKind' },
                       { title: 'الحالة', dataIndex: 'status', render: (value: string) => <Tag>{value}</Tag> },
                       { title: 'الإنشاء', dataIndex: 'createdAt', render: (value: string) => formatDate(value) },

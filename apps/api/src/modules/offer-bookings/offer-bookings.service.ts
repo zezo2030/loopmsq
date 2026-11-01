@@ -1210,15 +1210,35 @@ export class OfferBookingsService {
 
     await this.expireTimedTicketsPastDeadline(booking.tickets || []);
 
-    const tickets = (booking.tickets || []).map((ticket) => ({
-      id: ticket.id,
-      ticketKind: ticket.ticketKind,
-      status: ticket.status,
-      scannedAt: ticket.scannedAt,
-      startedAt: ticket.startedAt,
-      expiresAt: ticket.expiresAt,
-      createdAt: ticket.createdAt,
-    }));
+    // Staff can show or scan a ticket's QR from the dashboard (e.g. when the
+    // customer can't open the app); rendered here so the console needs no QR lib.
+    const orderedTickets = [...(booking.tickets || [])].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    const tickets = await Promise.all(
+      orderedTickets.map(async (ticket) => {
+        const qrData: string | null = ticket.metadata?.qrData ?? null;
+        let qrImage: string | null = null;
+        if (qrData) {
+          try {
+            qrImage = await this.qrCodeService.generateQRCode(qrData);
+          } catch {
+            qrImage = null;
+          }
+        }
+        return {
+          id: ticket.id,
+          ticketKind: ticket.ticketKind,
+          status: ticket.status,
+          scannedAt: ticket.scannedAt,
+          startedAt: ticket.startedAt,
+          expiresAt: ticket.expiresAt,
+          createdAt: ticket.createdAt,
+          qrData,
+          qrImage,
+        };
+      }),
+    );
 
     return {
       id: booking.id,
